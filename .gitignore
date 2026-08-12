@@ -1,0 +1,54 @@
+# ── Data (never committed — see PROJECT_PLAN.md Part 10) ────────────────
+data/
+!data/manifests/
+data/manifests/*
+!data/manifests/subset_*.txt
+*.npy
+*.parquet
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.wav
+
+# ── Model artifacts ─────────────────────────────────────────────────────
+checkpoints/
+*.pt
+*.pth
+*.onnx
+
+# ── Experiment tracking / logs ──────────────────────────────────────────
+logs/
+mlruns/
+experiments/*/*/predictions.parquet
+experiments/*/*/plots/
+
+# ── Python ──────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.ipynb_checkpoints/
+
+# ── Node / frontend ─────────────────────────────────────────────────────
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# ── Source material (not ours to redistribute) ──────────────────────────
+docs/*
+!docs/README.md
+
+# ── Environment / OS ────────────────────────────────────────────────────
+.env
+.env.local
+Thumbs.db
+desktop.ini
+*.tmp
