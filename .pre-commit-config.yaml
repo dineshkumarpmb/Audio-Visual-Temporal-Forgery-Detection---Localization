@@ -1,0 +1,40 @@
+# Hooks are deliberately cheap. Anything slow (pytest, mypy over the whole tree)
+# belongs in CI, not in the commit path — a slow hook is a hook people bypass.
+default_language_version:
+  python: python3.10
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: debug-statements
+      # PROJECT_PLAN.md Part 10: data/, checkpoints/ and features never enter git.
+      # 5 MB is above any config or fixture but far below a feature file.
+      - id: check-added-large-files
+        args: ["--maxkb=5120"]
+      - id: no-commit-to-branch
+        args: ["--branch", "master", "--branch", "main"]
+        stages: [manual]   # opt-in; solo work happens on master for now
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.4
+    hooks:
+      - id: ruff
+        args: ["--fix"]
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      # Notebook outputs bloat diffs, leak absolute paths, and can embed dataset
+      # samples we are not licensed to redistribute (LAV-DF is CC BY-NC 4.0).
+      - id: strip-notebook-outputs
+        name: strip notebook outputs
+        entry: python scripts/strip_notebook_outputs.py
+        language: system
+        files: \.ipynb$

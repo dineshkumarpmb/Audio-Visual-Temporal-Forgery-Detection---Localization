@@ -70,6 +70,77 @@ training runs (~2–3 h total).
 
 ---
 
+## Phase 0 decisions — resolved 2026-08-12
+
+### PF-4 · Numeric precision: fp32 locally, AMP fp16 on cloud
+
+**Decided by measurement, and it overturns the plan.** `PROJECT_PLAN.md` §12.3 specifies
+*"Precision: AMP fp16"* for the minimum (local) configuration. Benchmarking says otherwise.
+
+Measured on the GTX 1650, 2048³ GEMM, reproducible across 6 trials in two independent scripts:
+
+| Precision | Throughput | vs fp32 |
+|---|---|---|
+| fp32 | **2.38–2.56 TFLOP/s** | 1.00× |
+| bf16 | 1.52 TFLOP/s | 0.60× |
+| fp16 | **0.31–0.32 TFLOP/s** | **0.13×** |
+
+A 3×3 convolution at 112² — much closer to real Stage-A work than a raw GEMM — shows the same
+direction: **1601 img/s fp32 vs 303 img/s fp16 (0.19×)**.
+
+**Cause:** the GTX 1650 is TU117, the one Turing die shipped **without tensor cores**. There is no
+fast fp16 GEMM path, so cuBLAS falls back to a slow kernel. AMP's usual "free 2× speedup" simply
+does not exist on this card; fp16 here buys memory and costs 5–8× compute.
+
+**Decision:**
+
+| Tier | Precision | Reasoning |
+|---|---|---|
+| Local (GTX 1650) | **fp32** | The memory saving is obtainable more cheaply by lowering batch size; the compute cost is not recoverable |
+| Cloud (Kaggle P100 / T4) | **AMP fp16** | T4 has tensor cores, P100 has a fast fp16 path. **Re-run `make check-bench` there to confirm rather than assume** |
+
+**Consequences:**
+1. Precision becomes a **config field**, never a constant — the same code must be correct in both
+   tiers (task X-2, decision PF-1).
+2. Cached features stay `float16` **on disk** (Plan §D). That is storage, not compute, and is
+   unaffected. Cast to fp32 on load.
+3. §12.3's "Minimum" configuration block is superseded on this one line. Recorded here rather than
+   by editing the plan.
+4. Any future latency claim (Part 8 §8.1, Table 8.2.3) must state which precision it was measured
+   under.
+
+> This is the plan's own methodology working as intended: §0.3 forbids inheriting an unverified
+> number, and the first thing Phase 0 measured contradicted a design assumption. Worth reporting in
+> `reports/final_report.md` — it is a concrete example of measurement beating convention.
+
+### PF-5 · Full JupyterLab excluded from dev dependencies
+
+**Forced by a real failure, not preference.** `pip install -e ".[dev]"` aborted with
+`OSError: [Errno 2] No such file or directory` on a JupyterLab webpack asset whose path exceeded
+Windows' 260-character `MAX_PATH`. The project directory name
+(`Audio-Visual Temporal Forgery Detection & Localization`, 54 chars) plus
+`.venv/share/jupyter/labextensions/@jupyter-widgets/...` plus ~120-char bundle filenames overflows
+the limit, and pip aborts the **entire transaction** — so ~20 unrelated packages failed to install
+as collateral.
+
+**Decision:** dev deps carry `ipykernel` + `nbformat` only. That is sufficient to run
+`notebooks/*.ipynb` from VS Code or an external Jupyter. Anyone wanting the standalone Lab UI
+installs it in a separate venv outside this path.
+
+**⚠️ Open item — this will recur in Phase 14.** `node_modules` for React + Vite nests far deeper
+than JupyterLab does. Enabling Windows long-path support is recommended **before** Phase 14, and
+requires an elevated shell:
+
+```powershell
+# Run as Administrator, then reboot
+New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" `
+  -Name LongPathsEnabled -Value 1 -PropertyType DWORD -Force
+```
+
+Currently `LongPathsEnabled = 0`. Tracked as task **P14-0**.
+
+---
+
 ## Appendix B — architectural decisions
 
 | ID | Decision | Options | Resolved by | Date | Outcome |
@@ -77,6 +148,8 @@ training runs (~2–3 h total).
 | **PF-1** | Hardware strategy | Local-only / Local+Kaggle / defer | User, PRE-2 | 2026-08-12 | ✅ **Local + Kaggle free tier** |
 | **PF-2** | GAN tier | Tier 1 / Tier 1 minus GAN / Tier 2 | User, PRE-3 | 2026-08-12 | ✅ **Tier 1, three-arm F0/F1/F2** |
 | **PF-3** | D-1 & C-1 method | By experiment / by prior | User, PRE-3 | 2026-08-12 | ✅ **By experiment (J and K)** |
+| **PF-4** | Numeric precision | AMP fp16 / fp32 | Measurement, Phase 0 | 2026-08-12 | ✅ **fp32 local, AMP fp16 cloud** — overturns §12.3 |
+| **PF-5** | Jupyter in dev deps | full `jupyter` / `ipykernel` only | Phase 0 install failure | 2026-08-12 | ✅ **`ipykernel` + `nbformat` only** (MAX_PATH) |
 | **D-1** | Visual backbone | ResNet-18 / MobileNetV2 | Experiment J, Phase 4 | ⬜ | ⬜ Prior: ResNet-18 @112² |
 | **C-1** | Audio features | MFCC / log-Mel | Experiment K, Phase 5 | ⬜ | ⬜ Prior: log-Mel |
 | **B-1** | Face detector | MediaPipe / MTCNN / RetinaFace | Phase 2 | ⬜ | ⬜ Recommended: MediaPipe (CPU-only, keeps VRAM free, gives landmarks + mouth ROI in one pass) |

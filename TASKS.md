@@ -30,23 +30,50 @@ Part 6 assumes **float seconds**. If they are frame indices, every localization 
 
 ---
 
-## PHASE 0 — Environment & Hardware Validation
+## PHASE 0 — Environment & Hardware Validation — ✅ **COMPLETE (2026-08-12)**
 
-| ID | Task |
+Gate result: **33/33 checks passed, exit 0.** `make check` is now a reusable CI gate.
+
+| ID | Task | Status |
+|---|---|---|
+| P0-1 | Install Python 3.10 from python.org (NOT the Store alias) | ✅ 3.10.11 via `winget Python.Python.3.10` (uses the python.org installer). Note 3.14 was already present — too new for mediapipe and outside LAV-DF's `<3.11` pin |
+| P0-2 | Install ffmpeg, verify `ffmpeg -version` | ✅ ffmpeg + ffprobe 9.0 via `winget Gyan.FFmpeg` |
+| P0-3 | venv on **D:**; `PIP_CACHE_DIR` to D: | ✅ `.venv` in-project on D:; `PIP_CACHE_DIR=D:\pip-cache` set as a user env var |
+| P0-4 | PyTorch CUDA 11.8; verify `torch.cuda.is_available()` | ✅ torch **2.7.1+cu118** (the last cu118 release). Driver 526.47 supports CUDA 11.8 (≥522.06) but **not** 12.x (≥527.41) — so cu118 is forced, not just preferred. Verified with a real kernel launch, not just the flag |
+| P0-5 | Install remaining deps | ✅ All 23 imports pass. mediapipe 1.0.0 works with numpy 2.2.6, so the planned `numpy<2` pin was dropped |
+| P0-6 | Move pagefile to D: | ✅ **Already on D:** (18 GB) — no change needed |
+| P0-7 | `pyproject.toml` + pinned `requirements.txt` | ✅ torch deliberately excluded from `dependencies` so `pip install -e .` cannot swap the CUDA build for a CPU one; `requirements.txt` carries the cu118 `--extra-index-url` |
+| P0-8 | `Makefile` + `.gitignore` | ✅ make 4.4.1 installed via winget. All targets `.PHONY` — make is a command runner only, never dependency resolution, because the project path contains spaces and `&` |
+| P0-9 | `.pre-commit-config.yaml` | ✅ Installed to `.git/hooks/pre-commit`. Includes a 5 MB large-file guard and notebook-output stripping |
+| P0-10 | `scripts/00_check_env.py` | ✅ 33 checks; writes `reports/hardware_report.md` + `hardware_facts.json`; exits non-zero on failure |
+| P0-11 | Benchmark honestly | ✅ GEMM per precision, VRAM ceiling, decode throughput — see finding below |
+| P0-12 | `reports/hardware_report.md` | ✅ Generated from measurements only |
+| P0-13 | ⛔ **Gate** | ✅ **PASSED** |
+
+**Measured (`make check-bench`):**
+
+| Metric | Value |
 |---|---|
-| P0-1 | Install Python 3.10 from python.org (NOT the Microsoft Store alias) |
-| P0-2 | Install ffmpeg, add to PATH, verify `ffmpeg -version` |
-| P0-3 | Create the venv on **D:** (C: has only 27 GB free); set `PIP_CACHE_DIR` to D: |
-| P0-4 | Install PyTorch with CUDA 11.8 wheels; verify `torch.cuda.is_available() == True` on the GTX 1650 |
-| P0-5 | Install remaining deps: torchvision, torchaudio, librosa, opencv-python, mediapipe, pandas, pyarrow, scikit-learn, matplotlib, mlflow, fastapi, uvicorn, pytest, ruff, pydantic, tqdm, av |
-| P0-6 | Move the Windows pagefile to D: (prevents C: thrash under the 6 GB RAM constraint) |
-| P0-7 | Write `pyproject.toml` (deps + ruff/mypy/pytest config) and pinned `requirements.txt` |
-| P0-8 | Write `Makefile` (setup / features / train / test / api / demo) and `.gitignore` (data/, checkpoints/, logs/, *.npy) |
-| P0-9 | Add `.pre-commit-config.yaml` |
-| P0-10 | Write `scripts/00_check_env.py` — assert every dependency, print the hardware table, exit non-zero on failure |
-| P0-11 | Benchmark honestly: matmul throughput, peak allocatable VRAM before OOM, single-video decode speed, free RAM under load |
-| P0-12 | Write `reports/hardware_report.md` with measured numbers |
-| P0-13 | ⛔ **Gate:** CUDA works, ffmpeg works, hardware report written, `00_check_env.py` exits 0 |
+| fp32 GEMM | 2.38–2.56 TFLOP/s |
+| bf16 GEMM | 1.52 TFLOP/s |
+| fp16 GEMM | **0.31 TFLOP/s (0.13×)** |
+| Peak allocatable VRAM | **3456 MB of 4096** (84%) |
+| Decode, synthetic 640×480 | 894–1509 fps (36–60× realtime) |
+| RAM free during run | **0.16–0.29 GB** ⚠️ |
+
+**⛔ Finding — AMP fp16 must be OFF locally (decision PF-4).** fp16 is **5–8× slower** than fp32 on
+this GPU, reproducibly (conv3×3 @112²: 1601 img/s fp32 vs 303 fp16). The GTX 1650 is TU117, the one
+Turing die with **no tensor cores**. This contradicts `PROJECT_PLAN.md` §12.3's *"Precision: AMP
+fp16"*. → **fp32 locally, AMP fp16 on Kaggle** (re-benchmark there to confirm). Precision becomes a
+config field, not a constant. Disk-cached features stay fp16 — that's storage, not compute.
+
+**⚠️ Open — RAM.** Only 0.16–0.29 GB free with the machine at rest. §12.2's "close Chrome before
+training" is not a joke on this box; it is the operating procedure.
+
+**⚠️ Open — Windows MAX_PATH (P14-0).** Installing full JupyterLab aborted the whole pip
+transaction on a >260-char path (decision PF-5). Dev deps now carry `ipykernel` + `nbformat` only.
+**This will recur with `node_modules` in Phase 14** — enable long paths first, elevated:
+`New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -Name LongPathsEnabled -Value 1 -PropertyType DWORD -Force`
 
 ---
 
@@ -283,6 +310,7 @@ Part 6 assumes **float seconds**. If they are frame indices, every localization 
 
 | ID | Task |
 |---|---|
+| P14-0 | ⛔ **Enable Windows long-path support before `npm install`** (elevated + reboot). `node_modules` nests deeper than JupyterLab, which already broke a pip transaction in Phase 0 — see decision PF-5 |
 | P14-1 | Scaffold React + Vite + TailwindCSS (`frontend/`) |
 | P14-2 | Drag-drop upload component with progress |
 | P14-3 | Job polling (1 s interval) with graceful error states |

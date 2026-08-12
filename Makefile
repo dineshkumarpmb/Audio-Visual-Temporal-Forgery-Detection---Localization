@@ -1,0 +1,122 @@
+# Audio-Visual Temporal Forgery Detection & Localization
+#
+# All targets are .PHONY on purpose. This project lives at a path containing
+# spaces and an "&", which GNU make cannot express as a file target — so make is
+# used purely as a command runner, never for dependency resolution. Keep every
+# path in a recipe relative and quoted.
+
+PY  := .venv/Scripts/python.exe
+PIP := $(PY) -m pip
+
+TORCH_INDEX := https://download.pytorch.org/whl/cu118
+TORCH_PINS  := torch==2.7.1+cu118 torchvision==0.22.1+cu118 torchaudio==2.7.1+cu118
+
+.DEFAULT_GOAL := help
+.PHONY: help venv torch install install-dev check check-bench lint fmt typecheck test test-cov \
+        manifest subset features train evaluate ablations benchmark api frontend demo clean-bench
+
+help:  ## Show this help
+	@echo Audio-Visual Temporal Forgery Detection ^& Localization
+	@echo.
+	@echo   Setup
+	@echo     venv          Create the Python 3.10 virtualenv
+	@echo     torch         Install PyTorch from the CUDA 11.8 index (NOT PyPI)
+	@echo     install       Install project dependencies
+	@echo     install-dev   Install project + dev dependencies + pre-commit hooks
+	@echo.
+	@echo   Gates
+	@echo     check         Phase 0 environment gate
+	@echo     check-bench   Phase 0 gate + benchmarks, writes reports/hardware_report.md
+	@echo.
+	@echo   Quality
+	@echo     lint fmt typecheck test test-cov
+	@echo.
+	@echo   Pipeline
+	@echo     manifest subset features train evaluate ablations benchmark
+	@echo.
+	@echo   Serving
+	@echo     api           uvicorn on :8000
+	@echo     frontend      Vite dev server on :5173
+	@echo     demo          Both together
+
+# ── Setup ────────────────────────────────────────────────────────────────────
+
+venv:  ## Create the venv using Python 3.10
+	py -3.10 -m venv .venv
+	$(PIP) install --upgrade pip setuptools wheel
+
+torch:  ## Install CUDA 11.8 PyTorch. Driver 526.47 cannot run CUDA 12.x.
+	$(PIP) install $(TORCH_PINS) --index-url $(TORCH_INDEX)
+
+install:  ## Install runtime dependencies
+	$(PIP) install -e .
+
+install-dev:  ## Install runtime + dev dependencies and register pre-commit hooks
+	$(PIP) install -e ".[dev]"
+	$(PY) -m pre_commit install
+
+# ── Gates ────────────────────────────────────────────────────────────────────
+
+check:  ## Phase 0 gate — fails non-zero if the toolchain is not ready
+	$(PY) scripts/00_check_env.py
+
+check-bench:  ## Phase 0 gate plus GPU/VRAM/decode benchmarks
+	$(PY) scripts/00_check_env.py --bench
+
+# ── Quality ──────────────────────────────────────────────────────────────────
+
+lint:
+	$(PY) -m ruff check .
+
+fmt:
+	$(PY) -m ruff format .
+	$(PY) -m ruff check --fix .
+
+typecheck:
+	$(PY) -m mypy src api
+
+test:
+	$(PY) -m pytest
+
+test-cov:
+	$(PY) -m pytest --cov=src --cov-report=term-missing --cov-report=html
+
+# ── Pipeline (scripts land in their respective phases) ───────────────────────
+
+manifest:   ## Phase 1 — build manifest_v1.parquet from LAV-DF
+	$(PY) scripts/01_build_manifest.py
+	$(PY) scripts/02_validate_dataset.py
+
+subset:     ## Phase 1 — build the reproducible 100 / 2k / 10k subsets
+	$(PY) scripts/03_make_subset.py
+
+features:   ## Phases 2-5 — Stage-A extraction (resumable; safe to re-run)
+	$(PY) scripts/04_extract_visual.py
+	$(PY) scripts/05_extract_audio.py
+
+train:      ## Stage-B training. Override: make train CONFIG=configs/experiment/exp_e.yaml
+	$(PY) scripts/06_train.py --config $(or $(CONFIG),configs/default.yaml)
+
+evaluate:
+	$(PY) scripts/07_evaluate.py --config $(or $(CONFIG),configs/default.yaml)
+
+ablations:  ## Phase 11 — the full A-K matrix across 3 seeds
+	$(PY) scripts/08_run_ablations.py
+
+benchmark:  ## Phase 12 — latency / VRAM / model size, fills Table 8.2.3
+	$(PY) scripts/09_benchmark.py
+
+# ── Serving ──────────────────────────────────────────────────────────────────
+
+api:        ## FastAPI on :8000. Concurrency is capped at 1 by design (6 GB RAM).
+	$(PY) -m uvicorn api.main:app --host 127.0.0.1 --port 8000 --workers 1
+
+frontend:
+	cd frontend && npm run dev
+
+demo:       ## API + frontend together
+	start "avtfd-api" cmd /c "$(PY) -m uvicorn api.main:app --host 127.0.0.1 --port 8000 --workers 1"
+	cd frontend && npm run dev
+
+clean-bench:
+	@if exist "data\interim\_bench" rmdir /s /q "data\interim\_bench"

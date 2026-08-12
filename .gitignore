@@ -1,8 +1,11 @@
 # ── Data (never committed — see PROJECT_PLAN.md Part 10) ────────────────
-data/
-!data/manifests/
-data/manifests/*
-!data/manifests/subset_*.txt
+# Leading slash anchors to the repo root: an unanchored "data/" also matches
+# src/data/, which silently excluded the source package.
+/data/
+!/data/manifests/
+/data/manifests/*
+# Subset id lists ARE tracked — §3.9 requires the subsets be reproducible
+!/data/manifests/subset_*.txt
 *.npy
 *.parquet
 *.mp4
@@ -12,16 +15,16 @@ data/manifests/*
 *.wav
 
 # ── Model artifacts ─────────────────────────────────────────────────────
-checkpoints/
+/checkpoints/
 *.pt
 *.pth
 *.onnx
 
 # ── Experiment tracking / logs ──────────────────────────────────────────
-logs/
-mlruns/
-experiments/*/*/predictions.parquet
-experiments/*/*/plots/
+/logs/
+/mlruns/
+/experiments/*/*/predictions.parquet
+/experiments/*/*/plots/
 
 # ── Python ──────────────────────────────────────────────────────────────
 __pycache__/

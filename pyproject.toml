@@ -1,0 +1,124 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "avtfd"
+version = "0.1.0"
+description = "Audio-Visual Temporal Forgery Detection & Localization"
+readme = "README.md"
+requires-python = ">=3.10,<3.11"
+license = { text = "MIT" }
+authors = [{ name = "Dineshkumar K" }]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# NOTE: torch / torchvision / torchaudio are deliberately NOT listed here.
+#
+# They must come from the CUDA 11.8 index, not PyPI. PyPI serves CPU-only
+# wheels on Windows, and listing them here would let a later `pip install -e .`
+# silently replace the CUDA build with a CPU one — the exact failure mode in
+# PROJECT_PLAN.md Phase 0's problem table ("torch.cuda.is_available() False").
+#
+# Install them with:  make torch     (or see reports/hardware_report.md)
+#   pip install torch==2.7.1+cu118 torchvision==0.22.1+cu118 \
+#       torchaudio==2.7.1+cu118 --index-url https://download.pytorch.org/whl/cu118
+#
+# Driver 526.47 supports CUDA 11.8 (needs >=522.06) but NOT CUDA 12.x
+# (needs >=527.41), so cu118 is required, not merely preferred.
+# ─────────────────────────────────────────────────────────────────────────────
+dependencies = [
+    # data / manifest
+    "pandas>=2.0",
+    "pyarrow>=14.0",
+    # No upper bound: let mediapipe/opencv metadata drive the resolution rather than
+    # guessing. torch 2.7.1 pulls numpy 2.2.6; if a dependency genuinely needs 1.x,
+    # pip will downgrade and 00_check_env.py will catch any resulting ABI breakage.
+    "numpy>=1.24",
+
+    # media decode & preprocessing
+    "av>=11.0",                  # PyAV — frame-exact decoding (Component B)
+    "opencv-python>=4.8",
+    "mediapipe>=0.10",           # face detect + 468 landmarks, CPU-only (Decision B-1)
+    "librosa>=0.10",
+    "soundfile>=0.12",
+
+    # modelling support
+    "scipy>=1.10",               # median filter / binary closing (Part 6 post-processing)
+    "scikit-learn>=1.3",
+    "einops>=0.7",
+
+    # config & validation
+    "pydantic>=2.5",
+    "pydantic-settings>=2.1",
+    "pyyaml>=6.0",
+
+    # experiment tracking & logging
+    "mlflow>=2.9",               # local file-backed store (Component O)
+    "structlog>=24.1",
+    "tqdm>=4.66",
+    "psutil>=5.9",               # RAM/VRAM headroom checks — 5.94 GB is the binding constraint
+
+    # evaluation & figures
+    "matplotlib>=3.7",
+
+    # API (Component M)
+    "fastapi>=0.109",
+    "uvicorn[standard]>=0.27",
+    "python-multipart>=0.0.9",   # required for multipart/form-data upload
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+    "httpx>=0.26",               # API integration tests
+    "ruff>=0.2",
+    "mypy>=1.8",
+    "pre-commit>=3.6",
+    # ipykernel + nbformat is enough to run notebooks/*.ipynb from VS Code or any
+    # external Jupyter. The full `jupyter` metapackage is deliberately NOT pulled in:
+    # JupyterLab ships webpack assets with ~120-char filenames, which overflow
+    # Windows' 260-char MAX_PATH under this project's long directory name and abort
+    # the whole pip transaction. Install it into a separate venv if you want the
+    # standalone Lab UI.
+    "ipykernel>=6.29",
+    "nbformat>=5.9",
+]
+
+[tool.setuptools.packages.find]
+include = ["src*", "api*"]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Tooling
+# ─────────────────────────────────────────────────────────────────────────────
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = ["notebooks", ".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "SIM", "PTH", "NPY"]
+ignore = [
+    "E501",   # line length is handled by the formatter
+    "B008",   # FastAPI's Depends() in defaults is idiomatic
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["N802"]  # test names may be non-PEP8 for readability
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true      # mediapipe, librosa, av ship no stubs
+exclude = ["notebooks/", ".venv/"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+markers = [
+    "slow: takes more than a few seconds",
+    "gpu: requires CUDA",
+    "dataset: requires LAV-DF on disk",
+]

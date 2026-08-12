@@ -79,16 +79,16 @@ The plan's §3.3 guess was close but **wrong in three ways**. Confirmed from the
 ```python
 @dataclass
 class Metadata:
-    file: str                        # e.g. "train/000001.mp4"
-    n_fakes: int                     # ← NOT in the plan's §3.3 guess
-    fake_periods: List[List[int]]    # list of [start, end]
+    file: str  # e.g. "train/000001.mp4"
+    n_fakes: int  # ← NOT in the plan's §3.3 guess
+    fake_periods: List[List[int]]  # list of [start, end]
     duration: float
-    original: Optional[str]          # None for real videos
+    original: Optional[str]  # None for real videos
     modify_video: bool
     modify_audio: bool
-    split: str                       # "train" | "dev" | "test"
+    split: str  # "train" | "dev" | "test"
     video_frames: int
-    audio_channels: int              # ← NOT in the plan's §3.3 guess
+    audio_channels: int  # ← NOT in the plan's §3.3 guess
     audio_frames: int
 ```
 
