@@ -1,9 +1,53 @@
 # Implementation Task List — Audio-Visual Temporal Forgery Detection & Localization
 
-Derived from `PROJECT_PLAN.md` (Parts 0–15, Phases 0–16). Nothing here is started yet.
+Derived from `PROJECT_PLAN.md` (Parts 0–15, Phases 0–16).
 IDs are stable — use them when referring to work.
 
 Legend: ⛔ = blocking gate item · ⭐ = headline capability · 🔬 = experiment · ✋ = manual human check
+
+---
+
+## 📍 CURRENT STATUS — paused 2026-08-12, resuming at Phase 1
+
+| | |
+|---|---|
+| **Done** | Phase −1 (pre-flight) · Phase 0 (environment) — **gate green, 33/33** |
+| **Next** | **Phase 1 — Dataset Acquisition & Validation** (20 tasks, starts at P1-2) |
+| **Branch** | `master`, working tree clean |
+| **Commits** | `ab2b620` baseline · `c53922b` decisions PF-1/2/3 · `ebf3196` Phase 0 |
+
+### Resume checklist for tomorrow
+
+1. `make check` — should print **GATE PASSED**, exit 0. If not, the environment changed; fix
+   before anything else.
+2. Start at **P1-2**: download LAV-DF (25.6 GB) to `data/raw/`. P1-1 is already resolved.
+   D: currently has **156.7 GB free** — ample.
+   - No approval gate exists. Use the open Google Drive/OneDrive links, or accept the
+     click-through terms on HuggingFace. See `reports/dataset_access.md`.
+   - Prefer the **HuggingFace CLI** — it resumes. A 25.6 GB browser download on a machine the
+     plan assumes will be interrupted (R13) is a bad bet.
+3. Then P1-5 → P1-20 in order. Note the schema is already confirmed: the file is
+   **`metadata.min.json`**, not `metadata.json`.
+
+### Three things to watch in Phase 1
+
+- ⛔ **`fake_periods` units.** The authors' loader annotates them `List[List[int]]`; all of Part 6
+  assumes float **seconds**. If they are frame indices, every localization target is wrong by ~25×
+  and the loss curve will still look healthy. Assert `max(end) <= duration` immediately (P1-5).
+- ⛔ **Leakage assertions must fail the build**, not warn (P1-8). This is R3, the highest-impact
+  correctness item in the plan.
+- ⚠️ **RAM.** Only 0.16–0.29 GB free at rest on this machine. Close Chrome before any bulk
+  `ffprobe` sweep.
+
+### Carried-forward open items
+
+| Item | Blocks | Notes |
+|---|---|---|
+| PRE-1 — original report missing | Phase 16 only | Not on this machine; drop at `docs/original_report.pdf`. Phases 0–15 do not need it |
+| P14-0 — Windows long paths disabled | Phase 14 | `LongPathsEnabled = 0`. Needs an elevated shell + reboot before `npm install` |
+| PF-4 — precision re-benchmark on Kaggle | Phase 9–11 | fp32 locally is settled; the cloud figure is assumed until measured |
+
+---
 
 ---
 
