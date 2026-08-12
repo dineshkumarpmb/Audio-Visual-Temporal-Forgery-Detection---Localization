@@ -12,8 +12,8 @@ Legend: ⛔ = blocking gate item · ⭐ = headline capability · 🔬 = experime
 | ID | Task | Status |
 |---|---|---|
 | PRE-1 | ⛔ Locate & supply the original project report (PDF/DOCX) — Part 1 is a reconstruction until audited | 🔴 **BLOCKED — not on this machine.** Searched D:\ + Downloads/Desktop/Documents/OneDrive. See `reports/report_audit.md`. Drop it at `docs/original_report.pdf`. **Not on the critical path for Phases 0–15** |
-| PRE-2 | ⛔ Decide hardware strategy: local-only (≤10k subset) **vs** local + Kaggle free tier for full-dataset runs | ⬜ Awaiting decision |
-| PRE-3 | ⛔ Approve/amend the plan — specifically the GAN reframing (§I Tier 1) and leaving D-1 / C-1 to experiment | ⬜ Awaiting decision |
+| PRE-2 | ⛔ Decide hardware strategy | ✅ **Local + Kaggle free tier.** Local = Phases 0–8, ablations, API/frontend. Kaggle P100 = full-dataset extraction + final Phase 11 runs. Adds tasks CL-1…CL-6; makes X-2 mandatory |
+| PRE-3 | ⛔ Approve/amend the plan (GAN reframing; D-1 / C-1 by experiment) | ✅ **Approved as written.** Tier 1 GAN with three arms F0/F1/F2; D-1 and C-1 settled by Experiments J and K. Tie-break rules pre-committed in `reports/decision_log.md` |
 | PRE-4 | Request LAV-DF dataset access **immediately** (lead time is the #1 schedule risk, R2) | ✅ **DONE — no approval gate exists.** Open Google Drive/OneDrive links; HuggingFace needs only a click-through. **R2 downgraded to Low likelihood.** See `reports/dataset_access.md` |
 | PRE-5 | Create the git repository; commit `PROJECT_PLAN.md` and this task list as the baseline | ✅ Done — repo initialised, `.gitignore` + `docs/` + `reports/` scaffolded |
 
@@ -332,12 +332,27 @@ Part 6 assumes **float seconds**. If they are frame indices, every localization 
 
 ---
 
+## CLOUD — Kaggle track (new, from decision PF-1)
+
+Runs alongside Phases 9–11. Not a separate phase — these are the tasks the local+Kaggle strategy adds.
+
+| ID | Task |
+|---|---|
+| CL-1 | Create/verify the Kaggle account; confirm GPU quota (free tier: ~30 h/week, P100 16 GB or T4×2) |
+| CL-2 | Mirror the dataset to Kaggle — attach the existing public LAV-DF Kaggle dataset if usable, else upload the cached **features** (~3.3 GB, far smaller than 25.6 GB of raw video) as a private Kaggle Dataset |
+| CL-3 | Write a thin Kaggle notebook entrypoint that clones the repo and calls the **same** `scripts/` — no logic duplicated in notebook cells (drift here silently invalidates cross-environment comparisons) |
+| CL-4 | ⛔ Verify device-agnosticism: run one Phase-4 experiment on both local and Kaggle from the same config and confirm metrics match within seed variance |
+| CL-5 | Checkpoint/artifact sync back to D: — MLflow runs and `best.pt` must land in the same `experiments/` tree so Part 11's evidence table stays single-source |
+| CL-6 | Handle Kaggle preemption: per-epoch checkpointing + resume-from-checkpoint verified **before** launching any long run (R13 now applies to cloud too) |
+
+---
+
 ## Cross-cutting / continuous
 
 | ID | Task |
 |---|---|
 | X-1 | Every phase: tests pass + reproducible from a committed config + descriptive commit + results in `reports/` (universal exit gate) |
-| X-2 | Keep code device-agnostic so the same code runs locally and on Kaggle without edits |
+| X-2 | ⛔ Keep code device-agnostic so the same code runs locally and on Kaggle without edits — **mandatory, not aspirational, per decision PF-1** |
 | X-3 | `data/raw/` is immutable; `experiments/` is append-only; `src/` never imports from `api/` or `scripts/` |
 | X-4 | Assume interruption: checkpoint every epoch, all long jobs resumable (R13) |
 | X-5 | Watch RAM continuously — `num_workers=2`, mmap feature files, `persistent_workers=False`, close Chrome while training (R1) |
@@ -368,5 +383,8 @@ Part 6 assumes **float seconds**. If they are frame indices, every localization 
 | P14 Frontend | 12 |
 | P15 Testing | 9 |
 | P16 Documentation | 11 |
+| Cloud (Kaggle track) | 6 |
 | Cross-cutting | 7 |
-| **Total** | **195** |
+| **Total** | **201** |
+
+*Phase −1 complete except PRE-1 (report retrieval), which does not block Phases 0–15.*
