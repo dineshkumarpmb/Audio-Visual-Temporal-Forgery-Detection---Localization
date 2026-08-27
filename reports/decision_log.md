@@ -141,6 +141,77 @@ Currently `LongPathsEnabled = 0`. Tracked as task **P14-0**.
 
 ---
 
+## Phase 1 decisions — resolved 2026-08-27
+
+### PF-6 · Dataset access: attach on Kaggle, never download the raw 25.6 GB locally
+
+**Decision: cloud-first data path.** ✅ Approved 2026-08-27. Supersedes task P1-2 as originally
+written ("download LAV-DF to `data/raw/`") and the §12.4 disk budget's assumption that raw video
+lives on D:.
+
+**What changes.** A public Kaggle mirror of LAV-DF exists
+(`elin75/localized-audio-visual-deepfake-dataset-lav-df`). Kaggle mounts an attached dataset
+read-only at `/kaggle/input` — no download, no transfer wait, and it does **not** consume the
+20 GB `/kaggle/working` budget. So Phases 1–4 run against the mounted copy, and only the derived
+feature cache ever comes down to D:.
+
+| | Before | After |
+|---|---|---|
+| Local raw video | 25.6 GB | **0 GB** (plus ~200 MB smoke-100 for the ✋ checks) |
+| Local download | 25.6 GB | **~3.3 GB** — the dev-10k feature cache |
+| Where Phases 1–4 run | local | **Kaggle** |
+| Where Phases 4–11 run | local | local, unchanged |
+
+**Why this works and is not a shortcut.** The plan already touches raw video exactly once: Phases
+2–3 turn video into face crops + log-mel, Phase 4 turns those into a frozen-feature cache, and
+every run from Phase 4 to Phase 11 trains on that cache. Moving the one-pass stage to the machine
+that already holds the data is the natural placement, not a compromise.
+
+**Size figure, stated precisely.** The ~3.3 GB is §12.4's **dev-10k** cache (2.5 GB visual fp16 +
+0.8 GB audio). It is *not* the full-dataset figure — 136,304 videos would be ≈45 GB of features.
+Full-dataset features stay on Kaggle and are never synced to D:; only metrics and checkpoints come
+back (CL-5). This is consistent with PF-1, which already scoped the local track to dev-10k and the
+`Full` row to Kaggle.
+
+**Consequences accepted:**
+
+1. **CL-1, CL-2, CL-3 move from "alongside Phases 9–11" to *before* P1-2.** The Kaggle account,
+   the attached dataset and the thin notebook entrypoint are now Phase 1 prerequisites, not
+   Phase 9 conveniences.
+2. **X-2 (device-agnostic code) becomes load-bearing on day one.** Under PF-1 it was a hard
+   requirement that would first be exercised around Phase 9. It is now exercised by the very first
+   script that runs. This is strictly healthier — the requirement gets tested while the codebase is
+   small enough to fix cheaply.
+3. **New verification burden — the mirror is a community re-upload, not the authors' bucket.**
+   It must be proven equivalent before anything is built on it. Added as **CL-7** with hard checks.
+   The specific hazard: if the mirror was re-encoded, fps and duration shift and every
+   `fake_periods` target silently moves. P1-5's `assert max(end) <= duration` catches the gross
+   case; CL-7 covers the rest.
+4. **Full-dataset feature extraction will not fit in one session.** ≈45 GB of features against a
+   20 GB `/kaggle/working` cap and a 12 h session limit means sharded, resumable output across
+   several sessions. Added as **CL-8**. R13 already demanded resumability; this makes it structural.
+5. **The ✋ manual checks (P2-8, P2-10) still need real video locally.** Either pull the smoke-100
+   subset (~200 MB) or render the 20 overlay clips on Kaggle and download those. Recorded against
+   P2-10.
+6. **PF-4's cloud half becomes testable immediately.** The P100/T4 have tensor cores; the local
+   TU117 does not. AMP fp16 can now be benchmarked on the cloud side during Phase 1 rather than
+   remaining an assumption until Phase 9.
+
+**Options rejected:**
+
+- **HuggingFace streaming.** The repo is a single 25.6 GB `LAV-DF.tar`, not sharded
+  parquet/webdataset. `load_dataset(streaming=True)` gives sequential access only — adequate for a
+  one-pass extraction, useless for shuffled training or stratified subsetting (P1-15). Also gated.
+- **Colab + Google Drive shortcut.** The authors' Drive folder is open, so this avoids a local
+  download too. Rejected on three counts: Colab's ~78 GB disk is ephemeral so the data is re-copied
+  every session; sustained reads off mounted Drive are slow and hit quota errors; free GPU
+  allocation is unguaranteed. Kaggle's persistent read-only mount dominates it for this workload.
+- **Download the 25.6 GB to D: anyway.** Not wrong — 156.7 GB is free — but it buys nothing the
+  mount does not, and costs a long interruptible transfer on a machine R13 assumes will be
+  interrupted.
+
+---
+
 ## Appendix B — architectural decisions
 
 | ID | Decision | Options | Resolved by | Date | Outcome |
@@ -150,6 +221,7 @@ Currently `LongPathsEnabled = 0`. Tracked as task **P14-0**.
 | **PF-3** | D-1 & C-1 method | By experiment / by prior | User, PRE-3 | 2026-08-12 | ✅ **By experiment (J and K)** |
 | **PF-4** | Numeric precision | AMP fp16 / fp32 | Measurement, Phase 0 | 2026-08-12 | ✅ **fp32 local, AMP fp16 cloud** — overturns §12.3 |
 | **PF-5** | Jupyter in dev deps | full `jupyter` / `ipykernel` only | Phase 0 install failure | 2026-08-12 | ✅ **`ipykernel` + `nbformat` only** (MAX_PATH) |
+| **PF-6** | Raw dataset location | download 25.6 GB to D: / attach on Kaggle / HF streaming / Colab+Drive | User, Phase 1 | 2026-08-27 | ✅ **Attach on Kaggle; only the ~3.3 GB dev-10k feature cache comes local** |
 | **D-1** | Visual backbone | ResNet-18 / MobileNetV2 | Experiment J, Phase 4 | ⬜ | ⬜ Prior: ResNet-18 @112² |
 | **C-1** | Audio features | MFCC / log-Mel | Experiment K, Phase 5 | ⬜ | ⬜ Prior: log-Mel |
 | **B-1** | Face detector | MediaPipe / MTCNN / RetinaFace | Phase 2 | ⬜ | ⬜ Recommended: MediaPipe (CPU-only, keeps VRAM free, gives landmarks + mouth ROI in one pass) |

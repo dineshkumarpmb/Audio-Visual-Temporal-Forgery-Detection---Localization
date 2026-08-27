@@ -12,7 +12,7 @@ Legend: ⛔ = blocking gate item · ⭐ = headline capability · 🔬 = experime
 | | |
 |---|---|
 | **Done** | Phase −1 (pre-flight) · Phase 0 (environment) — **gate green, 33/33** |
-| **Next** | **Phase 1 — Dataset Acquisition & Validation** (20 tasks, starts at P1-2) |
+| **Next** | **Phase 1 — Dataset Acquisition & Validation** (20 tasks) — now runs **on Kaggle**, starting at CL-1 (PF-6) |
 | **Branch** | `master`, working tree clean |
 | **Commits** | `ab2b620` baseline · `c53922b` decisions PF-1/2/3 · `ebf3196` Phase 0 |
 
@@ -20,14 +20,16 @@ Legend: ⛔ = blocking gate item · ⭐ = headline capability · 🔬 = experime
 
 1. `make check` — should print **GATE PASSED**, exit 0. If not, the environment changed; fix
    before anything else.
-2. Start at **P1-2**: download LAV-DF (25.6 GB) to `data/raw/`. P1-1 is already resolved.
-   D: currently has **156.7 GB free** — ample.
-   - No approval gate exists. Use the open Google Drive/OneDrive links, or accept the
-     click-through terms on HuggingFace. See `reports/dataset_access.md`.
-   - Prefer the **HuggingFace CLI** — it resumes. A 25.6 GB browser download on a machine the
-     plan assumes will be interrupted (R13) is a bad bet.
-3. Then P1-5 → P1-20 in order. Note the schema is already confirmed: the file is
-   **`metadata.min.json`**, not `metadata.json`.
+2. Start at **CL-1 → CL-2 → CL-3 → CL-7**, *then* P1-2. Per **decision PF-6 (2026-08-27)** the
+   25.6 GB raw dataset is **never downloaded locally** — it is attached read-only on Kaggle at
+   `/kaggle/input`, which costs no transfer and does not consume the 20 GB `/kaggle/working`
+   budget. Only the **~3.3 GB dev-10k feature cache** ever lands on D:.
+   - Mirror: `elin75/localized-audio-visual-deepfake-dataset-lav-df` (public, *Add Data*).
+   - ⛔ It is a community re-upload, not the authors' bucket — **CL-7 must prove it equivalent
+     before anything is built on it.**
+   - See `reports/dataset_access.md` §9 and `reports/decision_log.md` PF-6.
+3. Then P1-5 → P1-20 in order, **running on Kaggle**. Note the schema is already confirmed: the
+   file is **`metadata.min.json`**, not `metadata.json`.
 
 ### Three things to watch in Phase 1
 
@@ -126,7 +128,7 @@ transaction on a >260-char path (decision PF-5). Dev deps now carry `ipykernel` 
 | ID | Task |
 |---|---|
 | P1-1 | ✅ ~~Check LAV-DF download size~~ — **resolved in PRE-4: 25.6 GB, download to D:** |
-| P1-2 | Download LAV-DF to `data/raw/` via HuggingFace CLI (resumable — matters at 25.6 GB, see R13); verify checksums; confirm real folder structure vs §3.3 |
+| P1-2 | **Attach** the LAV-DF Kaggle mirror read-only at `/kaggle/input` (decision **PF-6** — no local download); confirm real folder structure vs §3.3. Requires CL-1…CL-3 and ⛔ CL-7 first. `data/raw/` stays empty locally except the smoke-100 subset needed for the ✋ checks |
 | P1-3 | ⛔ **Report audit** — resolve §0.4 Finding 3: provenance of the 53.35% figure and the evaluation protocol behind 80.00%; write `reports/report_audit.md` |
 | P1-4 | ⛔ Resolve all 15 Appendix-A `TO VERIFY` items, or explicitly escalate as unresolvable |
 | P1-5 | Parse **`metadata.min.json`** (schema confirmed in PRE-4); ⛔ **print 10 raw `fake_periods` and assert `max(end) <= duration`** — determines whether values are seconds or frame indices (~25× error if misread); assert `n_fakes == len(fake_periods)` |
@@ -161,7 +163,7 @@ transaction on a >260-char path (decision PF-5). Dev deps now carry `ipykernel` 
 | P2-7 | Contact-sheet visualizer for 20 random videos |
 | P2-8 | ✋ Inspect contact sheets: faces correctly cropped, aligned, upright |
 | P2-9 | Write `scripts/viz_overlay.py` — burn `fake_periods` onto video as a red overlay |
-| P2-10 | ⛔✋ **Personally watch 20 overlay videos** and confirm the highlighted spans genuinely look manipulated (§6.3 — catches label bugs nothing else will) |
+| P2-10 | ⛔✋ **Personally watch 20 overlay videos** and confirm the highlighted spans genuinely look manipulated (§6.3 — catches label bugs nothing else will). Under PF-6 raw video is not on D: — either pull the smoke-100 subset (~200 MB) or render the 20 overlays on Kaggle and download those |
 | P2-11 | Determinism test: byte-identical output across two runs |
 | P2-12 | Verify interrupt-and-resume actually resumes |
 | P2-13 | Assert `face_found.mean() > 0.9` on a clean sample; measure and record extraction wall-clock |
@@ -406,16 +408,21 @@ transaction on a >260-char path (decision PF-5). Dev deps now carry `ipykernel` 
 
 ## CLOUD — Kaggle track (new, from decision PF-1)
 
-Runs alongside Phases 9–11. Not a separate phase — these are the tasks the local+Kaggle strategy adds.
+Not a separate phase — these are the tasks the local+Kaggle strategy adds.
+
+**⚠️ CL-1, CL-2, CL-3 and CL-7 are now Phase 1 prerequisites, not Phase 9 work** (decision **PF-6**,
+2026-08-27). They gate P1-2. CL-4…CL-6 and CL-8 still run alongside Phases 9–11.
 
 | ID | Task |
 |---|---|
-| CL-1 | Create/verify the Kaggle account; confirm GPU quota (free tier: ~30 h/week, P100 16 GB or T4×2) |
-| CL-2 | Mirror the dataset to Kaggle — attach the existing public LAV-DF Kaggle dataset if usable, else upload the cached **features** (~3.3 GB, far smaller than 25.6 GB of raw video) as a private Kaggle Dataset |
+| CL-1 | Create/verify the Kaggle account; confirm GPU quota (free tier: ~30 h/week, P100 16 GB or T4×2, 12 h/session, 20 GB writable `/kaggle/working`) |
+| CL-2 | Attach the public LAV-DF mirror `elin75/localized-audio-visual-deepfake-dataset-lav-df` read-only at `/kaggle/input` (no download, does not count against `/kaggle/working`). Fallback if CL-7 fails: upload the authors' copy as a private Kaggle Dataset |
 | CL-3 | Write a thin Kaggle notebook entrypoint that clones the repo and calls the **same** `scripts/` — no logic duplicated in notebook cells (drift here silently invalidates cross-environment comparisons) |
 | CL-4 | ⛔ Verify device-agnosticism: run one Phase-4 experiment on both local and Kaggle from the same config and confirm metrics match within seed variance |
 | CL-5 | Checkpoint/artifact sync back to D: — MLflow runs and `best.pt` must land in the same `experiments/` tree so Part 11's evidence table stays single-source |
 | CL-6 | Handle Kaggle preemption: per-epoch checkpointing + resume-from-checkpoint verified **before** launching any long run (R13 now applies to cloud too) |
+| CL-7 | ⛔ **Prove the Kaggle mirror is equivalent to the authors' release** before building on it — it is a community re-upload. Check: file count = 136,304; real/fake = 36,431/99,873; `metadata.min.json` present and byte-identical to the HF/GitHub copy; ⛔ **spot-check 20 videos with `ffprobe` for fps = 25 and unchanged `duration`/`video_frames` vs metadata** — a silent re-encode shifts every `fake_periods` target. Escalate to the fallback in CL-2 if any check fails |
+| CL-8 | Shard full-dataset feature extraction across sessions — ≈45 GB of features against a 20 GB `/kaggle/working` cap and a 12 h session limit means resumable, sharded output written to a Kaggle Dataset. Only metrics and checkpoints sync back to D: (CL-5); the 45 GB never does |
 
 ---
 
@@ -455,8 +462,8 @@ Runs alongside Phases 9–11. Not a separate phase — these are the tasks the l
 | P14 Frontend | 12 |
 | P15 Testing | 9 |
 | P16 Documentation | 11 |
-| Cloud (Kaggle track) | 6 |
+| Cloud (Kaggle track) | 8 |
 | Cross-cutting | 7 |
-| **Total** | **201** |
+| **Total** | **203** |
 
 *Phase −1 complete except PRE-1 (report retrieval), which does not block Phases 0–15.*

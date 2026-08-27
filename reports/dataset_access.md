@@ -2,7 +2,8 @@
 
 **Task:** PRE-4 (Phase −1)
 **Date:** 2026-08-12
-**Status:** ✅ Research complete — **no manual approval gate exists**. Download can begin immediately.
+**Status:** ✅ Research complete — **no manual approval gate exists**.
+**Updated 2026-08-27:** §9 superseded by decision **PF-6** — attach on Kaggle, no local download.
 
 ---
 
@@ -172,14 +173,41 @@ The LAV-DF repo pins **Python ≥3.7, <3.11** and `pytorch_lightning == 1.7.*`.
 
 ---
 
-## 9. Recommended download procedure (execute in Phase 1, task P1-2)
+## 9. Access procedure — **superseded 2026-08-27 by decision PF-6**
 
-1. Accept the terms on HuggingFace (log in → click through), **or** use the open Google Drive link.
-2. Download to `D:\...\data\raw\` — **never C:**.
-3. Prefer **HuggingFace CLI** over the browser: it supports resume, which matters for 25.6 GB on a
-   machine the plan assumes will be interrupted (R13).
-4. Verify checksums before parsing anything.
-5. Confirm the real folder structure against §3.3 and note any deviation.
+> **The 25.6 GB raw dataset is no longer downloaded locally.** It is attached read-only on Kaggle.
+> Only the ~3.3 GB dev-10k feature cache ever lands on D:. See `reports/decision_log.md` PF-6.
+
+### 9.1 Current procedure (Kaggle-first)
+
+1. **CL-1** — Kaggle account, confirm GPU quota (~30 h/week, P100 16 GB or T4×2, 12 h/session).
+2. **CL-2** — *Add Data* → attach `elin75/localized-audio-visual-deepfake-dataset-lav-df`.
+   It mounts read-only at `/kaggle/input`: no download, no transfer wait, and it does **not**
+   consume the 20 GB `/kaggle/working` budget.
+3. **CL-7 ⛔** — prove the mirror equals the authors' release *before* building on it. It is a
+   community re-upload. Verify file count, real/fake split, `metadata.min.json` integrity, and
+   `ffprobe` fps/duration on 20 spot-checks. **A silent re-encode shifts every `fake_periods`
+   target** — the same class of failure as the seconds-vs-frames hazard in §5.
+4. **CL-3** — thin notebook entrypoint that clones the repo and calls the same `scripts/`.
+5. **P1-2** — confirm the real folder structure against §3.3 and note any deviation.
+
+### 9.2 Fallback, if CL-7 fails
+
+Accept the terms on HuggingFace (log in → click through) or use the open Google Drive link, and
+upload the authors' copy as a **private Kaggle Dataset**. Still no local 25.6 GB download.
+
+### 9.3 Rejected alternatives
+
+| Option | Why rejected |
+|---|---|
+| **HuggingFace streaming** | The repo is a single 25.6 GB `LAV-DF.tar`, not sharded parquet/webdataset. `streaming=True` gives sequential access only — fine for a one-pass extraction, useless for shuffled training or stratified subsetting (P1-15) |
+| **Colab + Drive shortcut** | ~78 GB disk is ephemeral (re-copy every session); sustained reads off mounted Drive are slow and quota-limited; free GPU allocation unguaranteed |
+| **Download 25.6 GB to D:** | Not wrong (156.7 GB free) but buys nothing the mount does not, at the cost of a long interruptible transfer on a machine R13 assumes will be interrupted |
+
+### 9.4 What still needs real video on D:
+
+The ✋ manual checks **P2-8** and **P2-10** require watching actual overlay videos. Either pull the
+smoke-100 subset (~200 MB) or render the 20 overlay clips on Kaggle and download those.
 
 ---
 
