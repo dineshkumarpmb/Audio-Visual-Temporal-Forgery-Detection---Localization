@@ -58,6 +58,13 @@ dependencies = [
     "tqdm>=4.66",
     "psutil>=5.9",               # RAM/VRAM headroom checks — 5.94 GB is the binding constraint
 
+    # cloud sync (decisions PF-1, PF-6)
+    # The dataset lives on Kaggle rather than on D:, so the client is a runtime
+    # dependency of the data path, not a dev convenience. NB: `import kaggle`
+    # authenticates at import time and raises without credentials — import
+    # kaggle.api.kaggle_api_extended and call authenticate() explicitly instead.
+    "kaggle>=1.6",
+
     # evaluation & figures
     "matplotlib>=3.7",
 

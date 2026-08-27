@@ -1,0 +1,12 @@
+{
+  "free_tier_reference": {
+    "accelerators": "P100 16 GB, or T4 x2 (32 GB combined)",
+    "gpu_hours_per_week": "~30",
+    "input_mount": "/kaggle/input (read-only, does not count against /kaggle/working)",
+    "session_limit_hours": 12,
+    "working_disk_gb": 20
+  },
+  "gpu_hours_remaining": null,
+  "kaggle_client_version": "1.7.4.5",
+  "phone_verified": null
+}

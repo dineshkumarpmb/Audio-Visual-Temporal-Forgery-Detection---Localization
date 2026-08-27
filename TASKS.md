@@ -415,7 +415,7 @@ Not a separate phase — these are the tasks the local+Kaggle strategy adds.
 
 | ID | Task |
 |---|---|
-| CL-1 | Create/verify the Kaggle account; confirm GPU quota (free tier: ~30 h/week, P100 16 GB or T4×2, 12 h/session, 20 GB writable `/kaggle/working`) |
+| CL-1 | Create/verify the Kaggle account; confirm GPU quota (free tier: ~30 h/week, P100 16 GB or T4×2, 12 h/session, 20 GB writable `/kaggle/working`). 🔧 **`make check-kaggle`** — `scripts/01_check_kaggle.py` verifies the client, credentials, a live authenticated round trip, and mirror reachability, and writes `reports/kaggle_report.md`. ✋ Phone verification and remaining quota are not exposed by the API — attest them with `--phone-verified --gpu-hours N`. ⚠️ **Phone verification gates GPU *and* internet in notebooks**, so without it CL-3's `git clone` fails too |
 | CL-2 | Attach the public LAV-DF mirror `elin75/localized-audio-visual-deepfake-dataset-lav-df` read-only at `/kaggle/input` (no download, does not count against `/kaggle/working`). Fallback if CL-7 fails: upload the authors' copy as a private Kaggle Dataset |
 | CL-3 | Write a thin Kaggle notebook entrypoint that clones the repo and calls the **same** `scripts/` — no logic duplicated in notebook cells (drift here silently invalidates cross-environment comparisons) |
 | CL-4 | ⛔ Verify device-agnosticism: run one Phase-4 experiment on both local and Kaggle from the same config and confirm metrics match within seed variance |

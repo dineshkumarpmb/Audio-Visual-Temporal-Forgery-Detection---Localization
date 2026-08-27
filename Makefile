@@ -12,8 +12,9 @@ TORCH_INDEX := https://download.pytorch.org/whl/cu118
 TORCH_PINS  := torch==2.7.1+cu118 torchvision==0.22.1+cu118 torchaudio==2.7.1+cu118
 
 .DEFAULT_GOAL := help
-.PHONY: help venv torch install install-dev check check-bench lint fmt typecheck test test-cov \
-        manifest subset features train evaluate ablations benchmark api frontend demo clean-bench
+.PHONY: help venv torch install install-dev check check-bench check-kaggle lint fmt \
+        typecheck test test-cov manifest subset features train evaluate ablations \
+        benchmark api frontend demo clean-bench
 
 help:  ## Show this help
 	@echo Audio-Visual Temporal Forgery Detection ^& Localization
@@ -27,6 +28,7 @@ help:  ## Show this help
 	@echo   Gates
 	@echo     check         Phase 0 environment gate
 	@echo     check-bench   Phase 0 gate + benchmarks, writes reports/hardware_report.md
+	@echo     check-kaggle  CL-1 gate, writes reports/kaggle_report.md
 	@echo.
 	@echo   Quality
 	@echo     lint fmt typecheck test test-cov
@@ -58,12 +60,18 @@ install-dev:  ## Install runtime + dev dependencies and register pre-commit hook
 # ── Gates ────────────────────────────────────────────────────────────────────
 
 check:  ## Phase 0 gate — fails non-zero if the toolchain is not ready
-	$(PY) scripts/00_check_env.py
+# --no-report on purpose: the plain gate has no benchmark numbers to write, and
+# letting it regenerate reports/hardware_report.md silently deletes the measured
+# fp16/fp32 finding behind decision PF-4. Use check-bench to refresh the report.
+	$(PY) scripts/00_check_env.py --no-report
 
 check-bench:  ## Phase 0 gate plus GPU/VRAM/decode benchmarks
 	$(PY) scripts/00_check_env.py --bench
 
 # ── Quality ──────────────────────────────────────────────────────────────────
+
+check-kaggle:  ## CL-1 gate - verify Kaggle access. Add --gpu-hours N --phone-verified to attest.
+	$(PY) scripts/01_check_kaggle.py $(ARGS)
 
 lint:
 	$(PY) -m ruff check .
