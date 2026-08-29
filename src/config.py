@@ -35,8 +35,15 @@ class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
-class PreprocessConfig(StrictModel):
-    """Parameters that change the *content* of cached features (§3.8)."""
+class VideoPreprocessConfig(StrictModel):
+    """Parameters that change the *content* of the cached face crops (section 3.8).
+
+    Split from the audio config on purpose. Both are content-hashed into their own cache
+    directory, so tuning `n_mels` does not invalidate 7.5 MB/video of face crops (PF-10)
+    and changing `crop_size` does not invalidate the log-mels. A single combined config
+    would couple them and force re-extraction of the expensive side for a change to the
+    cheap one.
+    """
 
     target_fps: float = Field(default=LAVDF_FPS, gt=0)
     crop_size: int = Field(default=112, gt=0)
@@ -49,19 +56,71 @@ class PreprocessConfig(StrictModel):
     face_margin: float = Field(default=0.0, ge=0)
     align: bool = True
 
-    audio_sample_rate: int = Field(default=LAVDF_SAMPLE_RATE, gt=0)
-    n_mels: int = Field(default=64, gt=0)
+
+class AudioPreprocessConfig(StrictModel):
+    """PROJECT_PLAN section C, verbatim. **Do not retune `hop_length`.**
+
+    `hop_length=640` at 16 kHz is exactly 40 ms, and one video frame at 25 fps is exactly
+    40 ms. That makes audio frame `t` correspond to video frame `t` by array index rather
+    than by interpolation, which removes an entire class of alignment bug. Section C calls
+    it "the single most important number in the preprocessing" and says to lock it; the
+    validator below enforces that rather than trusting it.
+
+    Defaults to log-mel, not MFCC (decision C-1): MFCC's DCT compresses away the fine
+    spectral structure where vocoder artefacts live. MFCC stays available as the
+    Experiment K arm.
+    """
+
+    sample_rate: int = Field(default=LAVDF_SAMPLE_RATE, gt=0)
+    n_fft: int = Field(default=1024, gt=0)
+    hop_length: int = Field(default=640, gt=0)
+    n_mels: int = Field(default=80, gt=0)
+    fmin: float = Field(default=20.0, ge=0)
+    fmax: float = Field(default=7600.0, gt=0)
+    preemphasis: float = Field(default=0.97, ge=0, lt=1)
+    cmvn: bool = True
+    eps: float = Field(default=1e-10, gt=0)
+    feature: Literal["logmel", "mfcc"] = "logmel"
     n_mfcc: int = Field(default=40, gt=0)
-    win_length_ms: float = Field(default=25.0, gt=0)
-    hop_length_ms: float = Field(default=10.0, gt=0)
+
+    @property
+    def frames_per_second(self) -> float:
+        """Audio frame rate implied by the hop. Must equal the video fps."""
+        return self.sample_rate / self.hop_length
+
+    @property
+    def hop_ms(self) -> float:
+        return 1000.0 * self.hop_length / self.sample_rate
 
     @model_validator(mode="after")
-    def _hop_fits_window(self) -> PreprocessConfig:
-        if self.hop_length_ms > self.win_length_ms:
+    def _grid_locks_to_video(self) -> AudioPreprocessConfig:
+        if abs(self.frames_per_second - LAVDF_FPS) > 1e-9:
             raise ValueError(
-                f"hop_length_ms ({self.hop_length_ms}) > win_length_ms ({self.win_length_ms}): "
-                "frames would not overlap and audio would be undersampled"
+                f"hop_length={self.hop_length} at sr={self.sample_rate} gives "
+                f"{self.frames_per_second:.4f} audio frames/s, but video is {LAVDF_FPS} fps. "
+                "Section C requires these to be equal so audio frame t == video frame t. "
+                f"For {self.sample_rate} Hz use hop_length={int(self.sample_rate / LAVDF_FPS)}."
             )
+        return self
+
+    @model_validator(mode="after")
+    def _window_covers_hop(self) -> AudioPreprocessConfig:
+        if self.n_fft < self.hop_length:
+            raise ValueError(
+                f"n_fft ({self.n_fft}) < hop_length ({self.hop_length}): consecutive windows "
+                "would leave gaps, so some samples would never be analysed"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _nyquist(self) -> AudioPreprocessConfig:
+        if self.fmax > self.sample_rate / 2:
+            raise ValueError(
+                f"fmax ({self.fmax}) exceeds Nyquist ({self.sample_rate / 2}) for "
+                f"sr={self.sample_rate}"
+            )
+        if self.fmin >= self.fmax:
+            raise ValueError(f"fmin ({self.fmin}) >= fmax ({self.fmax})")
         return self
 
 
@@ -98,7 +157,7 @@ def config_hash(cfg: BaseModel, length: int = 8) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:length]
 
 
-def cache_dir(cfg: PreprocessConfig, root: Path = Path("data/features")) -> Path:
+def cache_dir(cfg: BaseModel, root: Path = Path("data/features")) -> Path:
     """features/{sha256(config)[:8]}/ — change a parameter, get a new directory."""
     return root / config_hash(cfg)
 

@@ -7,24 +7,25 @@ Legend: ⛔ = blocking gate item · ⭐ = headline capability · 🔬 = experime
 
 ---
 
-## 📍 CURRENT STATUS — 2026-08-29, Phase 2 done (13/15) · next is Phase 3
+## 📍 CURRENT STATUS — 2026-08-29, Phase 3 done (9/9) · next is Phase 4
 
 | | |
 |---|---|
 | **Done** | Phase −1 (pre-flight) · Phase 0 (environment) — **gate green, 33/33** |
-| **Done** | Phase −1 · Phase 0 · **Phase 1 (18/20)** · **Phase 2 (13/15)** · CL-1 ✅ · CL-7 ✅ |
-| **Next** | **Phase 3 — Audio Preprocessing** (9 tasks) |
-| **Progress** | ~52 of 203 tasks (≈26%) · 4 of 18 phases complete |
-| **Tests** | **130 passing** — 114 unit + 16 integration against the real 136,304-entry dataset |
+| **Done** | Phase −1 · Phase 0 · **Phase 1 (18/20)** · **Phase 2 (13/15)** · **Phase 3 (9/9)** · CL-1 ✅ · CL-7 ✅ |
+| **Next** | **Phase 4 — Visual Baseline** (12 tasks) 🔬 Experiment A + Decision D-1. First phase with a model in it |
+| **Progress** | ~61 of 203 tasks (≈30%) · 5 of 18 phases complete |
+| **Tests** | **190 passing** — 174 unit + 16 integration against the real 136,304-entry dataset |
 | **✋ Awaiting you** | P2-8 (contact sheets) · ⛔ P2-10 (watch 20 overlays) — artefacts rendered in `reports/figures/` |
 | **Kaggle** | `dinesh1234567` · phone verified · **30 GPU h/week** · P100 16 GB or T4×2 · 12 h/session · 20 GB `/kaggle/working` |
 | **Branch** | `master`, working tree clean |
 | **Commits** | `ab2b620` baseline · `c53922b` decisions PF-1/2/3 · `ebf3196` Phase 0 · `badb58b` PF-6 · `3c0d0dc` CL-1 gate · `c872158` CL-1 credentials + API-drift fix |
 
-**Phases 1–2 built the data and preprocessing layers.** `src/` holds `config.py`, `seed.py`,
-`data/{metadata,manifest,leakage,validate,subset}.py` and
-`preprocessing/{video,face,align,cache,pipeline}.py`, driven by `scripts/02`–`11`, with
-**130 passing tests**. `api/` and the model packages are still empty stubs — Phases 3–16 untouched.
+**Phases 1–3 built the data and preprocessing layers.** `src/` holds `config.py`, `seed.py`,
+`utils/console.py`, `data/{metadata,manifest,leakage,validate,subset}.py` and
+`preprocessing/{video,face,align,audio,cache,pipeline}.py`, driven by `scripts/02`–`12`, with
+**190 passing tests**. Both modalities are cached on one 40 ms grid and ready for a model.
+`api/` and the model packages are still empty stubs — Phases 4–16 untouched.
 
 ### 🔴 The one thing still blocked
 
@@ -42,9 +43,10 @@ comparison rather than quote 53.35% / 80.00% without provenance — see
 2. `make phase1` — metadata → CL-7 → manifest → subsets → statistics → tests.
 3. `make phase2` — models → smoke-100 video → face crops → gate → label check → sheets → overlays.
    Pulls ~19 MB of video and 3.8 MB of weights; the 25.5 GB stays on Kaggle (PF-6).
-4. ✋ **Do P2-8 and P2-10**: open `reports/figures/contact_sheets/` and watch
+4. `make phase3` — log-mel + MFCC on the video grid → ⛔ strict alignment gate → label check.
+5. ✋ **Do P2-8 and P2-10**: open `reports/figures/contact_sheets/` and watch
    `reports/figures/overlays/`. These are the two things nothing automated can sign off.
-5. Start **Phase 3** (audio) at P3-1.
+6. Start **Phase 4** (visual baseline) at P4-1 — the first phase with a model in it.
 
 ### Mirror verified — CL-7 PASSED 10/10 (2026-08-29)
 
@@ -83,8 +85,14 @@ from its original (142 vs 136 frames, 331 vs 310) — LAV-DF replaces a word wit
 The clips desynchronise from the manipulation point onward, so only the **leading edge** of
 divergence is informative; peak difference is not.
 
+**Phase 3 — the alignment gate holds at 100%.** One audio frame is one video frame by
+construction (`hop_length=640` = 40 ms = one frame at 25 fps), verified on 100/100 files. Label
+verification now covers **all three fake classes, 12/12, median error 0.000 s** — the audio arm
+reaches `audio_only` fakes, which are pixel-identical to their originals and so invisible to the
+visual method.
+
 ⚠️ **RAM returns in Phase 4.** Crops are 7.52 MB/video (PF-10), so feature extraction must stream
-and delete per video.
+and delete per video. Audio is only 64 KB/video and is not a constraint.
 
 ### Carried-forward open items
 
@@ -107,8 +115,8 @@ and delete per video.
 | 0 Environment | 13 | ✅ Complete — gate 33/33 |
 | 1 Dataset | 20 | ✅ **18/20** — gate 3/4; P1-3 blocked on PRE-1 |
 | 2 Video preproc | 15 | ✅ **13/15** — gate 8/8; P2-8 & P2-10 await ✋ |
-| 3 Audio preproc | 9 | ⬜ **Next** |
-| 4 Visual baseline | 12 | ⬜ Not started |
+| 3 Audio preproc | 9 | ✅ **9/9** — gate 100/100, no manual checks |
+| 4 Visual baseline | 12 | ⬜ **Next** — 🔬 Experiment A + Decision D-1 |
 | 5 Audio baseline | 8 | ⬜ Not started |
 | 6 Fusion | 8 | ⬜ Not started |
 | 7 Temporal | 6 | ⬜ Not started |
@@ -293,19 +301,46 @@ cascades either. Phase 2 now depends on `scripts/08_fetch_models.py` fetching a 
 
 ---
 
-## PHASE 3 — Audio Preprocessing
+## PHASE 3 — Audio Preprocessing — ✅ **COMPLETE 9/9 (2026-08-29)**
 
-| ID | Task |
-|---|---|
-| P3-1 | ffmpeg demux → forced mono downmix → resample to 16 kHz |
-| P3-2 | ⛔ Log-mel with `n_fft=1024`, **`hop_length=640`** (= 40 ms = 1 frame @ 25 fps), `n_mels=80`, `fmin=20`, `fmax=7600` — lock this and never change it |
-| P3-3 | Pre-emphasis + per-utterance CMVN; epsilon guard (`1e-10`) before log |
-| P3-4 | ⛔ Assert `audio_frames == video_frames ± 1` on **100% of files** (handle `center=True` padding here, not downstream) |
-| P3-5 | Build the parallel MFCC path for Experiment K |
-| P3-6 | Synthetic 440 Hz tone round-trip test → peak lands in the correct mel bin |
-| P3-7 | Flag all-zero waveforms as `no_audio` |
-| P3-8 | Write `tests/unit/test_audio_align.py` |
-| P3-9 | ⛔ **Gate:** alignment assertion green on the whole subset — strict, no rounding fudge |
+⛔ **Gate P3-9 PASSED: 100/100 files aligned exactly**, re-verified with `--force` so every
+file was re-derived rather than read from cache. No manual checks outstanding — this is the
+first phase since Phase 0 to close completely.
+
+| ID | Task | Status |
+|---|---|---|
+| P3-1 | ffmpeg demux → forced mono → resample to 16 kHz | ✅ `src/preprocessing/audio.py::decode_audio`. ffmpeg with explicit `-ac 1 -ar 16000` rather than librosa/audioread, so the downmix and resample are reproducible instead of depending on whichever backend gets selected |
+| P3-2 | ⛔ Log-mel `n_fft=1024`, **`hop_length=640`**, `n_mels=80`, `fmin=20`, `fmax=7600` — lock and never change | ✅ §C verbatim, and **the lock is enforced, not trusted**: `AudioPreprocessConfig` rejects any `hop_length` where `sample_rate/hop_length != 25`, naming the correct value. The conventional 10 ms hop is what someone reaches for later, and it would silently misalign every target |
+| P3-3 | Pre-emphasis + per-utterance CMVN; epsilon guard before log | ✅ `preemphasis(0.97)`, `cmvn()` per coefficient, `eps=1e-10` applied **before** the log. CMVN matters beyond convention here: without it a model can separate real from fake by recognising recording conditions and score well while learning nothing |
+| P3-4 | ⛔ Assert `audio_frames == video_frames ± 1` on **100%** of files | ✅ **100/100 on smoke-100, exactly.** Achieved by `fit_to_video()` — see PF-11: neither `center=True` (87.9%) nor `center=False` (63.4%) reaches 100% on this dataset |
+| P3-5 | Build the parallel MFCC path for Experiment K | ✅ `--feature mfcc`, DCT-II on the same log-mel so the arms differ by exactly one transform. Identical time axis (142×80 vs 142×40), separate cache root, 100/100 aligned |
+| P3-6 | Synthetic 440 Hz tone round-trip → peak in the correct mel bin | ✅ Exact bin at 220 / 440 / 1000 / 4000 Hz (440 Hz → bin 11, centre 456.5 Hz), plus a monotonicity check |
+| P3-7 | Flag all-zero waveforms as `no_audio` | ✅ `is_silent()` at 1e-6; silent clips are flagged and **skip CMVN** — normalising zero variance is dividing noise by noise. **0 silent clips in smoke-100** |
+| P3-8 | Write `tests/unit/test_audio_align.py` | ✅ 48 tests; suite now **190 passing** |
+| P3-9 | ⛔ **Gate:** alignment green on the whole subset — strict, no rounding fudge | ✅ **PASS — 100/100**, verified with `--force` so every file was re-derived, not read from cache. Exits non-zero on a single violation |
+
+**⛔ Finding — decision PF-11: the plan's two options both fall short.** P3-4 demands 100%, and
+over all 136,304 metadata entries standard framing gives `center=True` **87.9%** and
+`center=False` **63.4%**. The residue is not rounding — the decoded track genuinely is not
+`video_frames × 640` samples long, drifting up to +2.4 frames. `fit_to_video()` pads or trims the
+waveform to exactly `video_frames × hop_length` *before* the STFT, so the count is right **by
+construction**. Measured adjustment on smoke-100: mean **−1.32 frames**, range [−3.40, 0.00] —
+under 0.14 s, always at the tail, and recorded per file so the size of the fudge stays visible.
+
+**⚠️ Decision PF-12: configs split.** `PreprocessConfig` became `VideoPreprocessConfig` +
+`AudioPreprocessConfig` with independent cache roots. Under one combined config, retuning `n_mels`
+would have invalidated **7.5 MB/video of face crops** (73.5 GB at dev-10k) to rebuild a 64 KB
+log-mel — and Experiment K would have triggered exactly that.
+
+**✅ Audio verification closed the `audio_only` label gap.** `scripts/11_verify_labels.py` now runs
+both modalities. Comparing log-mel between an `audio_only` fake and its original, divergence onset
+matches the labelled span start on **5/5 pairs, median error 0.000 s**. Combined with the visual
+side that is **12/12 across all three fake classes** — and because the onset is counted in *audio
+frames* and compared against a labelled time in *seconds*, it confirms the §C grid as well as the
+labels.
+
+**Measured cost:** 0.094 s/video, **64 KB/video** — 117× smaller than face crops, so PF-10's
+streaming constraint does not apply to audio. dev-10k log-mels would be ~0.6 GB.
 
 ---
 
@@ -589,4 +624,4 @@ Not a separate phase — these are the tasks the local+Kaggle strategy adds.
 
 *Phase −1 complete except PRE-1 (report retrieval), which does not block Phases 0–15.*
 
-*Completed as of 2026-08-29: ~52 of 203 tasks (≈26%). Phases −1, 0, 1 and 2 done (Phase 1 at 18/20 with gate 3/4; Phase 2 at 13/15 with the automated gate 8/8). CL-1 and CL-7 complete. 130 passing tests. Outstanding: P1-3 blocked on PRE-1, and the two ✋ Phase 2 manual checks.*
+*Completed as of 2026-08-29: ~61 of 203 tasks (≈30%). Phases −1, 0, 1, 2 and 3 done (Phase 1 at 18/20 with gate 3/4; Phase 2 at 13/15 with the automated gate 8/8; Phase 3 complete 9/9). CL-1 and CL-7 complete. 190 passing tests. Outstanding: P1-3 blocked on PRE-1, and the two ✋ Phase 2 manual checks.*

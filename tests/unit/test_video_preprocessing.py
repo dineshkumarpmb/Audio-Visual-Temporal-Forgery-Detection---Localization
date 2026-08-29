@@ -11,7 +11,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from src.config import PreprocessConfig
+from src.config import VideoPreprocessConfig
 from src.preprocessing.align import ARCFACE_112, align_face, template, umeyama
 from src.preprocessing.cache import (
     cache_path,
@@ -215,12 +215,12 @@ class TestFrameCountAssertion:
 
 class TestCache:
     def test_path_is_content_hashed(self, tmp_path):
-        a = cache_root(PreprocessConfig(), tmp_path)
-        b = cache_root(PreprocessConfig(crop_size=224), tmp_path)
+        a = cache_root(VideoPreprocessConfig(), tmp_path)
+        b = cache_root(VideoPreprocessConfig(crop_size=224), tmp_path)
         assert a != b
 
     def test_roundtrip(self, tmp_path):
-        cfg = PreprocessConfig()
+        cfg = VideoPreprocessConfig()
         crops = np.random.default_rng(0).integers(0, 255, (7, 112, 112, 3), dtype=np.uint8)
         found = np.array([True] * 5 + [False] * 2)
         save_faces("v1", crops, found, cfg, tmp_path)
@@ -229,31 +229,31 @@ class TestCache:
         assert np.array_equal(np.asarray(got_found), found)
 
     def test_is_cached_reflects_reality(self, tmp_path):
-        cfg = PreprocessConfig()
+        cfg = VideoPreprocessConfig()
         assert not is_cached("v1", cfg, tmp_path)
         save_faces("v1", np.zeros((2, 112, 112, 3), np.uint8), np.ones(2, bool), cfg, tmp_path)
         assert is_cached("v1", cfg, tmp_path)
 
     def test_zero_byte_file_is_not_cached(self, tmp_path):
         """A truncated write must not be mistaken for completed work."""
-        cfg = PreprocessConfig()
+        cfg = VideoPreprocessConfig()
         p = cache_path("v1", cfg, tmp_path)
         p.parent.mkdir(parents=True, exist_ok=True)
         p.touch()
         assert not is_cached("v1", cfg, tmp_path)
 
     def test_no_temp_file_survives_a_successful_write(self, tmp_path):
-        cfg = PreprocessConfig()
+        cfg = VideoPreprocessConfig()
         save_faces("v1", np.zeros((2, 112, 112, 3), np.uint8), np.ones(2, bool), cfg, tmp_path)
         assert not list(cache_root(cfg, tmp_path).glob("*.tmp"))
 
     def test_different_config_does_not_see_the_other_cache(self, tmp_path):
         crops, found = np.zeros((2, 112, 112, 3), np.uint8), np.ones(2, bool)
-        save_faces("v1", crops, found, PreprocessConfig(), tmp_path)
-        assert not is_cached("v1", PreprocessConfig(n_mels=80), tmp_path)
+        save_faces("v1", crops, found, VideoPreprocessConfig(), tmp_path)
+        assert not is_cached("v1", VideoPreprocessConfig(crop_size=224), tmp_path)
 
     def test_dtype_guards(self, tmp_path):
-        cfg = PreprocessConfig()
+        cfg = VideoPreprocessConfig()
         with pytest.raises(TypeError, match="uint8"):
             save_faces("v", np.zeros((2, 4, 4, 3), np.float32), np.ones(2, bool), cfg, tmp_path)
         with pytest.raises(TypeError, match="bool"):
@@ -265,12 +265,12 @@ class TestCache:
                 "v",
                 np.zeros((3, 4, 4, 3), np.uint8),
                 np.ones(2, bool),
-                PreprocessConfig(),
+                VideoPreprocessConfig(),
                 tmp_path,
             )
 
     def test_stats(self, tmp_path):
-        cfg = PreprocessConfig()
+        cfg = VideoPreprocessConfig()
         assert cache_stats(cfg, tmp_path)["n"] == 0
         save_faces("v1", np.zeros((2, 112, 112, 3), np.uint8), np.ones(2, bool), cfg, tmp_path)
         stats = cache_stats(cfg, tmp_path)

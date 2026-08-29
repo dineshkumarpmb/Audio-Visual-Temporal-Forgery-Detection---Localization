@@ -344,6 +344,65 @@ is CPU-bound here, so this figure is not improved by the GPU.
 
 ---
 
+## Phase 3 decisions — resolved 2026-08-29
+
+### PF-11 · The waveform is fitted to `video_frames × hop` before the STFT
+
+**Decision: explicit pad/trim, so P3-4 holds by construction.** ✅ Resolved 2026-08-29.
+Implements the fix PROJECT_PLAN Phase 3 asks for ("handle `center=True` padding here, not
+downstream") — but neither option the plan offers is sufficient on its own.
+
+**What was measured.** P3-4/P3-9 demand `audio_frames == video_frames ± 1` on **100%** of files,
+"no rounding fudge". Over all 136,304 metadata entries, standard STFT framing gives:
+
+| framing | frames within ±1 of `video_frames` |
+|---|---|
+| `center=True` (`1 + A//hop`) | 119,823 / 136,304 — **87.9%** |
+| `center=False` (`1 + (A−n_fft)//hop`) | 86,440 / 136,304 — **63.4%** |
+
+Neither passes. The residue is **not** a rounding artefact: the decoded track genuinely is not
+`video_frames × 640` samples long. Measured on real files it drifts from exactly 0 up to about
++2.4 frames, and `audio_frames/640 − video_frames` spans −0.2 to −0.8 in metadata.
+
+**Resolution.** `fit_to_video()` pads with zeros or trims the decoded waveform to exactly
+`video_frames × hop_length` samples *before* the STFT, then `center=True` yields `T+1` frames of
+which the trailing one is dropped. The frame count is then correct **by construction on 100% of
+files**, not by luck. Measured over smoke-100 the adjustment is mean −1.32 frames, range
+[−3.40, 0.00] — under 0.14 s, always at the tail.
+
+**Why the size of the adjustment is reported.** Padding a waveform is a small fiction, so
+`AudioResult.pad_frames` records it per file and the extraction script prints the distribution.
+A silent fudge is exactly what the gate exists to prevent; a measured, bounded one is fine.
+
+**Verified independently.** `scripts/11_verify_labels.py --modality audio` compares log-mel
+between an `audio_only` fake and its original: divergence onset matches the labelled span start on
+**5/5 pairs, median error 0.000 s**. Since the onset is counted in audio frames and compared
+against a labelled time in seconds, that confirms the grid as well as the labels.
+
+### PF-12 · Video and audio preprocessing configs are separate, hashed separately
+
+**Decision: split `PreprocessConfig` into `VideoPreprocessConfig` + `AudioPreprocessConfig`.**
+✅ Resolved 2026-08-29.
+
+**Why.** Section 3.8's content-hashed cache invalidates on any config change. With one combined
+config, retuning `n_mels` would invalidate **7.5 MB/video of face crops** (PF-10) — 73.5 GB at
+dev-10k — to rebuild a 64 KB/video log-mel. Experiment K (MFCC vs log-mel) would have triggered
+exactly that. Two configs, two cache roots, so each side invalidates only itself.
+
+`AudioPreprocessConfig` also enforces the section C grid rather than trusting it: a validator
+rejects any `hop_length` for which `sample_rate / hop_length != 25`, naming the correct value in
+the error. The conventional 10 ms hop is the obvious thing for someone to reach for later, and it
+would silently misalign every localization target.
+
+**Default is log-mel, not MFCC** — the plan's C-1 recommendation. This does **not** resolve C-1:
+that is settled by Experiment K in Phase 5. The MFCC arm is built and produces an identical time
+axis (`--feature mfcc`), so the experiment is a one-flag change.
+
+**Measured cost of the audio side:** 0.094 s/video, **64 KB/video** — 117× smaller than the face
+crops, so PF-10's streaming constraint does not apply here. dev-10k log-mels would be ~0.6 GB.
+
+---
+
 ## Appendix B — architectural decisions
 
 | ID | Decision | Options | Resolved by | Date | Outcome |

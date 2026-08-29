@@ -34,7 +34,7 @@ import numpy as np
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from src.config import PreprocessConfig, config_hash  # noqa: E402
+from src.config import VideoPreprocessConfig, config_hash  # noqa: E402
 from src.data.manifest import read_manifest  # noqa: E402
 from src.data.subset import load_subset  # noqa: E402
 from src.preprocessing.cache import cache_path, is_cached, load_faces  # noqa: E402
@@ -97,7 +97,7 @@ def main() -> int:
     ap.add_argument("--n", type=int, default=6, help="videos to use (each is extracted twice)")
     args = ap.parse_args()
 
-    cfg = PreprocessConfig()
+    cfg = VideoPreprocessConfig()
     video_root = Path(args.video_root or f"data/raw/LAV-DF/{args.subset}")
     manifest = read_manifest(args.manifest).set_index("video_id")
     ids = [

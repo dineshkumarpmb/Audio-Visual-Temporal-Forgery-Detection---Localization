@@ -1,31 +1,35 @@
 """Objective ground-truth verification for P2-10 / PROJECT_PLAN section 6.3.
 
     python scripts/11_verify_labels.py --subset smoke-100
+    python scripts/11_verify_labels.py --modality visual
 
 Section 6.3 calls ground-truth alignment "the highest-risk step in the project", and
 task P2-10 answers it with a human watching 20 overlay videos. That check is still
 required and nothing here replaces it — but it is subjective, and a half-second
-systematic offset is exactly the kind of thing an eye will forgive and a metric will
-not.
+systematic offset is exactly the kind of thing an eye will forgive and a metric will not.
 
 This adds an objective check alongside it, using a signal the dataset gives away for
-free: **every fake names its `original`.** Compare a visual fake against the real video
-it was built from and the frames must be near-identical until the manipulation starts,
-then diverge. So the *onset of divergence* is an independent measurement of where the
-forgery actually begins, derived from pixels rather than from the metadata being tested.
+free: **every fake names its `original`.** A fake must be near-identical to the real
+video it was built from until the manipulation starts, then diverge. So the *onset of
+divergence* independently measures where the forgery actually begins, from the media
+itself rather than from the metadata under test. A wrong unit, a wrong timeline origin
+or an off-by-one rasterisation would all show up here as a mismatch.
 
-If `fake_periods` were in the wrong units, on the wrong timeline, or rasterised with an
-off-by-one, the measured onset would not match the labelled start. Measured on LAV-DF
-it matches to within half a frame.
+Two modalities, because they cover different classes:
 
-⚠️ **Compare onset, not peak.** A LAV-DF fake replaces a word with a different word, so
-it is usually a *different length* from its original (e.g. 142 frames vs 136). The two
-videos desynchronise from the manipulation point onward and stay divergent for the rest
-of the clip. The peak difference is therefore meaningless; only the leading edge carries
-information.
+  **visual** — compares decoded frames. Covers `visual_only` and `both`.
+  **audio**  — compares log-mel on the video frame grid. Covers `audio_only` and `both`,
+               which the visual method cannot touch at all: an `audio_only` fake has, by
+               construction, pixel-identical frames. It also double-checks Phase 3's grid,
+               since the onset is measured in audio frames and compared against seconds.
 
-Only `modify_video` classes are testable. An `audio_only` fake has, by construction, no
-visual difference at all — its frames are the original's.
+Together they cover every fake class.
+
+⚠️ **Compare onset, not peak.** A LAV-DF fake replaces a word with a different word, so it
+is usually a *different length* from its original (e.g. 142 frames vs 136). The two clips
+desynchronise from the manipulation point onward and stay divergent for the rest of the
+clip. The peak difference is therefore meaningless and typically lands well after the
+span; only the leading edge carries information.
 """
 
 from __future__ import annotations
@@ -40,14 +44,20 @@ import numpy as np
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from src.config import LAVDF_FPS  # noqa: E402
+from src.config import LAVDF_FPS, AudioPreprocessConfig  # noqa: E402
 from src.data.manifest import read_manifest  # noqa: E402
+from src.preprocessing.audio import extract_audio  # noqa: E402
 from src.utils.console import init_console  # noqa: E402
 
 GREEN, RED, YELLOW, DIM, RESET = "\033[32m", "\033[31m", "\033[33m", "\033[2m", "\033[0m"
 
 # One frame at 25 fps is 0.04 s. Half a frame of agreement is as good as this can get.
 TOLERANCE_S = 0.5
+
+# CMVN is deliberately OFF for the audio comparison: it normalises each clip by its own
+# statistics, so the fake and the original would be scaled differently and the difference
+# between them would stop meaning anything.
+AUDIO_CFG = AudioPreprocessConfig(cmvn=False)
 
 
 def gray_frames(path: Path, limit: int) -> np.ndarray:
@@ -66,36 +76,41 @@ def gray_frames(path: Path, limit: int) -> np.ndarray:
     return np.array(out)
 
 
-def divergence_onset(fake: Path, real: Path, span_start_s: float, n_frames: int) -> float | None:
-    """First second at which the fake departs from its original.
+def onset_from_curve(diff: np.ndarray, span_start_s: float) -> float | None:
+    """First second at which `diff` leaves its pre-manipulation baseline.
 
-    The threshold is set from the *pre-manipulation* region only (mean + 4 sd), so the
-    constant offset introduced by re-encoding cancels out instead of masking the signal.
+    The threshold comes from the pre-manipulation region alone (mean + 4 sd), so the
+    constant offset introduced by re-encoding cancels instead of masking the signal.
     """
-    limit = n_frames
-    a, b = gray_frames(fake, limit), gray_frames(real, limit)
-    m = min(len(a), len(b))
-    if m < 20:
-        return None
-
-    diff = np.abs(a[:m] - b[:m]).mean(axis=(1, 2))
     pre = max(3, int(round(span_start_s * LAVDF_FPS)))
-    if pre >= m:
+    if pre >= len(diff):
         return None
     baseline = diff[:pre]
-    threshold = baseline.mean() + 4.0 * baseline.std() + 1e-6
-
-    above = np.flatnonzero(diff > threshold)
+    above = np.flatnonzero(diff > baseline.mean() + 4.0 * baseline.std() + 1e-9)
     return float(above[0] / LAVDF_FPS) if above.size else None
+
+
+def visual_diff(fake: Path, real: Path, limit: int) -> np.ndarray | None:
+    a, b = gray_frames(fake, limit), gray_frames(real, limit)
+    m = min(len(a), len(b))
+    return np.abs(a[:m] - b[:m]).mean(axis=(1, 2)) if m >= 20 else None
+
+
+def audio_diff(fake: Path, real: Path, limit: int) -> np.ndarray | None:
+    a = extract_audio(fake, limit, AUDIO_CFG).features
+    b = extract_audio(real, limit, AUDIO_CFG).features
+    m = min(len(a), len(b))
+    return np.abs(a[:m] - b[:m]).mean(axis=1) if m >= 20 else None
 
 
 def main() -> int:
     init_console()
-    ap = argparse.ArgumentParser(description="Verify fake_periods against pixel evidence")
+    ap = argparse.ArgumentParser(description="Verify fake_periods against media evidence")
     ap.add_argument("--subset", default="smoke-100")
     ap.add_argument("--manifest", default="data/manifests/manifest_v1.parquet")
     ap.add_argument("--video-root", default=None, help="default: data/raw/LAV-DF/<subset>")
     ap.add_argument("--out", default="reports/label_verification.md")
+    ap.add_argument("--modality", choices=("both", "visual", "audio"), default="both")
     ap.add_argument("--tolerance", type=float, default=TOLERANCE_S)
     args = ap.parse_args()
 
@@ -103,73 +118,81 @@ def main() -> int:
     df = read_manifest(args.manifest).set_index("video_id")
     have = {p.stem for p in root.glob("*.mp4")}
 
-    pairs = []
-    for vid in sorted(have):
-        if vid not in df.index:
-            continue
-        row = df.loc[vid]
-        if row.original is None or not row.modify_video or not len(row.fake_periods):
-            continue
-        oid = row.original.replace("/", "_").rsplit(".", 1)[0]
-        if oid in have:
-            pairs.append((vid, oid, row))
-
+    wanted = ("visual", "audio") if args.modality == "both" else (args.modality,)
     print(
-        f"{DIM}{'=' * 72}{RESET}\n  Ground-truth verification (section 6.3 / P2-10)\n{DIM}{'=' * 72}{RESET}"
-    )
-    if not pairs:
-        print(f"{YELLOW}no fake/original pairs available locally.{RESET}")
-        print("  Both a visual fake and the video named in its `original` field must be present.")
-        print(
-            f"  Fetch some with: python scripts/05_fetch_metadata.py --subset {args.subset} "
-            "--with-originals"
-        )
-        return 1
-
-    print(f"  {len(pairs)} visual fake/original pair(s) under {root}\n")
-    print(
-        f"  {'video':<14}{'class':<13}{'frames f/o':>12}{'labelled':>10}{'measured':>10}"
-        f"{'error':>8}"
+        f"{DIM}{'=' * 72}{RESET}\n  Ground-truth verification (section 6.3 / P2-10)"
+        f"\n{DIM}{'=' * 72}{RESET}"
     )
 
-    rows, errors = [], []
-    for vid, oid, row in pairs:
-        start = min(s for s, _ in row.fake_periods)
-        onset = divergence_onset(root / f"{vid}.mp4", root / f"{oid}.mp4", start, int(row.n_frames))
-        if onset is None:
-            print(f"  {vid:<14}{row.class_name:<13}{'-':>12}{start:>10.2f}{'n/a':>10}{'-':>8}")
+    rows: list[dict] = []
+    for modality in wanted:
+        flag = "modify_video" if modality == "visual" else "modify_audio"
+        pairs = []
+        for vid in sorted(have):
+            if vid not in df.index:
+                continue
+            row = df.loc[vid]
+            if row.original is None or not getattr(row, flag) or not len(row.fake_periods):
+                continue
+            oid = row.original.replace("/", "_").rsplit(".", 1)[0]
+            if oid in have:
+                pairs.append((vid, oid, row))
+
+        print(f"\n  {modality.upper()} — {len(pairs)} pair(s)")
+        if not pairs:
+            print(f"  {YELLOW}none available locally{RESET}")
             continue
-        err = float(abs(onset - start))
-        errors.append(err)
-        # bool(), not the numpy scalar the comparison yields -- np.bool_ is not
-        # JSON-serialisable and would only fail at the very end, after all the work.
-        ok = bool(err <= args.tolerance)
-        rows.append(
-            {
-                "video_id": vid,
-                "original": oid,
-                "class": row.class_name,
-                "labelled_start_s": round(start, 3),
-                "measured_onset_s": round(onset, 3),
-                "error_s": round(err, 3),
-                "pass": ok,
-                "frames_fake": int(row.n_frames),
-                "frames_real": int(df.loc[oid, "n_frames"]),
-            }
-        )
-        mark = GREEN if ok else RED
         print(
-            f"  {vid:<14}{row.class_name:<13}"
-            f"{str(int(row.n_frames)) + '/' + str(int(df.loc[oid, 'n_frames'])):>12}"
-            f"{start:>10.2f}{onset:>10.2f}{mark}{err:>8.2f}{RESET}"
+            f"  {'video':<14}{'class':<13}{'frames f/o':>12}{'labelled':>10}"
+            f"{'measured':>10}{'error':>8}"
         )
+
+        for vid, oid, row in pairs:
+            limit = min(int(row.n_frames), int(df.loc[oid, "n_frames"]))
+            start = min(s for s, _ in row.fake_periods)
+            diff = (visual_diff if modality == "visual" else audio_diff)(
+                root / f"{vid}.mp4", root / f"{oid}.mp4", limit
+            )
+            onset = onset_from_curve(diff, start) if diff is not None else None
+            if onset is None:
+                print(f"  {vid:<14}{row.class_name:<13}{'-':>12}{start:>10.2f}{'n/a':>10}{'-':>8}")
+                continue
+            err = float(abs(onset - start))
+            ok = bool(err <= args.tolerance)
+            rows.append(
+                {
+                    "modality": modality,
+                    "video_id": vid,
+                    "original": oid,
+                    "class": row.class_name,
+                    "labelled_start_s": round(start, 3),
+                    "measured_onset_s": round(onset, 3),
+                    "error_s": round(err, 3),
+                    "pass": ok,
+                    "frames_fake": int(row.n_frames),
+                    "frames_real": int(df.loc[oid, "n_frames"]),
+                }
+            )
+            mark = GREEN if ok else RED
+            frames = f"{int(row.n_frames)}/{int(df.loc[oid, 'n_frames'])}"
+            print(
+                f"  {vid:<14}{row.class_name:<13}{frames:>12}{start:>10.2f}"
+                f"{onset:>10.2f}{mark}{err:>8.2f}{RESET}"
+            )
 
     if not rows:
-        print(f"\n{RED}no pair produced a measurable onset{RESET}")
+        print(
+            f"\n{YELLOW}no measurable pairs.{RESET} Both a fake and the video named in its "
+            "`original` field must be present locally."
+        )
+        print(
+            f"  Fetch: python scripts/05_fetch_metadata.py --subset {args.subset} --with-originals"
+        )
         return 1
 
-    arr = np.array(errors)
-    n_ok = int((arr <= args.tolerance).sum())
+    arr = np.array([r["error_s"] for r in rows])
+    n_ok = int(sum(r["pass"] for r in rows))
+    covered = sorted({r["class"] for r in rows})
     facts = {
         "subset": args.subset,
         "n_pairs": len(rows),
@@ -177,6 +200,7 @@ def main() -> int:
         "tolerance_s": args.tolerance,
         "median_error_s": round(float(np.median(arr)), 4),
         "max_error_s": round(float(arr.max()), 4),
+        "classes_covered": covered,
         "rows": rows,
     }
     Path("reports/label_facts.json").write_text(
@@ -188,6 +212,7 @@ def main() -> int:
         f"\n  median error {np.median(arr):.3f}s, max {arr.max():.3f}s "
         f"(one frame = {1 / LAVDF_FPS:.2f}s)"
     )
+    print(f"  classes covered: {', '.join(covered)}")
     passed = n_ok == len(rows)
     print(
         f"\n{GREEN if passed else RED}"
@@ -196,15 +221,13 @@ def main() -> int:
     )
     print(f"  wrote {args.out}")
     if passed:
-        print(
-            f"  {DIM}This is evidence, not a substitute: P2-10's human watch still stands.{RESET}"
-        )
+        print(f"  {DIM}Evidence, not a substitute: P2-10's human watch still stands.{RESET}")
     return 0 if passed else 1
 
 
 def _write(path: Path, facts: dict) -> None:
     lines = [
-        "# Ground-truth verification — `fake_periods` against pixel evidence",
+        "# Ground-truth verification — `fake_periods` against media evidence",
         "",
         "Generated by `scripts/11_verify_labels.py`. Companion to the ✋ P2-10 manual watch,",
         "not a replacement for it.",
@@ -213,26 +236,38 @@ def _write(path: Path, facts: dict) -> None:
         f"{facts['tolerance_s']}s.** Median error **{facts['median_error_s']}s**, "
         f"max {facts['max_error_s']}s. One frame at 25 fps is 0.04 s.",
         "",
+        f"Classes covered: **{', '.join(facts['classes_covered'])}**.",
+        "",
         "## Method",
         "",
-        "Every LAV-DF fake names the real video it was built from. A visual fake must be",
+        "Every LAV-DF fake names the real video it was built from. A fake must be",
         "near-identical to that original until the manipulation begins, then diverge — so the",
-        "onset of divergence measures where the forgery actually starts, **from pixels**,",
+        "onset of divergence measures where the forgery actually starts, **from the media**,",
         "independently of the metadata under test. A wrong unit, a wrong timeline origin or an",
         "off-by-one rasterisation would all show up as a mismatch here.",
         "",
         "The detection threshold is computed from the pre-manipulation region alone, so the",
         "constant difference introduced by re-encoding cancels rather than masking the signal.",
         "",
+        "Two modalities, covering different classes:",
+        "",
+        "- **visual** — decoded frames. Covers `visual_only` and `both`.",
+        "- **audio** — log-mel on the video frame grid (CMVN off, since it would scale each",
+        "  clip by its own statistics and destroy the comparison). Covers `audio_only` and",
+        "  `both` — classes the visual method cannot touch, because an `audio_only` fake has",
+        "  pixel-identical frames. It also independently confirms Phase 3's grid: the onset is",
+        "  measured in audio frames and compared against a labelled time in seconds.",
+        "",
         "## Results",
         "",
-        "| Video | Class | Frames fake/real | Labelled start | Measured onset | Error |",
-        "|---|---|---|---|---|---|",
+        "| Modality | Video | Class | Frames fake/real | Labelled | Measured | Error |",
+        "|---|---|---|---|---|---|---|",
     ]
     for r in facts["rows"]:
         lines.append(
-            f"| `{r['video_id']}` | {r['class']} | {r['frames_fake']}/{r['frames_real']} | "
-            f"{r['labelled_start_s']:.2f}s | {r['measured_onset_s']:.2f}s | {r['error_s']:.2f}s |"
+            f"| {r['modality']} | `{r['video_id']}` | {r['class']} | "
+            f"{r['frames_fake']}/{r['frames_real']} | {r['labelled_start_s']:.2f}s | "
+            f"{r['measured_onset_s']:.2f}s | {r['error_s']:.2f}s |"
         )
     lines += [
         "",
@@ -243,12 +278,6 @@ def _write(path: Path, facts: dict) -> None:
         "desynchronise from the manipulation point onward and stay divergent to the end, which",
         "makes the peak difference uninformative and often located well after the span. Only the",
         "leading edge carries usable information.",
-        "",
-        "## Scope",
-        "",
-        "Only `modify_video` classes are testable. An `audio_only` fake has, by construction, no",
-        "visual difference from its original, so this method says nothing about those spans —",
-        "they rest on the metadata and on P2-10's watch.",
     ]
     while lines and not lines[-1].strip():
         lines.pop()

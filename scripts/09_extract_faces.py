@@ -24,7 +24,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from src.config import PreprocessConfig, config_hash  # noqa: E402
+from src.config import VideoPreprocessConfig, config_hash  # noqa: E402
 from src.data.manifest import read_manifest  # noqa: E402
 from src.data.subset import load_subset  # noqa: E402
 from src.preprocessing.cache import cache_stats  # noqa: E402
@@ -42,7 +42,7 @@ FOUND_THRESHOLD = 0.9
 def _job(args: tuple) -> dict:
     """One video, in a worker process. Returns a plain dict so it pickles cheaply."""
     video_id, path, n_frames, cfg_json, root, force = args
-    cfg = PreprocessConfig.model_validate_json(cfg_json)
+    cfg = VideoPreprocessConfig.model_validate_json(cfg_json)
     global _LANDMARKER  # noqa: PLW0603 - one model per process, reused across videos
     try:
         landmarker = _LANDMARKER
@@ -73,7 +73,7 @@ def main() -> int:
     args = ap.parse_args()
 
     seed_everything(args.seed)
-    cfg = PreprocessConfig()
+    cfg = VideoPreprocessConfig()
     video_root = Path(args.video_root or f"data/raw/LAV-DF/{args.subset}")
 
     ids = load_subset(args.subset, args.subset_dir)
@@ -140,7 +140,7 @@ def _tick(done: int, total: int, start: float) -> None:
         print(f"    {done}/{total}  {DIM}{rate:.2f} videos/s{RESET}", flush=True)
 
 
-def _report(results: list[dict], cfg: PreprocessConfig, args, elapsed: float) -> int:
+def _report(results: list[dict], cfg: VideoPreprocessConfig, args, elapsed: float) -> int:
     failed = [r for r in results if r["error"]]
     fresh = [r for r in results if not r["cached"] and not r["error"]]
     skipped = [r for r in results if r["cached"]]

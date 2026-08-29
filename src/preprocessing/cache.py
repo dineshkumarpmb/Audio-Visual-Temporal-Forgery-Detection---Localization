@@ -22,22 +22,24 @@ import os
 from pathlib import Path
 
 import numpy as np
+from pydantic import BaseModel
 
-from src.config import PreprocessConfig, config_hash
+from src.config import VideoPreprocessConfig, config_hash
 
 FACES_ROOT = Path("data/interim/faces")
+AUDIO_ROOT = Path("data/interim/audio")
 
 
-def cache_root(cfg: PreprocessConfig, root: Path | str = FACES_ROOT) -> Path:
+def cache_root(cfg: VideoPreprocessConfig, root: Path | str = FACES_ROOT) -> Path:
     """The directory this config's crops live in."""
     return Path(root) / config_hash(cfg)
 
 
-def cache_path(video_id: str, cfg: PreprocessConfig, root: Path | str = FACES_ROOT) -> Path:
+def cache_path(video_id: str, cfg: VideoPreprocessConfig, root: Path | str = FACES_ROOT) -> Path:
     return cache_root(cfg, root) / f"{video_id}.npz"
 
 
-def is_cached(video_id: str, cfg: PreprocessConfig, root: Path | str = FACES_ROOT) -> bool:
+def is_cached(video_id: str, cfg: VideoPreprocessConfig, root: Path | str = FACES_ROOT) -> bool:
     """True if a complete artefact exists. A zero-byte file is not complete."""
     path = cache_path(video_id, cfg, root)
     try:
@@ -50,7 +52,7 @@ def save_faces(
     video_id: str,
     crops: np.ndarray,
     found: np.ndarray,
-    cfg: PreprocessConfig,
+    cfg: VideoPreprocessConfig,
     root: Path | str = FACES_ROOT,
 ) -> Path:
     """Write crops + mask atomically.
@@ -82,7 +84,7 @@ def save_faces(
 
 
 def load_faces(
-    video_id: str, cfg: PreprocessConfig, root: Path | str = FACES_ROOT
+    video_id: str, cfg: VideoPreprocessConfig, root: Path | str = FACES_ROOT
 ) -> tuple[np.ndarray, np.ndarray]:
     """Read back crops and mask. Uses mmap so a batch does not pull whole clips into RAM."""
     path = cache_path(video_id, cfg, root)
@@ -90,7 +92,7 @@ def load_faces(
         return data["crops"], data["found"]
 
 
-def cache_stats(cfg: PreprocessConfig, root: Path | str = FACES_ROOT) -> dict:
+def cache_stats(cfg: VideoPreprocessConfig, root: Path | str = FACES_ROOT) -> dict:
     """Size and count of a cache directory, for progress reporting."""
     directory = cache_root(cfg, root)
     if not directory.exists():
@@ -102,3 +104,50 @@ def cache_stats(cfg: PreprocessConfig, root: Path | str = FACES_ROOT) -> dict:
         "bytes": sum(f.stat().st_size for f in files),
         "partial": len(list(directory.glob("*.npz.tmp"))),
     }
+
+
+# ---------------------------------------------------------------------------------
+# Audio side (Phase 3). Same content-hashing and same atomic-write discipline, but a
+# separate config and therefore a separate cache root: retuning `n_mels` must not
+# invalidate 7.5 MB/video of face crops (PF-10).
+# ---------------------------------------------------------------------------------
+
+
+def audio_path(video_id: str, cfg: BaseModel, root: Path | str = AUDIO_ROOT) -> Path:
+    return cache_root(cfg, root) / f"{video_id}.npy"
+
+
+def is_audio_cached(video_id: str, cfg: BaseModel, root: Path | str = AUDIO_ROOT) -> bool:
+    path = audio_path(video_id, cfg, root)
+    try:
+        return path.is_file() and path.stat().st_size > 0
+    except OSError:
+        return False
+
+
+def save_audio(
+    video_id: str, features: np.ndarray, cfg: BaseModel, root: Path | str = AUDIO_ROOT
+) -> Path:
+    """Write `(T, n_mels)` float32 atomically, as section C specifies."""
+    if features.dtype != np.float32:
+        raise TypeError(f"features must be float32, got {features.dtype}")
+    if features.ndim != 2:
+        raise ValueError(f"features must be 2-D (T, n_mels), got shape {features.shape}")
+
+    path = audio_path(video_id, cfg, root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".npy.tmp")
+    try:
+        with tmp.open("wb") as fh:
+            np.save(fh, features)
+            fh.flush()
+            os.fsync(fh.fileno())
+        tmp.replace(path)
+    finally:
+        if tmp.exists():
+            tmp.unlink(missing_ok=True)
+    return path
+
+
+def load_audio(video_id: str, cfg: BaseModel, root: Path | str = AUDIO_ROOT) -> np.ndarray:
+    return np.load(audio_path(video_id, cfg, root), mmap_mode="r")

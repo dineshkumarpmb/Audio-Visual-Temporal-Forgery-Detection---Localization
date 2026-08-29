@@ -31,7 +31,7 @@ import numpy as np
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from src.config import PreprocessConfig, config_hash  # noqa: E402
+from src.config import VideoPreprocessConfig, config_hash  # noqa: E402
 from src.data.subset import load_subset  # noqa: E402
 from src.preprocessing.cache import cache_root, is_cached, load_faces  # noqa: E402
 from src.utils.console import init_console  # noqa: E402
@@ -77,7 +77,7 @@ def main() -> int:
     ap.add_argument("--seed", type=int, default=1337)
     args = ap.parse_args()
 
-    cfg = PreprocessConfig()
+    cfg = VideoPreprocessConfig()
     out = Path(args.out_dir)
     out.mkdir(parents=True, exist_ok=True)
 

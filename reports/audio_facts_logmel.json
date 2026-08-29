@@ -1,0 +1,28 @@
+{
+  "subset": "smoke-100",
+  "config_hash": "6cc74f25",
+  "config": {
+    "sample_rate": 16000,
+    "n_fft": 1024,
+    "hop_length": 640,
+    "n_mels": 80,
+    "fmin": 20.0,
+    "fmax": 7600.0,
+    "preemphasis": 0.97,
+    "cmvn": true,
+    "eps": 1e-10,
+    "feature": "logmel",
+    "n_mfcc": 40
+  },
+  "n_extracted": 100,
+  "n_failed": 0,
+  "n_silent": 0,
+  "n_alignment_violations": 0,
+  "n_checked": 100,
+  "wall_clock_s": 9.26,
+  "seconds_per_video": 0.0926,
+  "pad_frames_mean": -1.316,
+  "pad_frames_min": -3.4,
+  "pad_frames_max": 0.0,
+  "cache_bytes": 6719360
+}

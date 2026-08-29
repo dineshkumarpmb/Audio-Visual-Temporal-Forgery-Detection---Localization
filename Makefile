@@ -13,7 +13,7 @@ TORCH_PINS  := torch==2.7.1+cu118 torchvision==0.22.1+cu118 torchaudio==2.7.1+cu
 
 .DEFAULT_GOAL := help
 .PHONY: help venv torch install install-dev check check-bench check-kaggle lint fmt \
-        typecheck test test-cov fetch-meta manifest subset verify-subsets verify-mirror \n        stats phase1 models faces verify-preproc verify-labels sheets overlays phase2 \n        features train evaluate ablations \
+        typecheck test test-cov fetch-meta manifest subset verify-subsets verify-mirror \n        stats phase1 models faces verify-preproc verify-labels sheets overlays phase2 \n        audio audio-mfcc phase3 \n        features train evaluate ablations \
         benchmark api frontend demo clean-bench
 
 help:  ## Show this help
@@ -36,6 +36,7 @@ help:  ## Show this help
 	@echo   Pipeline
 	@echo     fetch-meta manifest subset verify-subsets verify-mirror stats phase1
 	@echo     models faces verify-preproc verify-labels sheets overlays phase2
+	@echo     audio audio-mfcc phase3
 	@echo     features train evaluate ablations benchmark
 	@echo.
 	@echo   Serving
@@ -150,6 +151,20 @@ phase2:     ## Phase 2 - the whole pipeline, in order
 	$(MAKE) sheets
 	$(MAKE) overlays
 	$(PY) -m pytest tests/ -q
+
+audio:      ## Phase 3 - extract log-mel on the video frame grid (resumable)
+	$(PY) scripts/12_extract_audio.py $(ARGS)
+
+audio-mfcc: ## Phase 3 - the MFCC arm for Experiment K (separate cache)
+	$(PY) scripts/12_extract_audio.py --feature mfcc $(ARGS)
+
+phase3:     ## Phase 3 - audio pipeline + the strict alignment gate
+	$(MAKE) audio ARGS=--force
+	$(MAKE) audio-mfcc
+# --modality both, not audio: the report is one document covering all three fake
+# classes, and an audio-only run would overwrite the visual half.
+	$(PY) scripts/11_verify_labels.py --modality both
+	$(PY) -m pytest tests/unit/test_audio_align.py -q
 
 features:   ## Phases 2-5 — Stage-A extraction (resumable; safe to re-run)
 	$(PY) scripts/04_extract_visual.py

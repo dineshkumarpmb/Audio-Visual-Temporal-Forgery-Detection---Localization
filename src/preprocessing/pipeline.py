@@ -24,7 +24,7 @@ from pathlib import Path
 
 import numpy as np
 
-from src.config import PreprocessConfig
+from src.config import VideoPreprocessConfig
 from src.preprocessing.align import align_face
 from src.preprocessing.cache import is_cached, save_faces
 from src.preprocessing.face import FaceLandmarkerPool, FaceTrack, choose_face, interpolate_track
@@ -52,7 +52,7 @@ class ExtractionResult:
 def detect_track(
     path: str | Path,
     n_frames: int,
-    cfg: PreprocessConfig,
+    cfg: VideoPreprocessConfig,
     landmarker: FaceLandmarkerPool,
     *,
     max_gap: int = DEFAULT_MAX_GAP,
@@ -74,7 +74,7 @@ def detect_track(
     return interpolate_track(keyframes, n_frames, max_gap=max_gap)
 
 
-def align_all(path: str | Path, track: FaceTrack, cfg: PreprocessConfig) -> np.ndarray:
+def align_all(path: str | Path, track: FaceTrack, cfg: VideoPreprocessConfig) -> np.ndarray:
     """Pass 2: warp each frame onto the canonical template (P2-2).
 
     Frames with no face still produce a crop — the geometry is held from the nearest
@@ -94,7 +94,7 @@ def extract_video(
     path: str | Path,
     video_id: str,
     n_frames: int,
-    cfg: PreprocessConfig,
+    cfg: VideoPreprocessConfig,
     landmarker: FaceLandmarkerPool,
     *,
     root: Path | str = "data/interim/faces",

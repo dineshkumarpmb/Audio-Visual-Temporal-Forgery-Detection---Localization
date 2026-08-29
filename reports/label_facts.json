@@ -1,12 +1,18 @@
 {
   "subset": "smoke-100",
-  "n_pairs": 7,
-  "n_within_tolerance": 7,
+  "n_pairs": 12,
+  "n_within_tolerance": 12,
   "tolerance_s": 0.5,
   "median_error_s": 0.0,
   "max_error_s": 0.02,
+  "classes_covered": [
+    "audio_only",
+    "both",
+    "visual_only"
+  ],
   "rows": [
     {
+      "modality": "visual",
       "video_id": "dev_004542",
       "original": "dev_004541",
       "class": "both",
@@ -18,6 +24,7 @@
       "frames_real": 136
     },
     {
+      "modality": "visual",
       "video_id": "dev_011692",
       "original": "dev_011690",
       "class": "visual_only",
@@ -29,6 +36,7 @@
       "frames_real": 103
     },
     {
+      "modality": "visual",
       "video_id": "dev_011977",
       "original": "dev_011975",
       "class": "visual_only",
@@ -40,6 +48,7 @@
       "frames_real": 123
     },
     {
+      "modality": "visual",
       "video_id": "dev_036672",
       "original": "dev_036670",
       "class": "visual_only",
@@ -51,6 +60,7 @@
       "frames_real": 140
     },
     {
+      "modality": "visual",
       "video_id": "dev_059095",
       "original": "dev_059093",
       "class": "visual_only",
@@ -62,6 +72,7 @@
       "frames_real": 105
     },
     {
+      "modality": "visual",
       "video_id": "dev_096788",
       "original": "dev_096783",
       "class": "visual_only",
@@ -73,6 +84,67 @@
       "frames_real": 256
     },
     {
+      "modality": "visual",
+      "video_id": "dev_097533",
+      "original": "dev_097532",
+      "class": "both",
+      "labelled_start_s": 1.1,
+      "measured_onset_s": 1.12,
+      "error_s": 0.02,
+      "pass": true,
+      "frames_fake": 331,
+      "frames_real": 310
+    },
+    {
+      "modality": "audio",
+      "video_id": "dev_004542",
+      "original": "dev_004541",
+      "class": "both",
+      "labelled_start_s": 1.0,
+      "measured_onset_s": 1.0,
+      "error_s": 0.0,
+      "pass": true,
+      "frames_fake": 142,
+      "frames_real": 136
+    },
+    {
+      "modality": "audio",
+      "video_id": "dev_023738",
+      "original": "dev_023735",
+      "class": "audio_only",
+      "labelled_start_s": 3.4,
+      "measured_onset_s": 3.4,
+      "error_s": 0.0,
+      "pass": true,
+      "frames_fake": 317,
+      "frames_real": 297
+    },
+    {
+      "modality": "audio",
+      "video_id": "dev_035581",
+      "original": "dev_035578",
+      "class": "audio_only",
+      "labelled_start_s": 4.5,
+      "measured_onset_s": 4.52,
+      "error_s": 0.02,
+      "pass": true,
+      "frames_fake": 229,
+      "frames_real": 221
+    },
+    {
+      "modality": "audio",
+      "video_id": "dev_097404",
+      "original": "dev_097401",
+      "class": "audio_only",
+      "labelled_start_s": 3.6,
+      "measured_onset_s": 3.6,
+      "error_s": 0.0,
+      "pass": true,
+      "frames_fake": 390,
+      "frames_real": 351
+    },
+    {
+      "modality": "audio",
       "video_id": "dev_097533",
       "original": "dev_097532",
       "class": "both",
