@@ -13,7 +13,7 @@ TORCH_PINS  := torch==2.7.1+cu118 torchvision==0.22.1+cu118 torchaudio==2.7.1+cu
 
 .DEFAULT_GOAL := help
 .PHONY: help venv torch install install-dev check check-bench check-kaggle lint fmt \
-        typecheck test test-cov manifest subset features train evaluate ablations \
+        typecheck test test-cov fetch-meta manifest subset verify-subsets verify-mirror \n        stats phase1 \n        features train evaluate ablations \
         benchmark api frontend demo clean-bench
 
 help:  ## Show this help
@@ -34,7 +34,8 @@ help:  ## Show this help
 	@echo     lint fmt typecheck test test-cov
 	@echo.
 	@echo   Pipeline
-	@echo     manifest subset features train evaluate ablations benchmark
+	@echo     fetch-meta manifest subset verify-subsets verify-mirror stats phase1
+	@echo     features train evaluate ablations benchmark
 	@echo.
 	@echo   Serving
 	@echo     api           uvicorn on :8000
@@ -91,12 +92,31 @@ test-cov:
 
 # ── Pipeline (scripts land in their respective phases) ───────────────────────
 
-manifest:   ## Phase 1 — build manifest_v1.parquet from LAV-DF
-	$(PY) scripts/01_build_manifest.py
-	$(PY) scripts/02_validate_dataset.py
+fetch-meta: ## Phase 1 - fetch metadata.min.json from the Kaggle mirror (PF-6: no video)
+	$(PY) scripts/05_fetch_metadata.py $(ARGS)
 
-subset:     ## Phase 1 — build the reproducible 100 / 2k / 10k subsets
-	$(PY) scripts/03_make_subset.py
+manifest:   ## Phase 1 - build + validate manifest_v1.parquet (leakage assertions are fatal)
+	$(PY) scripts/02_build_manifest.py $(ARGS)
+
+subset:     ## Phase 1 - build the reproducible 100 / 2k / 10k subsets
+	$(PY) scripts/03_make_subset.py $(ARGS)
+
+verify-subsets: ## Phase 1 - fail if a subset drifted from its committed id list (P1-16)
+	$(PY) scripts/03_make_subset.py --verify
+
+verify-mirror: ## CL-7 - prove the Kaggle mirror equals the authors' release (gates P1-2)
+	$(PY) scripts/06_verify_mirror.py $(ARGS)
+
+stats:      ## Phase 1 - measure the dataset, write reports/dataset_statistics.md
+	$(PY) scripts/04_dataset_stats.py --probe-dir data/raw/_spotcheck
+
+phase1:     ## Phase 1 - the whole pipeline, in order, from a clean checkout
+	$(MAKE) fetch-meta
+	$(MAKE) verify-mirror
+	$(MAKE) manifest
+	$(MAKE) subset
+	$(MAKE) stats
+	$(PY) -m pytest tests/ -q
 
 features:   ## Phases 2-5 — Stage-A extraction (resumable; safe to re-run)
 	$(PY) scripts/04_extract_visual.py

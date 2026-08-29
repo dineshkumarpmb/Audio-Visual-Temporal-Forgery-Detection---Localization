@@ -1,0 +1,21 @@
+{
+  "name": "dev-10k",
+  "n": 10000,
+  "seed": 1337,
+  "fingerprint": "47cca9fba3da",
+  "split_counts": {
+    "dev": 2311,
+    "test": 1915,
+    "train": 5774
+  },
+  "class_counts": {
+    "audio_only": 2433,
+    "both": 2433,
+    "real": 2673,
+    "visual_only": 2461
+  },
+  "label_counts": {
+    "0": 2673,
+    "1": 7327
+  }
+}

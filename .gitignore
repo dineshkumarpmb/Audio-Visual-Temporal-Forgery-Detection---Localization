@@ -1,11 +1,19 @@
 # ── Data (never committed — see PROJECT_PLAN.md Part 10) ────────────────
 # Leading slash anchors to the repo root: an unanchored "data/" also matches
 # src/data/, which silently excluded the source package.
-/data/
+# `/data/*` (contents), not `/data/` (the directory): git never descends into an
+# excluded directory, so a nested negation under `/data/` can never re-include
+# anything. Each level must be unignored in turn.
+/data/*
 !/data/manifests/
 /data/manifests/*
-# Subset id lists ARE tracked — §3.9 requires the subsets be reproducible
-!/data/manifests/subset_*.txt
+# Subset id lists ARE tracked — §3.9 requires the subsets be reproducible, and
+# P1-16 requires every experiment to run on literally the same videos. Git must be
+# able to descend into subsets/, so the directory is unignored before its contents.
+!/data/manifests/subsets/
+/data/manifests/subsets/*
+!/data/manifests/subsets/*.txt
+!/data/manifests/subsets/*.json
 *.npy
 *.parquet
 *.mp4

@@ -1,0 +1,108 @@
+{
+  "n_total": 136304,
+  "n_usable": 136300,
+  "status_counts": {
+    "ok": 136300,
+    "bad_label": 4
+  },
+  "split_counts": {
+    "dev": 31501,
+    "test": 26100,
+    "train": 78703
+  },
+  "class_counts": {
+    "real": 36431,
+    "visual_only": 33543,
+    "audio_only": 33170,
+    "both": 33160
+  },
+  "label_counts": {
+    "1": 99873,
+    "0": 36431
+  },
+  "class_by_split": {
+    "dev": {
+      "real": 8271,
+      "visual_only": 7820,
+      "audio_only": 7709,
+      "both": 7701
+    },
+    "test": {
+      "real": 6906,
+      "visual_only": 6452,
+      "audio_only": 6373,
+      "both": 6369
+    },
+    "train": {
+      "real": 21254,
+      "visual_only": 19271,
+      "both": 19090,
+      "audio_only": 19088
+    }
+  },
+  "n_source_ids": 36431,
+  "source_ids_by_split": {
+    "dev": 8271,
+    "test": 6906,
+    "train": 21254
+  },
+  "duration_s": {
+    "min": 2.24,
+    "p05": 4.28,
+    "p25": 5.32,
+    "median": 7.16,
+    "p75": 10.96,
+    "p95": 16.68,
+    "max": 19.88,
+    "mean": 8.475257520176083,
+    "std": 3.9169785412480267
+  },
+  "total_hours": 320.8826666666639,
+  "n_frames_total": 28879440,
+  "n_spans": 114245,
+  "span_s": {
+    "min": 0.1639999999999997,
+    "p05": 0.20000000000000018,
+    "p25": 0.4,
+    "median": 0.6640000000000001,
+    "p75": 0.8439999999999994,
+    "p95": 1.1440000000000001,
+    "max": 1.6,
+    "mean": 0.6496835397610399,
+    "std": 0.29061086189416413
+  },
+  "span_frames_at_25": {
+    "min": 4.0999999999999925,
+    "p05": 5.000000000000004,
+    "p25": 10.0,
+    "median": 16.600000000000005,
+    "p75": 21.099999999999987,
+    "p95": 28.6,
+    "max": 40.0,
+    "mean": 16.242088494025996,
+    "std": 7.265271547354104
+  },
+  "n_fakes_distribution": {
+    "0": 36431,
+    "1": 85493,
+    "2": 14376
+  },
+  "fake_frames": 1861193,
+  "total_frames": 28879440,
+  "fake_frame_fraction": 0.06444699066186879,
+  "pos_weight": 14.516628313130342,
+  "video_level_fake_fraction": 0.7327146001467352,
+  "fps_values": {
+    "25.0": 136300
+  },
+  "sample_rate_values": {
+    "16000": 136300
+  },
+  "audio_channel_values": {
+    "1": 136300
+  },
+  "probe_n": 28,
+  "probe_frames_match": 28,
+  "probe_fps_25": 28,
+  "probe_sr_16k": 28
+}

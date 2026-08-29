@@ -141,7 +141,7 @@ Currently `LongPathsEnabled = 0`. Tracked as task **P14-0**.
 
 ---
 
-## Phase 1 decisions — resolved 2026-08-27
+## Phase 1 decisions — resolved 2026-08-27 / 2026-08-29
 
 ### PF-6 · Dataset access: attach on Kaggle, never download the raw 25.6 GB locally
 
@@ -209,6 +209,56 @@ back (CL-5). This is consistent with PF-1, which already scoped the local track 
 - **Download the 25.6 GB to D: anyway.** Not wrong — 156.7 GB is free — but it buys nothing the
   mount does not, and costs a long interruptible transfer on a machine R13 assumes will be
   interrupted.
+
+---
+
+### PF-7 · The video timeline is `video_frames`, not `duration` — P2-1 is wrong as written
+
+**Decision: `T == video_frames`.** ✅ Resolved 2026-08-29 by measurement during P1-5/P1-13.
+Corrects task **P2-1** in PROJECT_PLAN Phase 2 and the semantics of the `duration` column in the
+§2A manifest schema.
+
+**What was measured.** For **all 136,304 entries**, metadata's `duration` satisfies
+
+    duration == audio_frames / 16000 + 0.128        (exactly, 136,304/136,304)
+
+It is a padded audio-derived figure, not a media duration. `ffprobe` on 28 stratified videos
+confirms it exceeds *both* stream durations on every file:
+
+| | metadata | ffprobe video | ffprobe audio |
+|---|---|---|---|
+| `dev/101081.mp4` | 4.224 s | 4.120 s | 4.160 s |
+| `train/026282.mp4` | 18.944 s | 18.880 s | 18.880 s |
+
+**Why P2-1 fails.** P2-1 says `assert T == round(duration × 25) ± 1`. Measured over the whole
+dataset, `video_frames − round(duration × 25)` ranges from **−5 to −1**, and only **239 of
+136,304** entries (0.18%) fall within ±1. That assertion would fail on 99.8% of the dataset — and
+worse, anyone "fixing" it by *trusting* `duration` would allocate 2–5 phantom frames per video and
+silently misalign every localization target against the real frames.
+
+**The correct invariant.** `video_frames` matched `ffprobe`'s `nb_frames` on **28/28** spot-checked
+files, and `r_frame_rate` is exactly 25.00 on all of them. So:
+
+- the manifest's `duration` column is **`video_frames / 25`** — the timeline frames actually live on;
+- metadata's own value is preserved as `duration_meta`, not discarded, so the derivation stays auditable;
+- `bad_label` is judged against the **video** timeline, which is why 4 entries quarantine rather
+  than the 0 that checking against the padded `duration` alone would give.
+
+**Consequences accepted:**
+
+1. **P2-1's assertion text must be replaced**, not merely relaxed. Recorded in TASKS.md.
+2. **Phase 6 localization targets rasterise against `video_frames`.** A span end is clamped to
+   `n_frames`; the ~0.1 s of padded tail has no frames and must not be allocated any.
+3. **The 4 `bad_label` entries are real dirty data, not our bug** — checked by hand, all four have
+   a span starting *after* the video ends (e.g. `train/092507.mp4`, span `[16.4, 17.454]` against
+   16.12 s of video). They are quarantined, not repaired.
+
+**Options rejected:**
+
+- **Trust `duration` and pad the frame tensor.** Would invent 2–5 frames per video with no pixels
+  behind them, and shift every target that Part 6 depends on.
+- **Relax P2-1 to ±5.** Hides the finding instead of recording it, and ±5 is not a tolerance — it
+  is a systematic offset with an exact closed form.
 
 ---
 

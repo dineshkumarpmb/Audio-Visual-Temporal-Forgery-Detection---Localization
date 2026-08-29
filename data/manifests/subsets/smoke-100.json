@@ -1,0 +1,21 @@
+{
+  "name": "smoke-100",
+  "n": 100,
+  "seed": 1337,
+  "fingerprint": "48caaa63d358",
+  "split_counts": {
+    "dev": 23,
+    "test": 19,
+    "train": 58
+  },
+  "class_counts": {
+    "audio_only": 21,
+    "both": 16,
+    "real": 50,
+    "visual_only": 13
+  },
+  "label_counts": {
+    "0": 50,
+    "1": 50
+  }
+}

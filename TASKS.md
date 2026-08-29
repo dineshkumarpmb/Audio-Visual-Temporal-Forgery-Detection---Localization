@@ -7,80 +7,81 @@ Legend: ⛔ = blocking gate item · ⭐ = headline capability · 🔬 = experime
 
 ---
 
-## 📍 CURRENT STATUS — 2026-08-29, CL-1 green · next is CL-2
+## 📍 CURRENT STATUS — 2026-08-29, Phase 1 done (18/20) · next is Phase 2
 
 | | |
 |---|---|
 | **Done** | Phase −1 (pre-flight) · Phase 0 (environment) — **gate green, 33/33** |
-| **In progress** | **Cloud track** — CL-1 ✅ done (10/10). CL-2 is next |
-| **Next** | **CL-2** (attach mirror at `/kaggle/input`) → **CL-3** (notebook entrypoint) → ⛔ **CL-7** (prove equivalence) → **P1-2** |
-| **Progress** | ~19 of 203 tasks (≈9%) · 2 of 18 phases complete |
+| **Done** | Phase −1 · Phase 0 · **Phase 1 (18/20)** · CL-1 ✅ · **CL-7 ✅ 10/10** |
+| **Next** | **Phase 2 — Video Preprocessing** (15 tasks). Start at P2-1, applying decision **PF-7** |
+| **Progress** | ~39 of 203 tasks (≈19%) · 3 of 18 phases complete |
+| **Tests** | **90 passing** — 74 unit + 16 integration against the real 136,304-entry dataset |
 | **Kaggle** | `dinesh1234567` · phone verified · **30 GPU h/week** · P100 16 GB or T4×2 · 12 h/session · 20 GB `/kaggle/working` |
 | **Branch** | `master`, working tree clean |
 | **Commits** | `ab2b620` baseline · `c53922b` decisions PF-1/2/3 · `ebf3196` Phase 0 · `badb58b` PF-6 · `3c0d0dc` CL-1 gate · `c872158` CL-1 credentials + API-drift fix |
 
-**No `src/` code exists yet.** Every file under `src/`, `api/` and `tests/` is a 0-byte package
-stub. Phases 2–16 are untouched. The only executable code is `scripts/00_check_env.py` and
-`scripts/01_check_kaggle.py` — both gates, not pipeline.
+**Phase 1 built the data layer.** `src/` now holds `config.py`, `seed.py` and
+`data/{metadata,manifest,leakage,validate,subset}.py`, driven by `scripts/02`–`06`, with
+**90 passing tests**. `api/` and the model packages are still empty stubs — Phases 2–16 untouched.
 
-### ⛔ The one thing blocking everything
+### 🔴 The one thing still blocked
 
-**CL-7** — the mirror is a community re-upload, not the authors' bucket. Nothing may be built on it
-until it is proven equivalent: file count = 136,304 · real/fake = 36,431/99,873 ·
-`metadata.min.json` byte-identical to the HF/GitHub copy · ⛔ 20 `ffprobe` spot-checks for fps = 25
-and unchanged `duration`/`video_frames`. **A silent re-encode shifts every `fake_periods` target and
-no training curve would show it.** Fallback if it fails: CL-2's private-upload path.
+**PRE-1 — the original report is not on this machine.** It is the sole blocker for P1-3 (report
+audit) and for Appendix-A items 1–7. Drop it at `docs/original_report.pdf`.
 
-Two open questions CL-7 must answer, both raised by the CL-1 sampling:
-
-- The mirror is **24.84 GB vs 25.6 GB published** (~97%).
-- `metadata.min.json` did not appear in the 1,000-file sample.
+Impact, precisely: it blocks **Part 9's improvement comparison and Phase 16 (documentation)**.
+It does **not** block Phases 2–15. If it never surfaces, the defensible move is to drop Part 9's
+comparison rather than quote 53.35% / 80.00% without provenance — see
+`reports/appendix_a_resolution.md`.
 
 ### Resume checklist
 
-1. `make check` — should print **GATE PASSED**, exit 0. If not, the environment changed; fix
-   before anything else.
-2. ~~`make check-kaggle` attestations~~ — ✅ CL-1 green, 10/10.
-3. **CL-2 → CL-3 → ⛔ CL-7**, *then* P1-2. Per **decision PF-6 (2026-08-27)** the 25.6 GB raw
-   dataset is **never downloaded locally** — it is attached read-only on Kaggle at `/kaggle/input`,
-   which costs no transfer and does not consume the 20 GB `/kaggle/working` budget. Only the
-   **~3.3 GB dev-10k feature cache** ever lands on D:.
-4. Then P1-5 → P1-20 in order, **running on Kaggle**. Note the schema is already confirmed: the
-   file is **`metadata.min.json`**, not `metadata.json`.
+1. `make check` — Phase 0 gate, should print **GATE PASSED**, exit 0.
+2. `make phase1` — re-runs Phase 1 end to end from a clean checkout: fetch metadata → verify
+   mirror (CL-7) → build manifest → build subsets → write statistics → 90 tests.
+   Only `metadata.min.json` (33.8 MB) and 28 spot-check clips (5.6 MB) come down; the 25.5 GB
+   of video never does (PF-6).
+3. Start **Phase 2** at P2-1 — and apply **PF-7**: the frame-count assertion is
+   `T == video_frames`, *not* `round(duration × 25) ± 1`.
 
-### Mirror facts measured at CL-1 (2026-08-29)
+### Mirror verified — CL-7 PASSED 10/10 (2026-08-29)
 
-Recorded in `reports/kaggle_facts.json`. Reachability and size come from the dataset metadata in a
-single request; the file listing is only **sampled**, so no count below is authoritative.
+`reports/mirror_verification.md` · `reports/mirror_facts.json` · full listing in
+`reports/mirror_listing.tsv.gz`.
 
 | | |
 |---|---|
-| Ref | `elin75/localized-audio-visual-deepfake-dataset-lav-df` (public) |
-| Owner / version | Shaikh Hossain · v1, updated 2024-09-10 · usability 0.94 |
-| Size (API) | **23.14 GiB** = 24,842,461,534 bytes — inside the 20–32 GB smell test |
-| Layout | `LAV-DF/dev/004561.mp4` — **matches §3.3 as expected** |
-| Listing sample | 1,000 entries over 5 pages (999 `.mp4`); `metadata.min.json` not yet seen |
+| Ref | `elin75/localized-audio-visual-deepfake-dataset-lav-df` (public, v1) |
+| Videos | **136,304** — mp4 set matches metadata **exactly in both directions** |
+| Real / fake | **36,431 / 99,873** — matches the publication |
+| Splits | train 78,703 · dev 31,501 · test 26,100 — all match |
+| Size | **25,502,577,573 B = 25.50 GB** uncompressed |
+| `metadata.min.json` | 33,837,990 B · sha256 `96d5f79bef1aa92f…` |
+| Re-encode test | fps 25.00 **28/28** · `video_frames` byte-exact **28/28** · 16 kHz **28/28** |
 
-⛔ It is a community re-upload, not the authors' bucket — **CL-7 must prove it equivalent before
-anything is built on it.** See `reports/dataset_access.md` §9 and `reports/decision_log.md` PF-6.
+Both CL-1 flags are now closed: the 24.84 GB `total_bytes` was Kaggle's *compressed* figure, and
+`metadata.min.json` is present at the size the listing reports. Residual limit: it was not
+byte-compared against the authors' HuggingFace copy, since PF-6 keeps that copy off this machine —
+its sha256 is recorded so any future divergence is detectable.
 
-### Three things to watch in Phase 1
+### The three Phase 1 risks — all resolved
 
-- ⛔ **`fake_periods` units.** The authors' loader annotates them `List[List[int]]`; all of Part 6
-  assumes float **seconds**. If they are frame indices, every localization target is wrong by ~25×
-  and the loss curve will still look healthy. Assert `max(end) <= duration` immediately (P1-5).
-- ⛔ **Leakage assertions must fail the build**, not warn (P1-8). This is R3, the highest-impact
-  correctness item in the plan.
-- ⚠️ **RAM.** Only 0.16–0.29 GB free at rest on this machine. Close Chrome before any bulk
-  `ffprobe` sweep.
+- ✅ **`fake_periods` units.** They are float **seconds**. Ends are non-integral and only 4 of
+  114,253 spans exceed `duration`. Asserted on every load, not assumed.
+- ✅ **Leakage assertions fail the build.** Zero overlap on all three split pairs; enforced in
+  `validate_manifest()` and in pytest, so a violation cannot merely warn.
+- ✅ **RAM.** Never a factor — Phase 1 ran entirely off a 33.8 MB JSON file. It returns in Phase 2.
+
+⛔ **One new risk surfaced (PF-7):** metadata's `duration` is not a media duration, and P2-1's
+assertion is wrong as written. Carried into Phase 2 below.
 
 ### Carried-forward open items
 
 | Item | Blocks | Notes |
 |---|---|---|
-| Mirror is 24.84 GB vs 25.6 GB published | CL-7 | ~97% of the published figure. Not alarming alone, but **CL-7 must explain the gap** before P1-2 |
-| `metadata.min.json` not in the sampled pages | CL-7 | The sample covers 1,000 of ~136k files. Confirm on the mounted copy, where the whole tree is visible at once |
-| PRE-1 — original report missing | Phase 16 only | Not on this machine; drop at `docs/original_report.pdf`. Phases 0–15 do not need it |
+| 🔴 PRE-1 — original report missing | **P1-3, Part 9, Phase 16** | Not on this machine; drop at `docs/original_report.pdf`. Phases 2–15 do not need it. The only thing keeping the P1-20 gate at 3/4 |
+| ⛔ PF-7 — P2-1's frame assertion is wrong | Phase 2 | `T == video_frames`, not `round(duration × 25) ± 1`. Holds for only 239/136,304 entries as written |
+| ✋ Attach the mirror in a Kaggle notebook | Phase 2 execution on Kaggle | Manual browser step (*Add Data*). Not needed for Phase 1, which ran off metadata alone |
 | P14-0 — Windows long paths disabled | Phase 14 | `LongPathsEnabled = 0`. Needs an elevated shell + reboot before `npm install` |
 | PF-4 — precision re-benchmark on Kaggle | Phase 9–11 | fp32 locally is settled; the cloud figure is assumed until measured |
 
@@ -92,8 +93,8 @@ anything is built on it.** See `reports/dataset_access.md` §9 and `reports/deci
 |---|---|---|
 | −1 Pre-flight | 5 | ✅ Complete (4/5 — PRE-1 blocked, Phase 16 only) |
 | 0 Environment | 13 | ✅ Complete — gate 33/33 |
-| 1 Dataset | 20 | 🟡 1/20 — blocked on CL-7 |
-| 2 Video preproc | 15 | ⬜ Not started |
+| 1 Dataset | 20 | ✅ **18/20** — gate 3/4; P1-3 blocked on PRE-1 |
+| 2 Video preproc | 15 | ⬜ **Next** — apply PF-7 at P2-1 |
 | 3 Audio preproc | 9 | ⬜ Not started |
 | 4 Visual baseline | 12 | ⬜ Not started |
 | 5 Audio baseline | 8 | ⬜ Not started |
@@ -108,7 +109,7 @@ anything is built on it.** See `reports/dataset_access.md` §9 and `reports/deci
 | 14 Frontend | 12 | ⬜ Not started (also gated by P14-0) |
 | 15 Testing | 9 | ⬜ Not started |
 | 16 Documentation | 11 | ⬜ Not started (needs PRE-1) |
-| Cloud (Kaggle) | 8 | 🟡 1/8 — CL-1 ✅ complete (10/10); CL-2 next |
+| Cloud (Kaggle) | 8 | 🟡 3/8 — CL-1 ✅, CL-7 ✅ 10/10; CL-2/CL-3 when Phase 2 runs on Kaggle |
 | Cross-cutting | 7 | 🔄 Continuous |
 
 ---
@@ -188,33 +189,49 @@ transaction on a >260-char path (decision PF-5). Dev deps now carry `ipykernel` 
 
 ---
 
-## PHASE 1 — Dataset Acquisition & Validation — 🟡 **1/20, BLOCKED**
+## PHASE 1 — Dataset Acquisition & Validation — ✅ **18/20 (2026-08-29)**
 
-Blocked behind ⛔ CL-7, which is itself behind CL-1's two manual attestations. Only P1-1 is
-resolved (in PRE-4). Runs **on Kaggle** per decision PF-6.
+**Gate P1-20 is 3 of 4 green.** Manifest validated, leakage assertions green, statistics
+written. Only the report audit (P1-3) is outstanding, and it is blocked on PRE-1 — the
+original report — which gates Part 9's comparison and Phase 16, not Phases 2–15.
 
-| ID | Task |
-|---|---|
-| P1-1 | ✅ ~~Check LAV-DF download size~~ — **resolved in PRE-4: 25.6 GB, download to D:** |
-| P1-2 | **Attach** the LAV-DF Kaggle mirror read-only at `/kaggle/input` (decision **PF-6** — no local download); confirm real folder structure vs §3.3. Requires CL-1…CL-3 and ⛔ CL-7 first. `data/raw/` stays empty locally except the smoke-100 subset needed for the ✋ checks |
-| P1-3 | ⛔ **Report audit** — resolve §0.4 Finding 3: provenance of the 53.35% figure and the evaluation protocol behind 80.00%; write `reports/report_audit.md` |
-| P1-4 | ⛔ Resolve all 15 Appendix-A `TO VERIFY` items, or explicitly escalate as unresolvable |
-| P1-5 | Parse **`metadata.min.json`** (schema confirmed in PRE-4); ⛔ **print 10 raw `fake_periods` and assert `max(end) <= duration`** — determines whether values are seconds or frame indices (~25× error if misread); assert `n_fakes == len(fake_periods)` |
-| P1-6 | Implement `src/data/manifest.py` — `ffprobe` every file, join with metadata, write `manifest_v1.parquet` to the §A schema |
-| P1-7 | Derive `source_id` (identity key) — from `original` chain to root if no explicit key exists; document the derivation |
-| P1-8 | ⛔ Implement the three leakage assertions (train∩dev, train∩test, dev∩test on `source_id`) as **build-failing** tests |
-| P1-9 | Implement `src/data/validate.py` — quarantine per §3.7 (missing / corrupt / no_audio / no_video / too_short / too_long / bad_label); report exclusion counts + reasons |
-| P1-10 | Compute real dataset statistics: total/real/fake counts, 4-class breakdown, duration distribution |
-| P1-11 | ⛔ Compute **mean & distribution of forged-span durations** — this determines `T` in Part 6 |
-| P1-12 | ⛔ Compute the **fake-frame fraction** — this drives focal-loss / `pos_weight` |
-| P1-13 | Verify fps and sample-rate consistency across all files |
-| P1-14 | Write `reports/dataset_statistics.md` — every provisional §3.2 figure replaced with a measured one |
-| P1-15 | Implement `src/data/subset.py` + `scripts/03_make_subset.py`; build smoke-100 / dev-2k / dev-10k, stratified by split and 4-class taxonomy, fixed seed |
-| P1-16 | **Commit the subset ID lists to git** so every experiment runs on literally the same videos |
-| P1-17 | Write `tests/unit/test_manifest.py` |
-| P1-18 | Implement content-hashed config caching (§3.8) and `src/seed.py::seed_everything()` |
-| P1-19 | Implement `src/config.py` — pydantic schemas so configs are validated, not raw dicts |
-| P1-20 | ⛔ **Gate:** manifest validated, leakage assertions green, real statistics written, report audit complete |
+Ran locally against `metadata.min.json` alone: per decision PF-6 no video was downloaded
+except 28 stratified clips (5.6 MB) for the ffprobe checks metadata cannot answer.
+
+| ID | Task | Status |
+|---|---|---|
+| P1-1 | Check LAV-DF download size | ✅ **25.50 GB** measured (25,502,577,573 B over 136,307 files). PRE-4's 25.6 GB confirmed |
+| P1-2 | Confirm real folder structure vs §3.3 (decision **PF-6** — no local download) | ✅ **`LAV-DF/{train,dev,test}/*.mp4` + `metadata.json` + `metadata.min.json` + `README.md`** — matches §3.3, which guessed `metadata.json` only. Verified from the mirror's full file listing (`reports/mirror_listing.tsv.gz`). ✋ *Attaching* it in a Kaggle notebook stays a manual browser step, needed only when Phase 2 runs there |
+| P1-3 | ⛔ **Report audit** — §0.4 Finding 3: provenance of 53.35% and the protocol behind 80.00% | 🔴 **BLOCKED on PRE-1.** The report is not on this machine. See `reports/report_audit.md`. Blocks **Part 9's comparison and Phase 16 only** — not Phases 2–15 |
+| P1-4 | ⛔ Resolve all 15 Appendix-A `TO VERIFY` items, or escalate | ✅ **`reports/appendix_a_resolution.md`** — **8 resolved · 1 deferred by design (#15, Phase 2) · 6 escalated**, all six blocked on PRE-1 alone. Every blocking item not requiring the report is closed |
+| P1-5 | ⛔ Parse `metadata.min.json`; assert `fake_periods` units and `n_fakes == len(fake_periods)` | ✅ **`fake_periods` are float SECONDS.** Ends are non-integral, max end 19.314 s vs max duration 19.968 s, and only 4/136,304 exceed `duration`. The ~25× catastrophe is ruled out. Enforced on every load by `assert_fake_periods_are_seconds()` |
+| P1-6 | Implement `src/data/manifest.py`; write `manifest_v1.parquet` to the §A schema | ✅ **136,304 rows, 3.2 MB.** Full §2A schema plus `duration_meta`, `class_name`, `n_fakes`, `original`. `--probe` runs ffprobe where the video is mounted |
+| P1-7 | Derive `source_id` from the `original` chain; document the derivation | ✅ **36,431 roots — exactly the real-video count**, and the root set equals the real-video set. Every fake resolves to its original. Cycles raise |
+| P1-8 | ⛔ Three leakage assertions as **build-failing** tests | ✅ **Zero overlap on all three pairs** (train 21,254 / dev 8,271 / test 6,906 source_ids). `src/data/leakage.py`, enforced in `validate_manifest()` and in pytest |
+| P1-9 | Implement `src/data/validate.py` — §3.7 quarantine + exclusion counts | ✅ **4 excluded of 136,304 (0.0029%)**, all `bad_label`. All 8 status codes implemented; metadata-only mode for PF-6 |
+| P1-10 | Real dataset statistics: counts, 4-class breakdown, duration distribution | ✅ 136,304 total · 36,431/99,873 real/fake · 36,431/33,543/33,170/33,160 by class · 320.9 h |
+| P1-11 | ⛔ Mean & distribution of forged-span durations — determines `T` | ✅ **mean 0.650 s (16.2 frames), median 0.664 s, max 1.600 s**, over 114,253 spans. Spans are *short* — a hard constraint on receptive field and median-filter width |
+| P1-12 | ⛔ Fake-frame fraction — drives focal-loss / `pos_weight` | ✅ **6.4447%** (1,861,304 / 28,880,994) → **`pos_weight` 14.52**. Opposite direction from the 73.3% video-level fake share |
+| P1-13 | Verify fps and sample-rate consistency across all files | ✅ **fps 25.00 on 28/28 probed, `video_frames` byte-exact on 28/28, 16 kHz mono on 136,304/136,304.** Surfaced ⛔ **PF-7** — see below |
+| P1-14 | Write `reports/dataset_statistics.md` | ✅ Written from `manifest_v1.parquet`; every §3.2 provisional figure replaced with a measured one |
+| P1-15 | `src/data/subset.py` + `scripts/03_make_subset.py`; smoke-100 / dev-2k / dev-10k | ✅ Stratified by split **and** 4-class, largest-remainder apportionment, quarantined rows excluded |
+| P1-16 | **Commit the subset ID lists to git** | ✅ `data/manifests/subsets/` tracked (`.gitignore` fixed — `/data/` blocked descent, so the old negation could never match). `make verify-subsets` fails on drift |
+| P1-17 | Write `tests/unit/test_manifest.py` | ✅ **90 tests pass** — 74 unit + 16 integration against the real 136,304-entry file |
+| P1-18 | Content-hashed config caching (§3.8) + `seed_everything()` | ✅ `cache_dir()` = `features/{sha256(config)[:8]}`; seeds `random`/`numpy`/`torch`/cuDNN/`PYTHONHASHSEED` |
+| P1-19 | Implement `src/config.py` — pydantic schemas | ✅ Frozen, `extra="forbid"`, cross-field validators. A typo is a startup error |
+| P1-20 | ⛔ **Gate:** manifest validated, leakage green, statistics written, report audit complete | 🟡 **3 of 4.** Manifest ✅ · leakage ✅ · statistics ✅ · **report audit 🔴 blocked on PRE-1**. Phases 2–15 are unblocked; Part 9 and Phase 16 are not |
+
+**⛔ Finding — decision PF-7: task P2-1 is wrong as written.** For all 136,304 entries
+`duration == audio_frames/16000 + 0.128` exactly — a padded audio figure, not a media duration,
+exceeding *both* stream durations on every file probed. P2-1's `assert T == round(duration × 25) ± 1`
+holds for only **239 of 136,304** entries (offsets run −5..−1); it would fail on 99.8% of the
+dataset. The correct invariant is **`T == video_frames`**, which matched ffprobe 28/28. The manifest's
+`duration` column is `video_frames / 25`; metadata's value is kept as `duration_meta`.
+
+**✅ CL-7 PASSED 10/10 — the mirror is equivalent** (`reports/mirror_verification.md`). File set
+matches metadata exactly in both directions; real/fake and per-split counts match the publication;
+fps/frame-counts byte-exact. The CL-1 size flag is resolved: Kaggle's 24.84 GB `total_bytes` is the
+*compressed* figure, and the per-file sizes sum to **25.50 GB**.
 
 ---
 
@@ -536,4 +553,4 @@ Not a separate phase — these are the tasks the local+Kaggle strategy adds.
 
 *Phase −1 complete except PRE-1 (report retrieval), which does not block Phases 0–15.*
 
-*Completed as of 2026-08-29: ~19 of 203 tasks (≈9%). Phases −1 and 0 done; CL-1 complete; Phase 1 at 1/20 (P1-1, resolved in PRE-4). No `src/` implementation code exists yet.*
+*Completed as of 2026-08-29: ~39 of 203 tasks (≈19%). Phases −1, 0 and 1 done (Phase 1 at 18/20, gate 3/4); CL-1 and CL-7 complete. `src/` now holds config, seeding, metadata, manifest, leakage, validate and subset modules, with 90 passing tests.*
