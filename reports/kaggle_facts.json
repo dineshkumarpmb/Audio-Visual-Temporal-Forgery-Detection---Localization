@@ -1,4 +1,5 @@
 {
+  "credential_source": "C:\\Users\\Admin\\.kaggle\\kaggle.json",
   "free_tier_reference": {
     "accelerators": "P100 16 GB, or T4 x2 (32 GB combined)",
     "gpu_hours_per_week": "~30",
@@ -8,5 +9,19 @@
   },
   "gpu_hours_remaining": null,
   "kaggle_client_version": "1.7.4.5",
+  "kaggle_username": "dinesh1234567",
+  "mirror": "elin75/localized-audio-visual-deepfake-dataset-lav-df",
+  "mirror_files_sampled": 1000,
+  "mirror_is_private": false,
+  "mirror_last_updated": "2024-09-10 04:57:21",
+  "mirror_listing_truncated": true,
+  "mirror_metadata_seen": false,
+  "mirror_mp4_sampled": 999,
+  "mirror_owner": "Shaikh Hossain",
+  "mirror_title": "Localized Audio Visual DeepFake Dataset (LAV-DF)",
+  "mirror_total_bytes": 24842461534,
+  "mirror_total_gb": 23.14,
+  "mirror_usability": 0.9375,
+  "mirror_version": 1,
   "phone_verified": null
 }

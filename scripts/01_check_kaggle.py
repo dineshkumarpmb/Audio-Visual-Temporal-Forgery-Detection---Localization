@@ -41,6 +41,11 @@ MIRROR = "elin75/localized-audio-visual-deepfake-dataset-lav-df"
 EXPECTED_VIDEOS = 136_304
 EXPECTED_GB_MIN, EXPECTED_GB_MAX = 20.0, 32.0
 
+# The mirror holds ~136k files; a full paged walk is ~680 requests and is reliably
+# rate-limited (HTTP 429). CL-1 only samples enough to prove the listing endpoint
+# works — CL-7 does the authoritative count on the mounted copy.
+MAX_LIST_PAGES = 5
+
 # Free-tier facts CL-1 is meant to confirm, quoted in reports/ for traceability.
 FREE_TIER = {
     "gpu_hours_per_week": "~30",
@@ -152,12 +157,34 @@ def check_api(r: Results, username: str):  # noqa: ANN201 - client type is versi
     # A round trip proves the key is live, not merely well-formed. An expired or
     # revoked token parses fine and fails only here.
     try:
-        api.datasets_list(search="lav-df", page=1)
+        api.dataset_list(search="lav-df", page=1)
     except Exception as exc:  # noqa: BLE001
         r.check("authenticated round trip", False, f"{type(exc).__name__}: {exc}")
         return None
-    r.check("authenticated round trip", True, "datasets_list responded")
+    r.check("authenticated round trip", True, "dataset_list responded")
     return api
+
+
+def _list_files_page(api, token, attempts: int = 4):  # noqa: ANN001, ANN202
+    """One page of the file listing, backing off through Kaggle's rate limiter.
+
+    A 429 here is expected, not exceptional: the mirror holds ~136k files, so any
+    full walk is ~680 requests. We retry a few times and let the caller stop early
+    rather than pretend a truncated walk was a complete one.
+    """
+    import time
+
+    delay = 2.0
+    for attempt in range(attempts):
+        try:
+            return api.dataset_list_files(MIRROR, page_token=token, page_size=200), None
+        except Exception as exc:  # noqa: BLE001
+            if "429" in str(exc) and attempt < attempts - 1:
+                time.sleep(delay)
+                delay *= 2
+                continue
+            return None, exc
+    return None, None
 
 
 def check_mirror(r: Results, api) -> None:  # noqa: ANN001
@@ -165,23 +192,17 @@ def check_mirror(r: Results, api) -> None:  # noqa: ANN001
 
     This is CL-1's handoff to CL-2. It deliberately does NOT decide whether the
     mirror is trustworthy — that is CL-7's job, and it needs ffprobe on real files.
+
+    Reachability and total size come from the dataset metadata in a single request.
+    The per-file listing is only *probed*: walking all ~136k files costs ~680 paged
+    requests and is reliably rate-limited, so counts are never derived from it. The
+    authoritative file count is taken on the mounted copy in CL-7, where it is one
+    cheap filesystem walk instead of hundreds of API calls.
     """
     section(f"Mirror — {MIRROR}")
 
-    files: list[tuple[str, int]] = []
-    token, pages = None, 0
     try:
-        while pages < 200:  # hard stop; a paging bug must not spin forever
-            resp = api.dataset_list_files(MIRROR, page_token=token, page_size=200)
-            if getattr(resp, "error_message", None):
-                r.check("mirror is reachable", False, str(resp.error_message))
-                return
-            for f in getattr(resp, "files", []) or []:
-                files.append((getattr(f, "name", "?"), int(getattr(f, "total_bytes", 0) or 0)))
-            pages += 1
-            token = getattr(resp, "next_page_token", None)
-            if not token:
-                break
+        matches = api.dataset_list(search=MIRROR.split("/", 1)[1])
     except Exception as exc:  # noqa: BLE001
         r.check("mirror is reachable", False, f"{type(exc).__name__}: {exc}")
         print(
@@ -191,43 +212,95 @@ def check_mirror(r: Results, api) -> None:  # noqa: ANN001
         )
         return
 
-    if not files:
-        r.check("mirror is reachable", False, "responded, but listed no files")
+    ds = next(
+        (d for d in matches or [] if str(getattr(d, "ref", "")).lower() == MIRROR.lower()), None
+    )
+    if ds is None:
+        listed = ", ".join(str(getattr(d, "ref", "?")) for d in (matches or [])[:5]) or "nothing"
+        r.check("mirror is reachable", False, f"exact ref not in search results (saw: {listed})")
+        r.warn(
+            "mirror ref did not resolve — it may have been renamed or removed; see CL-2 fallback"
+        )
         return
 
-    total_gb = sum(size for _, size in files) / 1024**3
-    videos = sum(1 for name, _ in files if name.lower().endswith(".mp4"))
-    r.check("mirror is reachable", True, f"{len(files):,} files listed over {pages} page(s)")
+    total_bytes = int(getattr(ds, "total_bytes", 0) or 0)
+    r.check("mirror is reachable", True, f"resolved {getattr(ds, 'ref', MIRROR)}")
 
     r.facts["mirror"] = MIRROR
-    r.facts["mirror_files_listed"] = len(files)
-    r.facts["mirror_mp4_listed"] = videos
-    r.facts["mirror_total_gb"] = round(total_gb, 2)
-    r.facts["mirror_pages_walked"] = pages
+    r.facts["mirror_title"] = str(getattr(ds, "title", "") or "")
+    r.facts["mirror_owner"] = str(getattr(ds, "owner_name", "") or "")
+    r.facts["mirror_total_bytes"] = total_bytes
+    r.facts["mirror_last_updated"] = str(getattr(ds, "last_updated", "") or "")
+    r.facts["mirror_version"] = getattr(ds, "current_version_number", None)
+    r.facts["mirror_is_private"] = bool(getattr(ds, "is_private", False))
+    r.facts["mirror_usability"] = getattr(ds, "usability_rating", None)
 
     # Size smell test. Wrong by a factor means the mirror is a subset or a
     # re-encode, and CL-7 becomes mandatory-blocking rather than merely required.
-    if EXPECTED_GB_MIN <= total_gb <= EXPECTED_GB_MAX:
-        r.check("mirror size is plausible", True, f"{total_gb:.1f} GB (expected ~25.6 GB)")
+    total_gb = total_bytes / 1024**3
+    r.facts["mirror_total_gb"] = round(total_gb, 2)
+    if not total_bytes:
+        r.check("mirror size is plausible", False, "API reported no size")
+        r.warn("no size reported — treat CL-7 as blocking")
+    elif EXPECTED_GB_MIN <= total_gb <= EXPECTED_GB_MAX:
+        r.check("mirror size is plausible", True, f"{total_gb:.1f} GiB (expected ~25.6 GB)")
     else:
-        r.check("mirror size is plausible", False, f"{total_gb:.1f} GB, expected 20-32 GB")
+        r.check("mirror size is plausible", False, f"{total_gb:.1f} GiB, expected 20-32")
         r.warn("size is off — treat CL-7 as blocking, and read CL-2's fallback")
 
-    has_metadata = any(name.endswith("metadata.min.json") for name, _ in files)
-    if has_metadata:
-        r.check("metadata.min.json present", True, "")
+    # Bounded probe of the file listing. Enough to prove the listing endpoint works
+    # and to look for the metadata file; never enough to count 136k files.
+    files: list[tuple[str, int]] = []
+    pages, truncated = 0, False
+    token = None
+    while pages < MAX_LIST_PAGES:
+        resp, exc = _list_files_page(api, token)
+        if exc is not None or resp is None:
+            truncated = True
+            r.warn(
+                f"file listing stopped early ({type(exc).__name__ if exc else 'rate limit'}) — counts deferred to CL-7"
+            )
+            break
+        if getattr(resp, "error_message", None):
+            truncated = True
+            r.warn(f"file listing error: {resp.error_message} — counts deferred to CL-7")
+            break
+        for f in getattr(resp, "files", []) or []:
+            files.append((getattr(f, "name", "?"), int(getattr(f, "total_bytes", 0) or 0)))
+        pages += 1
+        token = getattr(resp, "next_page_token", None)
+        if not token:
+            break
     else:
-        # Not a FAIL: the listing may be paginated or the file may sit inside an
-        # archive. CL-7 resolves it on the mounted copy, where it is unambiguous.
-        r.check("metadata.min.json present", False, "not in the listing")
-        r.warn("metadata.min.json not listed — confirm on the mounted copy in CL-7")
+        truncated = True
 
-    if videos and abs(videos - EXPECTED_VIDEOS) > EXPECTED_VIDEOS * 0.01:
-        r.warn(f"{videos:,} .mp4 listed vs {EXPECTED_VIDEOS:,} published — CL-7 must explain this")
+    if not files:
+        r.check("file listing responds", False, "listed no files")
+        return
+    r.check("file listing responds", True, f"{len(files):,} entries sampled over {pages} page(s)")
 
-    print(f"\n  {DIM}Largest listed entries:{RESET}")
+    r.facts["mirror_files_sampled"] = len(files)
+    r.facts["mirror_listing_truncated"] = truncated
+    r.facts["mirror_mp4_sampled"] = sum(1 for name, _ in files if name.lower().endswith(".mp4"))
+
+    if any(name.endswith("metadata.min.json") for name, _ in files):
+        r.check("metadata.min.json present", True, "found in the sampled listing")
+        r.facts["mirror_metadata_seen"] = True
+    else:
+        # Not a FAIL: the sample covers only the first pages. CL-7 resolves it on
+        # the mounted copy, where the whole tree is visible at once.
+        r.facts["mirror_metadata_seen"] = False
+        r.warn("metadata.min.json not in the sampled pages — confirm on the mounted copy in CL-7")
+
+    if truncated:
+        r.warn(
+            f"listing sampled only {len(files):,} of ~{EXPECTED_VIDEOS:,} expected files — "
+            "the authoritative file count is CL-7's, taken on the mounted copy"
+        )
+
+    print(f"\n  {DIM}Largest sampled entries:{RESET}")
     for name, size in sorted(files, key=lambda x: -x[1])[:5]:
-        print(f"    {size / 1024**3:8.2f} GB  {name}")
+        print(f"    {size / 1024**3:8.2f} GiB  {name}")
 
 
 def check_manual(r: Results, gpu_hours: float | None, phone_verified: bool) -> None:
@@ -309,10 +382,21 @@ def write_report(r: Results, argv: str) -> Path:
             "| | |",
             "|---|---|",
             f"| Dataset | `{f['mirror']}` |",
-            f"| Files listed | {f['mirror_files_listed']:,} |",
-            f"| `.mp4` listed | {f['mirror_mp4_listed']:,} |",
-            f"| Total size | {f['mirror_total_gb']} GB |",
-            f"| Listing pages walked | {f['mirror_pages_walked']} |",
+            f"| Title | {f.get('mirror_title', '?')} |",
+            f"| Owner | {f.get('mirror_owner', '?')} |",
+            f"| Version | {f.get('mirror_version', '?')} |",
+            f"| Last updated | {f.get('mirror_last_updated', '?')} |",
+            f"| Total size (API) | {f.get('mirror_total_gb', '?')} GiB "
+            f"({f.get('mirror_total_bytes', 0):,} bytes) |",
+            f"| Files sampled | {f.get('mirror_files_sampled', 0):,} "
+            f"({'truncated' if f.get('mirror_listing_truncated') else 'complete'}) |",
+            f"| `.mp4` in sample | {f.get('mirror_mp4_sampled', 0):,} |",
+            f"| `metadata.min.json` in sample | {'yes' if f.get('mirror_metadata_seen') else 'not seen'} |",
+            "",
+            "> Size and reachability come from the dataset metadata in one request. The file",
+            f"> listing is only **sampled** ({f.get('mirror_files_sampled', 0):,} entries): walking all",
+            f"> ~{EXPECTED_VIDEOS:,} files costs ~680 paged requests and is reliably rate-limited",
+            "> (HTTP 429). No count here is authoritative — CL-7 takes them on the mounted copy.",
             "",
             "> Reachable is not the same as correct. **CL-7 still has to prove this mirror",
             "> equals the authors' release** — file count, real/fake split, `metadata.min.json`",
