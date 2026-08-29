@@ -7,7 +7,7 @@
     "session_limit_hours": 12,
     "working_disk_gb": 20
   },
-  "gpu_hours_remaining": null,
+  "gpu_hours_remaining": 30.0,
   "kaggle_client_version": "1.7.4.5",
   "kaggle_username": "dinesh1234567",
   "mirror": "elin75/localized-audio-visual-deepfake-dataset-lav-df",
@@ -23,5 +23,5 @@
   "mirror_total_gb": 23.14,
   "mirror_usability": 0.9375,
   "mirror_version": 1,
-  "phone_verified": null
+  "phone_verified": true
 }
