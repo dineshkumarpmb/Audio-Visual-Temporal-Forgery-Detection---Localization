@@ -1,0 +1,87 @@
+{
+  "subset": "smoke-100",
+  "n_pairs": 7,
+  "n_within_tolerance": 7,
+  "tolerance_s": 0.5,
+  "median_error_s": 0.0,
+  "max_error_s": 0.02,
+  "rows": [
+    {
+      "video_id": "dev_004542",
+      "original": "dev_004541",
+      "class": "both",
+      "labelled_start_s": 1.0,
+      "measured_onset_s": 1.0,
+      "error_s": 0.0,
+      "pass": true,
+      "frames_fake": 142,
+      "frames_real": 136
+    },
+    {
+      "video_id": "dev_011692",
+      "original": "dev_011690",
+      "class": "visual_only",
+      "labelled_start_s": 3.0,
+      "measured_onset_s": 3.0,
+      "error_s": 0.0,
+      "pass": true,
+      "frames_fake": 105,
+      "frames_real": 103
+    },
+    {
+      "video_id": "dev_011977",
+      "original": "dev_011975",
+      "class": "visual_only",
+      "labelled_start_s": 1.7,
+      "measured_onset_s": 1.72,
+      "error_s": 0.02,
+      "pass": true,
+      "frames_fake": 125,
+      "frames_real": 123
+    },
+    {
+      "video_id": "dev_036672",
+      "original": "dev_036670",
+      "class": "visual_only",
+      "labelled_start_s": 2.8,
+      "measured_onset_s": 2.8,
+      "error_s": 0.0,
+      "pass": true,
+      "frames_fake": 142,
+      "frames_real": 140
+    },
+    {
+      "video_id": "dev_059095",
+      "original": "dev_059093",
+      "class": "visual_only",
+      "labelled_start_s": 2.7,
+      "measured_onset_s": 2.72,
+      "error_s": 0.02,
+      "pass": true,
+      "frames_fake": 108,
+      "frames_real": 105
+    },
+    {
+      "video_id": "dev_096788",
+      "original": "dev_096783",
+      "class": "visual_only",
+      "labelled_start_s": 0.2,
+      "measured_onset_s": 0.2,
+      "error_s": 0.0,
+      "pass": true,
+      "frames_fake": 257,
+      "frames_real": 256
+    },
+    {
+      "video_id": "dev_097533",
+      "original": "dev_097532",
+      "class": "both",
+      "labelled_start_s": 1.1,
+      "measured_onset_s": 1.12,
+      "error_s": 0.02,
+      "pass": true,
+      "frames_fake": 331,
+      "frames_real": 310
+    }
+  ]
+}

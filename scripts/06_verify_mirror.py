@@ -36,6 +36,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from src.data.metadata import load_metadata  # noqa: E402
 from src.data.validate import ffprobe  # noqa: E402
+from src.utils.console import init_console  # noqa: E402
 
 MIRROR = "elin75/localized-audio-visual-deepfake-dataset-lav-df"
 # Stored gzipped: 136,307 lines is 4.2 MB plain, 0.8 MB compressed. Committed as CL-7
@@ -110,6 +111,7 @@ def read_listing() -> dict[str, int]:
 
 
 def main() -> int:
+    init_console()
     ap = argparse.ArgumentParser(description="CL-7: verify the Kaggle LAV-DF mirror")
     ap.add_argument("--metadata", default="data/raw/LAV-DF/metadata.min.json")
     ap.add_argument("--spotcheck-dir", default="data/raw/_spotcheck")

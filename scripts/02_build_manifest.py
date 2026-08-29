@@ -31,11 +31,13 @@ from src.data.metadata import (  # noqa: E402
     load_metadata,
 )
 from src.seed import seed_everything  # noqa: E402
+from src.utils.console import init_console  # noqa: E402
 
 GREEN, RED, YELLOW, DIM, RESET = "\033[32m", "\033[31m", "\033[33m", "\033[2m", "\033[0m"
 
 
 def main() -> int:
+    init_console()
     ap = argparse.ArgumentParser(description="Build manifest_v1.parquet from LAV-DF metadata")
     ap.add_argument("--data-root", default="data/raw/LAV-DF", help="dir holding train/ dev/ test/")
     ap.add_argument("--metadata", default=None, help="default: <data-root>/metadata.min.json")

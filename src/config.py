@@ -41,7 +41,12 @@ class PreprocessConfig(StrictModel):
     target_fps: float = Field(default=LAVDF_FPS, gt=0)
     crop_size: int = Field(default=112, gt=0)
     detect_every_n: int = Field(default=5, ge=1)
-    face_margin: float = Field(default=0.25, ge=0)
+    # 0.0, not the plan's 0.25 -- decision PF-9. LAV-DF ships 224x224 frames that are
+    # already tight VoxCeleb2 face crops, so there is no surrounding context for a
+    # margin to include; it only manufactures replicated border. Measured over 12
+    # subjects: margin 0.0 -> 11.0% of crop pixels fall outside the source frame,
+    # 0.25 -> 21.4%. Kept configurable because a full-frame dataset would want 0.25.
+    face_margin: float = Field(default=0.0, ge=0)
     align: bool = True
 
     audio_sample_rate: int = Field(default=LAVDF_SAMPLE_RATE, gt=0)

@@ -26,6 +26,7 @@ sys.path.insert(0, str(REPO_ROOT))
 from src.config import LAVDF_FPS  # noqa: E402
 from src.data.manifest import read_manifest  # noqa: E402
 from src.data.validate import ffprobe  # noqa: E402
+from src.utils.console import init_console  # noqa: E402
 
 GREEN, DIM, RESET = "\033[32m", "\033[2m", "\033[0m"
 
@@ -54,6 +55,7 @@ def fmt(d: dict[str, float], unit: str = "s") -> str:
 
 
 def main() -> int:
+    init_console()
     ap = argparse.ArgumentParser(description="Measure LAV-DF and write dataset_statistics.md")
     ap.add_argument("--manifest", default="data/manifests/manifest_v1.parquet")
     ap.add_argument("--out", default="reports/dataset_statistics.md")

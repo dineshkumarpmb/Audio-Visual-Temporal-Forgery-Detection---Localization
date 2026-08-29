@@ -28,11 +28,13 @@ from src.data.subset import (  # noqa: E402
     write_subset,
 )
 from src.seed import seed_everything  # noqa: E402
+from src.utils.console import init_console  # noqa: E402
 
 GREEN, RED, DIM, RESET = "\033[32m", "\033[31m", "\033[2m", "\033[0m"
 
 
 def main() -> int:
+    init_console()
     ap = argparse.ArgumentParser(description="Build reproducible LAV-DF development subsets")
     ap.add_argument("--manifest", default="data/manifests/manifest_v1.parquet")
     ap.add_argument("--out-dir", default="data/manifests/subsets")

@@ -7,22 +7,24 @@ Legend: ⛔ = blocking gate item · ⭐ = headline capability · 🔬 = experime
 
 ---
 
-## 📍 CURRENT STATUS — 2026-08-29, Phase 1 done (18/20) · next is Phase 2
+## 📍 CURRENT STATUS — 2026-08-29, Phase 2 done (13/15) · next is Phase 3
 
 | | |
 |---|---|
 | **Done** | Phase −1 (pre-flight) · Phase 0 (environment) — **gate green, 33/33** |
-| **Done** | Phase −1 · Phase 0 · **Phase 1 (18/20)** · CL-1 ✅ · **CL-7 ✅ 10/10** |
-| **Next** | **Phase 2 — Video Preprocessing** (15 tasks). Start at P2-1, applying decision **PF-7** |
-| **Progress** | ~39 of 203 tasks (≈19%) · 3 of 18 phases complete |
-| **Tests** | **90 passing** — 74 unit + 16 integration against the real 136,304-entry dataset |
+| **Done** | Phase −1 · Phase 0 · **Phase 1 (18/20)** · **Phase 2 (13/15)** · CL-1 ✅ · CL-7 ✅ |
+| **Next** | **Phase 3 — Audio Preprocessing** (9 tasks) |
+| **Progress** | ~52 of 203 tasks (≈26%) · 4 of 18 phases complete |
+| **Tests** | **130 passing** — 114 unit + 16 integration against the real 136,304-entry dataset |
+| **✋ Awaiting you** | P2-8 (contact sheets) · ⛔ P2-10 (watch 20 overlays) — artefacts rendered in `reports/figures/` |
 | **Kaggle** | `dinesh1234567` · phone verified · **30 GPU h/week** · P100 16 GB or T4×2 · 12 h/session · 20 GB `/kaggle/working` |
 | **Branch** | `master`, working tree clean |
 | **Commits** | `ab2b620` baseline · `c53922b` decisions PF-1/2/3 · `ebf3196` Phase 0 · `badb58b` PF-6 · `3c0d0dc` CL-1 gate · `c872158` CL-1 credentials + API-drift fix |
 
-**Phase 1 built the data layer.** `src/` now holds `config.py`, `seed.py` and
-`data/{metadata,manifest,leakage,validate,subset}.py`, driven by `scripts/02`–`06`, with
-**90 passing tests**. `api/` and the model packages are still empty stubs — Phases 2–16 untouched.
+**Phases 1–2 built the data and preprocessing layers.** `src/` holds `config.py`, `seed.py`,
+`data/{metadata,manifest,leakage,validate,subset}.py` and
+`preprocessing/{video,face,align,cache,pipeline}.py`, driven by `scripts/02`–`11`, with
+**130 passing tests**. `api/` and the model packages are still empty stubs — Phases 3–16 untouched.
 
 ### 🔴 The one thing still blocked
 
@@ -37,12 +39,12 @@ comparison rather than quote 53.35% / 80.00% without provenance — see
 ### Resume checklist
 
 1. `make check` — Phase 0 gate, should print **GATE PASSED**, exit 0.
-2. `make phase1` — re-runs Phase 1 end to end from a clean checkout: fetch metadata → verify
-   mirror (CL-7) → build manifest → build subsets → write statistics → 90 tests.
-   Only `metadata.min.json` (33.8 MB) and 28 spot-check clips (5.6 MB) come down; the 25.5 GB
-   of video never does (PF-6).
-3. Start **Phase 2** at P2-1 — and apply **PF-7**: the frame-count assertion is
-   `T == video_frames`, *not* `round(duration × 25) ± 1`.
+2. `make phase1` — metadata → CL-7 → manifest → subsets → statistics → tests.
+3. `make phase2` — models → smoke-100 video → face crops → gate → label check → sheets → overlays.
+   Pulls ~19 MB of video and 3.8 MB of weights; the 25.5 GB stays on Kaggle (PF-6).
+4. ✋ **Do P2-8 and P2-10**: open `reports/figures/contact_sheets/` and watch
+   `reports/figures/overlays/`. These are the two things nothing automated can sign off.
+5. Start **Phase 3** (audio) at P3-1.
 
 ### Mirror verified — CL-7 PASSED 10/10 (2026-08-29)
 
@@ -64,24 +66,34 @@ Both CL-1 flags are now closed: the 24.84 GB `total_bytes` was Kaggle's *compres
 byte-compared against the authors' HuggingFace copy, since PF-6 keeps that copy off this machine —
 its sha256 is recorded so any future divergence is detectable.
 
-### The three Phase 1 risks — all resolved
+### Risk status
 
-- ✅ **`fake_periods` units.** They are float **seconds**. Ends are non-integral and only 4 of
-  114,253 spans exceed `duration`. Asserted on every load, not assumed.
-- ✅ **Leakage assertions fail the build.** Zero overlap on all three split pairs; enforced in
-  `validate_manifest()` and in pytest, so a violation cannot merely warn.
-- ✅ **RAM.** Never a factor — Phase 1 ran entirely off a 33.8 MB JSON file. It returns in Phase 2.
+**Phase 1 — all three resolved.** `fake_periods` are float **seconds** (asserted every load);
+leakage assertions are **build-failing** with zero overlap on all three pairs; RAM was never a
+factor (Phase 1 ran off a 33.8 MB JSON).
 
-⛔ **One new risk surfaced (PF-7):** metadata's `duration` is not a media duration, and P2-1's
-assertion is wrong as written. Carried into Phase 2 below.
+**Phase 2 — ground truth is now measured, not assumed.** §6.3 calls label alignment the
+highest-risk step in the project. Comparing each visual fake against the real video it names in
+`original`, divergence onset matches the labelled span start on **7/7 pairs, median error
+0.000 s** (one frame = 0.04 s). That independently confirms the units, the timeline origin **and**
+the `round(t×25)` rasterisation.
+
+⚠️ **Note for anyone using `original` as a reference:** a fake is generally a *different length*
+from its original (142 vs 136 frames, 331 vs 310) — LAV-DF replaces a word with a different word.
+The clips desynchronise from the manipulation point onward, so only the **leading edge** of
+divergence is informative; peak difference is not.
+
+⚠️ **RAM returns in Phase 4.** Crops are 7.52 MB/video (PF-10), so feature extraction must stream
+and delete per video.
 
 ### Carried-forward open items
 
 | Item | Blocks | Notes |
 |---|---|---|
 | 🔴 PRE-1 — original report missing | **P1-3, Part 9, Phase 16** | Not on this machine; drop at `docs/original_report.pdf`. Phases 2–15 do not need it. The only thing keeping the P1-20 gate at 3/4 |
-| ⛔ PF-7 — P2-1's frame assertion is wrong | Phase 2 | `T == video_frames`, not `round(duration × 25) ± 1`. Holds for only 239/136,304 entries as written |
-| ✋ Attach the mirror in a Kaggle notebook | Phase 2 execution on Kaggle | Manual browser step (*Add Data*). Not needed for Phase 1, which ran off metadata alone |
+| ⛔ PF-10 — crops are 7.52 MB/video | Phase 4 | dev-10k = 73.5 GB, full ≈ 1 TB. Phase 4 must featurise and delete **per video**; will not fit Kaggle's 20 GB `/kaggle/working` |
+| ✋ P2-8 / ⛔ P2-10 manual checks | Phase 2 sign-off | Contact sheets and overlays rendered in `reports/figures/`. P2-10 is backed by 7/7 objective label verification but still needs a human watch |
+| ✋ Attach the mirror in a Kaggle notebook | Phase 4+ on Kaggle | Manual browser step (*Add Data*). Phases 1–2 ran locally off metadata plus smoke-100 |
 | P14-0 — Windows long paths disabled | Phase 14 | `LongPathsEnabled = 0`. Needs an elevated shell + reboot before `npm install` |
 | PF-4 — precision re-benchmark on Kaggle | Phase 9–11 | fp32 locally is settled; the cloud figure is assumed until measured |
 
@@ -94,8 +106,8 @@ assertion is wrong as written. Carried into Phase 2 below.
 | −1 Pre-flight | 5 | ✅ Complete (4/5 — PRE-1 blocked, Phase 16 only) |
 | 0 Environment | 13 | ✅ Complete — gate 33/33 |
 | 1 Dataset | 20 | ✅ **18/20** — gate 3/4; P1-3 blocked on PRE-1 |
-| 2 Video preproc | 15 | ⬜ **Next** — apply PF-7 at P2-1 |
-| 3 Audio preproc | 9 | ⬜ Not started |
+| 2 Video preproc | 15 | ✅ **13/15** — gate 8/8; P2-8 & P2-10 await ✋ |
+| 3 Audio preproc | 9 | ⬜ **Next** |
 | 4 Visual baseline | 12 | ⬜ Not started |
 | 5 Audio baseline | 8 | ⬜ Not started |
 | 6 Fusion | 8 | ⬜ Not started |
@@ -235,25 +247,49 @@ fps/frame-counts byte-exact. The CL-1 size flag is resolved: Kaggle's 24.84 GB `
 
 ---
 
-## PHASE 2 — Video Preprocessing
+## PHASE 2 — Video Preprocessing — ✅ **13/15 automated (2026-08-29)**
 
-| ID | Task |
-|---|---|
-| P2-1 | PyAV decoder wrapper with exact fps resampling to 25; assert `T == round(duration × 25) ± 1` |
-| P2-2 | MediaPipe face detection (Decision B-1) + 5-point similarity-transform alignment → 112×112 crops |
-| P2-3 | Detect every 5th frame, track/interpolate between; handle detection gaps; emit `face_found` mask |
-| P2-4 | Multiple-face policy: pick largest or most temporally consistent track — **document the choice** |
-| P2-5 | Content-hashed, **resumable** caching to `data/interim/faces/{video_id}.npy` (skip if output exists) |
-| P2-6 | Stream frames — never hold a full video in RAM; cap `num_workers=2` |
-| P2-7 | Contact-sheet visualizer for 20 random videos |
-| P2-8 | ✋ Inspect contact sheets: faces correctly cropped, aligned, upright |
-| P2-9 | Write `scripts/viz_overlay.py` — burn `fake_periods` onto video as a red overlay |
-| P2-10 | ⛔✋ **Personally watch 20 overlay videos** and confirm the highlighted spans genuinely look manipulated (§6.3 — catches label bugs nothing else will). Under PF-6 raw video is not on D: — either pull the smoke-100 subset (~200 MB) or render the 20 overlays on Kaggle and download those |
-| P2-11 | Determinism test: byte-identical output across two runs |
-| P2-12 | Verify interrupt-and-resume actually resumes |
-| P2-13 | Assert `face_found.mean() > 0.9` on a clean sample; measure and record extraction wall-clock |
-| P2-14 | Write `tests/unit/test_video_preprocessing.py` |
-| P2-15 | ⛔ **Gate:** determinism verified, visual inspection done, resumability confirmed |
+**Automated gate 8/8 green**: determinism (byte-identical), resumability (rebuilds match,
+survivors untouched), detection rate (mean `face_found` 0.969). Two ✋ manual checks remain
+yours: P2-8 (contact sheets) and ⛔ P2-10 (watch 20 overlays) — both have artefacts rendered
+and waiting in `reports/figures/`.
+
+Ran on smoke-100 locally (100 videos, 19 MB) plus 10 `original` counterparts, which is
+exactly what PF-6 permits.
+
+| ID | Task | Status |
+|---|---|---|
+| P2-1 | PyAV decoder with exact fps resampling to 25; assert frame count | ✅ `src/preprocessing/video.py`. **Assertion is `T == video_frames` per PF-7**, not `round(duration × 25) ± 1` — the latter fails on 99.8% of LAV-DF. Resampling implemented by nearest source index (a no-op here: every file is exactly 25.00) |
+| P2-2 | MediaPipe detection + 5-point similarity alignment → 112×112 | ✅ `face.py` + `align.py`. ⚠️ **B-1 amended by PF-8**: mediapipe 1.0.0 removed `mp.solutions` and ships no weights, so this uses the Tasks API `FaceLandmarker` with a pinned bundle. Umeyama closed form, **not** `estimateAffinePartial2D` — its RANSAC default would break P2-11 |
+| P2-3 | Detect every 5th frame, track/interpolate; handle gaps; emit `face_found` | ✅ Linear interpolation within `max_gap=15` frames (0.6 s ≈ the mean forged span). Wider gaps are **held, not interpolated**, and marked not-found — inventing landmarks across a 0.6 s gap could paper over an entire manipulated segment |
+| P2-4 | Multiple-face policy — **document the choice** | ✅ **Most temporally consistent track, tie-broken by area.** Largest-per-frame is the obvious choice and is wrong: it flips identity mid-clip whenever a background face is briefly nearer. First detection takes the largest; thereafter nearest centre to the previous accepted face wins |
+| P2-5 | Content-hashed, **resumable** caching (skip if output exists) | ✅ `data/interim/faces/{sha256(cfg)[:8]}/{video_id}.npz`. Writes are temp-file + atomic rename, so an interrupt cannot leave a truncated file that `is_cached()` would call done |
+| P2-6 | Stream frames — never hold a full video in RAM; cap `num_workers=2` | ✅ Decoding is a generator throughout; two decode passes rather than buffering frames. Default `--workers 2` per §12.2 |
+| P2-7 | Contact-sheet visualizer for 20 random videos | ✅ `scripts/viz_contact_sheet.py` — 8×4 grid, evenly sampled, **frames with `face_found=False` tinted red** so dropouts are unmissable |
+| P2-8 | ✋ Inspect contact sheets: faces cropped, aligned, upright | 🟡 **20 sheets written and reviewed here** — faces upright, eyes level, one identity per clip, dropouts correctly flagged. Worst case `test_001689` (0.41) is the subject turning away, honestly marked rather than silently mis-cropped. ✋ **Yours to confirm**: `reports/figures/contact_sheets/` |
+| P2-9 | `scripts/viz_overlay.py` — burn `fake_periods` on as a red overlay | ✅ 20 rendered. Red border + FORGED banner, timeline strip with playhead, frame/timestamp/class caption. Spans rasterised **identically to the training target** (`round(t×25)`, clamped) so what you watch is what the model is taught |
+| P2-10 | ⛔✋ **Personally watch 20 overlay videos** | 🟡 **Backed by objective evidence, still needs your eyes.** `scripts/11_verify_labels.py` compares each visual fake against the real video it names in `original`: divergence must begin at the labelled span start. **7/7 pairs, median error 0.000 s, max 0.020 s** — half a frame. ✋ **Yours**: `reports/figures/overlays/` |
+| P2-11 | Determinism test: byte-identical output across two runs | ✅ **6/6 byte-identical**, comparing raw array bytes across two separate cache roots (`scripts/10_verify_preprocessing.py`) |
+| P2-12 | Verify interrupt-and-resume actually resumes | ✅ Half the cache deleted and re-run: rebuilt entries **byte-identical** to the deleted ones, survivors' mtime **unchanged** (skipped, not silently rewritten), resume 4.3 s vs 16.4 s full |
+| P2-13 | Assert `face_found.mean() > 0.9`; measure extraction wall-clock | ✅ **mean 0.969** over smoke-100 (median 0.988, min 0.406; 6 of 100 below 0.9, all genuine head-turns). **1.49 s/video** at `--workers 2` → dev-10k ≈ 4.1 h, full ≈ **56 h** (see PF-10) |
+| P2-14 | Write `tests/unit/test_video_preprocessing.py` | ✅ 40 tests; suite now **130 passing** |
+| P2-15 | ⛔ **Gate:** determinism verified, visual inspection done, resumability confirmed | 🟡 **Automated 8/8 green** (`reports/preprocessing_verification.md`). Determinism ✅ · resumability ✅ · detection rate ✅. ✋ Awaiting your sign-off on P2-8 and ⛔ P2-10 |
+
+**⛔ Finding — decision PF-10: crops are 7.52 MB/video.** Measured over smoke-100 (788,763,014 B /
+100). Extrapolated: dev-2k **14.7 GB**, dev-10k **73.5 GB**, full **~1.0 TB**. §3.9's 25 MB/2.5 GB
+figures are for *frozen features*, not these intermediates. So **Phase 4 must extract features and
+delete crops per video**, never crop-all-then-feature-all: dev-10k cannot fit Kaggle's 20 GB
+`/kaggle/working` and is uncomfortable on D:. Only smoke-100's 0.75 GB is kept (X-6).
+
+**⚠️ Finding — decision PF-9: `face_margin` is now 0.0, not 0.25.** Every LAV-DF frame is
+**224×224** — already a tight VoxCeleb2 face crop, not a full scene. A margin has no context to
+add and only manufactures replicated border: measured over 12 subjects, 11.0% of crop pixels fall
+outside the source frame at margin 0.0 versus **21.4% at 0.25**.
+
+**⚠️ Finding — decision PF-8: Decision B-1's API is gone.** `mediapipe 1.0.0` removed
+`mp.solutions` entirely and ships no model weights; `opencv-python` 5.0 no longer bundles Haar
+cascades either. Phase 2 now depends on `scripts/08_fetch_models.py` fetching a pinned
+`face_landmarker.task` (3,758,596 B, sha256 `64184e229b263107`) into a gitignored `models/`.
 
 ---
 
@@ -553,4 +589,4 @@ Not a separate phase — these are the tasks the local+Kaggle strategy adds.
 
 *Phase −1 complete except PRE-1 (report retrieval), which does not block Phases 0–15.*
 
-*Completed as of 2026-08-29: ~39 of 203 tasks (≈19%). Phases −1, 0 and 1 done (Phase 1 at 18/20, gate 3/4); CL-1 and CL-7 complete. `src/` now holds config, seeding, metadata, manifest, leakage, validate and subset modules, with 90 passing tests.*
+*Completed as of 2026-08-29: ~52 of 203 tasks (≈26%). Phases −1, 0, 1 and 2 done (Phase 1 at 18/20 with gate 3/4; Phase 2 at 13/15 with the automated gate 8/8). CL-1 and CL-7 complete. 130 passing tests. Outstanding: P1-3 blocked on PRE-1, and the two ✋ Phase 2 manual checks.*

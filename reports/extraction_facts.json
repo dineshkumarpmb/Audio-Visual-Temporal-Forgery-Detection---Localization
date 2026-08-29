@@ -1,0 +1,23 @@
+{
+  "subset": "smoke-100",
+  "config_hash": "79ba1653",
+  "config": {
+    "target_fps": 25.0,
+    "crop_size": 112,
+    "detect_every_n": 5,
+    "face_margin": 0.0,
+    "align": true,
+    "audio_sample_rate": 16000,
+    "n_mels": 64,
+    "n_mfcc": 40,
+    "win_length_ms": 25.0,
+    "hop_length_ms": 10.0
+  },
+  "n_extracted": 100,
+  "n_failed": 0,
+  "wall_clock_s": 149.06,
+  "seconds_per_video": 1.491,
+  "face_found_mean": 0.9687,
+  "face_found_min": 0.4056,
+  "cache_bytes": 788763014
+}

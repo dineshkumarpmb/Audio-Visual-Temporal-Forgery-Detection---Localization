@@ -262,6 +262,88 @@ files, and `r_frame_rate` is exactly 25.00 on all of them. So:
 
 ---
 
+## Phase 2 decisions — resolved 2026-08-29
+
+### PF-8 · Decision B-1 amended: MediaPipe Tasks API, with pinned model weights
+
+**Decision: keep MediaPipe, change the API.** ✅ Resolved 2026-08-29. Amends **B-1**, which named
+MediaPipe as the face detector, and the Phase 2 spec's "468 landmarks" via `mp.solutions.face_mesh`.
+
+**What broke.** `mediapipe 1.0.0` (the version Phase 0 installed and validated) **removed
+`mp.solutions` entirely**. `import mediapipe as mp; mp.solutions` raises `AttributeError`. The
+wheel also ships **no model weights** — neither `.task` bundles nor `.tflite` — and the installed
+`opencv-python` 5.0 no longer bundles Haar cascades either, so there was no in-package fallback.
+
+**Resolution.** Use `mediapipe.tasks.python.vision.FaceLandmarker` with a `face_landmarker.task`
+bundle fetched by `scripts/08_fetch_models.py` into `models/`. Underneath this is the same
+BlazeFace + FaceMesh pipeline B-1 chose; only the Python surface and the weight distribution
+changed, so B-1's comparison against MTCNN/RetinaFace still stands.
+
+**Consequences accepted:**
+
+1. **A network fetch is now a Phase 2 prerequisite.** Sizes and sha256 prefixes are pinned in the
+   script: `face_landmarker.task` 3,758,596 B / `64184e229b263107`. A changed bundle changes every
+   crop, so it must be a loud event, not silent drift in the cache.
+2. **`models/` is gitignored** — 3.8 MB of weights are re-fetchable, not source.
+3. **Landmark count is 478, not 468** (the Tasks bundle adds 10 iris points). Immaterial here: the
+   5 alignment points are all in the original 468.
+
+### PF-9 · `face_margin` defaults to 0.0, not the plan's 0.25
+
+**Decision: margin 0.0 for LAV-DF.** ✅ Resolved 2026-08-29 by measurement. Amends the
+`margin=0.25` in PROJECT_PLAN section B.
+
+**What was measured.** Every LAV-DF video is **224×224** — the frames are already tight VoxCeleb2
+face crops, not full scenes. There is no surrounding context for a margin to include, so widening
+the crop only manufactures replicated border. Over 12 subjects, the fraction of crop pixels falling
+outside the source frame:
+
+| margin | out-of-frame pixels |
+|---|---|
+| **0.00** | **11.0%** mean, 17.5% max |
+| 0.10 | 14.9% mean, 21.7% max |
+| 0.25 | 21.4% mean, 29.1% max |
+
+**Why it matters.** `BORDER_REPLICATE` smears the edge row outward. At 0.25 more than a fifth of
+every crop would be fabricated pixels carrying no facial information — and a backbone will happily
+learn the smear as a feature. The parameter stays configurable because a full-frame dataset would
+genuinely want 0.25.
+
+**Consequence:** even at 0.0 about 11% of each crop is replicated border. That is inherent to
+aligning an already-cropped source and is visible in the contact sheets; it is not a bug.
+
+### PF-10 · Face crops are ~7.5 MB/video — they must never be materialised in bulk
+
+**Finding, recorded 2026-08-29.** Measured over smoke-100: **788,763,014 B for 100 videos = 7.52 MB
+each**, at 112×112×3 uint8 over a mean ~200 frames.
+
+| Subset | Crops on disk |
+|---|---|
+| smoke-100 | 0.75 GB |
+| dev-2k | **14.7 GB** |
+| dev-10k | **73.5 GB** |
+| full (136,304) | **~1.0 TB** |
+
+**Why this is not a crisis but must be designed around.** Section 3.9's "feature size" estimates
+(25 MB smoke, 2.5 GB dev-10k) are for the *frozen backbone features*, not for these intermediate
+crops, and X-6 already says to delete crops once features are extracted. The magnitude was simply
+never quantified.
+
+**Consequences accepted:**
+
+1. **Phase 4 must extract features and delete crops per video**, never crop-all-then-feature-all.
+   dev-10k's 73.5 GB does not fit D:'s free space comfortably and cannot fit Kaggle's 20 GB
+   `/kaggle/working` at all.
+2. **CL-8's sharding applies to crops as well as features.**
+3. Only the smoke-100 crops are kept on disk (0.75 GB), per X-6.
+
+**Extraction wall-clock (P2-13):** 1.49 s/video single-machine at `--workers 2`. Extrapolated:
+dev-2k ≈ 50 min, dev-10k ≈ **4.1 h**, full ≈ **56 h** — which exceeds Kaggle's ~30 h/week GPU
+quota in one pass and confirms CL-8's multi-session sharding is required, not optional. Detection
+is CPU-bound here, so this figure is not improved by the GPU.
+
+---
+
 ## Appendix B — architectural decisions
 
 | ID | Decision | Options | Resolved by | Date | Outcome |

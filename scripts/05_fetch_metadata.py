@@ -33,6 +33,8 @@ from urllib.parse import quote
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
+from src.utils.console import init_console  # noqa: E402
+
 MIRROR = "elin75/localized-audio-visual-deepfake-dataset-lav-df"
 BASE = "https://www.kaggle.com/api/v1/datasets/download"
 
@@ -72,10 +74,25 @@ def fetch(member: str, auth: tuple[str, str], timeout: int = 900) -> bytes:
 
 
 def main() -> int:
+    init_console()
     ap = argparse.ArgumentParser(description="Fetch LAV-DF metadata from the Kaggle mirror")
     ap.add_argument("--out", default="data/raw/LAV-DF")
     ap.add_argument("--spotcheck", type=int, default=0, help="also fetch N videos for ffprobe")
     ap.add_argument("--spotcheck-dir", default="data/raw/_spotcheck")
+    ap.add_argument(
+        "--subset",
+        default=None,
+        help="also fetch every video in a committed subset list, e.g. smoke-100. "
+        "Phase 2's manual checks (P2-8, P2-10) need real video on this machine; "
+        "PF-6 permits exactly this and nothing larger.",
+    )
+    ap.add_argument("--subset-dir", default="data/manifests/subsets")
+    ap.add_argument(
+        "--with-originals",
+        action="store_true",
+        help="also fetch the real video each fake was built from -- needed by "
+        "scripts/11_verify_labels.py to check fake_periods against pixel evidence",
+    )
     ap.add_argument("--seed", type=int, default=1337)
     args = ap.parse_args()
 
@@ -132,6 +149,25 @@ def main() -> int:
             if dest.exists():
                 continue
             dest.write_bytes(fetch(f"LAV-DF/{m.file}", auth))
+        total = sum(f.stat().st_size for f in sdir.glob("*.mp4"))
+        print(
+            f"  [{GREEN}OK{RESET}] {len(list(sdir.glob('*.mp4')))} videos, {total / 1024**2:.1f} MB"
+        )
+
+    if args.subset:
+        from src.data.subset import load_subset
+
+        ids = load_subset(args.subset, args.subset_dir)
+        sdir = out / args.subset
+        sdir.mkdir(parents=True, exist_ok=True)
+        todo = [v for v in ids if not (sdir / f"{v}.mp4").exists()]
+        print(f"\n  subset {args.subset}: {len(ids)} videos -> {sdir}")
+        print(f"  {len(ids) - len(todo)} already present, {len(todo)} to fetch")
+        for i, vid in enumerate(todo, 1):
+            split, num = vid.split("_", 1)
+            (sdir / f"{vid}.mp4").write_bytes(fetch(f"LAV-DF/{split}/{num}.mp4", auth))
+            if i % 20 == 0 or i == len(todo):
+                print(f"    {i}/{len(todo)}", flush=True)
         total = sum(f.stat().st_size for f in sdir.glob("*.mp4"))
         print(
             f"  [{GREEN}OK{RESET}] {len(list(sdir.glob('*.mp4')))} videos, {total / 1024**2:.1f} MB"

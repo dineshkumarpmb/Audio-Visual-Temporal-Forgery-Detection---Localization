@@ -1,0 +1,10 @@
+{
+  "subset": "smoke-100",
+  "n_videos": 4,
+  "config_hash": "79ba1653",
+  "determinism_identical": 4,
+  "full_run_s": 12.35,
+  "resume_run_s": 2.93,
+  "face_found_mean": 0.9785,
+  "face_found_min": 0.9619
+}

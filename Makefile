@@ -13,7 +13,7 @@ TORCH_PINS  := torch==2.7.1+cu118 torchvision==0.22.1+cu118 torchaudio==2.7.1+cu
 
 .DEFAULT_GOAL := help
 .PHONY: help venv torch install install-dev check check-bench check-kaggle lint fmt \
-        typecheck test test-cov fetch-meta manifest subset verify-subsets verify-mirror \n        stats phase1 \n        features train evaluate ablations \
+        typecheck test test-cov fetch-meta manifest subset verify-subsets verify-mirror \n        stats phase1 models faces verify-preproc verify-labels sheets overlays phase2 \n        features train evaluate ablations \
         benchmark api frontend demo clean-bench
 
 help:  ## Show this help
@@ -35,6 +35,7 @@ help:  ## Show this help
 	@echo.
 	@echo   Pipeline
 	@echo     fetch-meta manifest subset verify-subsets verify-mirror stats phase1
+	@echo     models faces verify-preproc verify-labels sheets overlays phase2
 	@echo     features train evaluate ablations benchmark
 	@echo.
 	@echo   Serving
@@ -120,6 +121,34 @@ phase1:     ## Phase 1 - the whole pipeline, in order, reproducibly
 	$(MAKE) manifest ARGS=--force
 	$(MAKE) subset
 	$(MAKE) stats
+	$(PY) -m pytest tests/ -q
+
+models:     ## Phase 2 - fetch the pinned MediaPipe weights (decision PF-8)
+	$(PY) scripts/08_fetch_models.py
+
+faces:      ## Phase 2 - extract aligned face crops (resumable; safe to re-run)
+	$(PY) scripts/09_extract_faces.py $(ARGS)
+
+verify-preproc: ## Phase 2 gate - determinism, resumability, detection rate
+	$(PY) scripts/10_verify_preprocessing.py $(ARGS)
+
+verify-labels: ## Phase 2 - check fake_periods against pixel evidence (section 6.3)
+	$(PY) scripts/11_verify_labels.py $(ARGS)
+
+sheets:     ## Phase 2 - contact sheets for the manual P2-8 check
+	$(PY) scripts/viz_contact_sheet.py $(ARGS)
+
+overlays:   ## Phase 2 - burn fake_periods onto video for the manual P2-10 watch
+	$(PY) scripts/viz_overlay.py $(ARGS)
+
+phase2:     ## Phase 2 - the whole pipeline, in order
+	$(MAKE) models
+	$(PY) scripts/05_fetch_metadata.py --subset smoke-100 --with-originals
+	$(MAKE) faces
+	$(MAKE) verify-preproc
+	$(MAKE) verify-labels
+	$(MAKE) sheets
+	$(MAKE) overlays
 	$(PY) -m pytest tests/ -q
 
 features:   ## Phases 2-5 — Stage-A extraction (resumable; safe to re-run)

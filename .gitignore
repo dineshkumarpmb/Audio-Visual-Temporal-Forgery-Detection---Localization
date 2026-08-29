@@ -63,3 +63,15 @@ docs/*
 Thumbs.db
 desktop.ini
 *.tmp
+
+# ── Phase 2 generated artefacts ─────────────────────────────────────────
+# MediaPipe weights: 3.8 MB, re-fetchable and pinned by hash in
+# scripts/08_fetch_models.py. Weights are not source.
+/models/
+
+# Contact sheets (13 MB) and overlay videos (22 MB) are deterministic outputs of
+# committed code plus a committed subset id list -- `make sheets` / `make overlays`
+# regenerate them exactly. The evidence that matters (counts, error margins) lives in
+# reports/*.md and reports/*_facts.json, which ARE tracked.
+/reports/figures/contact_sheets/
+/reports/figures/overlays/
