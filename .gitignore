@@ -33,6 +33,16 @@
 /mlruns/
 /experiments/*/*/predictions.parquet
 /experiments/*/*/plots/
+# Checkpoints and the MLflow store are regenerable; the committed evidence is
+# experiments/*/*/{result,history}.json plus reports/*.json, which are small, readable,
+# and do not need MLflow installed to inspect.
+*.pt
+/experiments/mlflow.db
+/experiments/mlruns/
+# Cached features: 87 MB for 262 clips at two backbones, and fully regenerable from
+# committed code plus a committed subset id list (PF-10 explains why they are never
+# materialised in bulk).
+/data/features/
 
 # ── Python ──────────────────────────────────────────────────────────────
 __pycache__/

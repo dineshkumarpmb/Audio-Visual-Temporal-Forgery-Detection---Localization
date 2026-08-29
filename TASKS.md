@@ -7,35 +7,42 @@ Legend: ⛔ = blocking gate item · ⭐ = headline capability · 🔬 = experime
 
 ---
 
-## 📍 CURRENT STATUS — 2026-08-29, Phase 3 done (9/9) · next is Phase 4
+## 📍 CURRENT STATUS — 2026-08-29, Phase 4 at 11/12 · blocked on data volume
 
 | | |
 |---|---|
 | **Done** | Phase −1 (pre-flight) · Phase 0 (environment) — **gate green, 33/33** |
-| **Done** | Phase −1 · Phase 0 · **Phase 1 (18/20)** · **Phase 2 (13/15)** · **Phase 3 (9/9)** · CL-1 ✅ · CL-7 ✅ |
-| **Next** | **Phase 4 — Visual Baseline** (12 tasks) 🔬 Experiment A + Decision D-1. First phase with a model in it |
-| **Progress** | ~61 of 203 tasks (≈30%) · 5 of 18 phases complete |
-| **Tests** | **190 passing** — 174 unit + 16 integration against the real 136,304-entry dataset |
-| **✋ Awaiting you** | P2-8 (contact sheets) · ⛔ P2-10 (watch 20 overlays) — artefacts rendered in `reports/figures/` |
+| **Done** | Phase −1 · Phase 0 · **P1 (18/20)** · **P2 (13/15)** · **P3 (9/9)** · **P4 (11/12)** · CL-1 ✅ · CL-7 ✅ |
+| **Blocked** | ⛔ **P4-12 gate** — needs dev-2k, which needs the Kaggle mount. Local downloads are quota-capped (**PF-13**) |
+| **Next** | **CL-2/CL-3** (attach mirror + notebook entrypoint), then re-run Phase 4 at scale → **Phase 5** |
+| **Progress** | ~72 of 203 tasks (≈35%) · 5 of 18 phases complete, Phase 4 at 11/12 |
+| **Tests** | **223 passing** — 207 unit + 16 integration against the real 136,304-entry dataset |
+| **✋ Awaiting you** | P2-8 (contact sheets) · ⛔ P2-10 (watch 20 overlays) — artefacts in `reports/figures/` |
 | **Kaggle** | `dinesh1234567` · phone verified · **30 GPU h/week** · P100 16 GB or T4×2 · 12 h/session · 20 GB `/kaggle/working` |
 | **Branch** | `master`, working tree clean |
 | **Commits** | `ab2b620` baseline · `c53922b` decisions PF-1/2/3 · `ebf3196` Phase 0 · `badb58b` PF-6 · `3c0d0dc` CL-1 gate · `c872158` CL-1 credentials + API-drift fix |
 
-**Phases 1–3 built the data and preprocessing layers.** `src/` holds `config.py`, `seed.py`,
-`utils/console.py`, `data/{metadata,manifest,leakage,validate,subset}.py` and
-`preprocessing/{video,face,align,audio,cache,pipeline}.py`, driven by `scripts/02`–`12`, with
-**190 passing tests**. Both modalities are cached on one 40 ms grid and ready for a model.
-`api/` and the model packages are still empty stubs — Phases 4–16 untouched.
+**Phases 1–4 built the data, preprocessing and first model.** `src/` now also holds
+`models/backbones/visual.py`, `models/heads/classification.py`, `training/trainer.py`,
+`evaluation/metrics.py` and `data/dataset.py`, driven by `scripts/02`–`17`, with **223 passing
+tests**. There is a trained model, MLflow tracking, Baseline 0 floors and a resolved D-1.
+`api/` and the remaining model packages are still stubs — Phases 5–16 untouched.
 
-### 🔴 The one thing still blocked
+### 🔴 What is blocked, and why
 
-**PRE-1 — the original report is not on this machine.** It is the sole blocker for P1-3 (report
-audit) and for Appendix-A items 1–7. Drop it at `docs/original_report.pdf`.
+**1. ⛔ Phase 4's gate needs data this machine cannot fetch (PF-13).** Kaggle's single-file
+download endpoint returns **404 after ~300 files per window** — the files exist and the same URLs
+work again an hour later, so it is a volume quota signalled as 404. That capped the local corpus
+at **262 clips (train 58)** instead of dev-2k's 2,000. Every correctness check passes; there is
+simply not enough training data for the models to *clearly* beat the majority-class floor.
 
-Impact, precisely: it blocks **Part 9's improvement comparison and Phase 16 (documentation)**.
-It does **not** block Phases 2–15. If it never surfaces, the defensible move is to drop Part 9's
-comparison rather than quote 53.35% / 80.00% without provenance — see
-`reports/appendix_a_resolution.md`.
+**The fix is CL-2/CL-3, not more local work.** On Kaggle the dataset is *mounted* read-only at
+`/kaggle/input` — no downloads, no quota. PF-6 chose that for disk reasons; it turns out to be the
+only way to reach dev-2k at all.
+
+**2. 🔴 PRE-1 — the original report is not on this machine.** Sole blocker for P1-3 and Appendix-A
+items 1–7. Blocks **Part 9's comparison and Phase 16**, not Phases 5–15. Drop it at
+`docs/original_report.pdf`.
 
 ### Resume checklist
 
@@ -44,9 +51,8 @@ comparison rather than quote 53.35% / 80.00% without provenance — see
 3. `make phase2` — models → smoke-100 video → face crops → gate → label check → sheets → overlays.
    Pulls ~19 MB of video and 3.8 MB of weights; the 25.5 GB stays on Kaggle (PF-6).
 4. `make phase3` — log-mel + MFCC on the video grid → ⛔ strict alignment gate → label check.
-5. ✋ **Do P2-8 and P2-10**: open `reports/figures/contact_sheets/` and watch
    `reports/figures/overlays/`. These are the two things nothing automated can sign off.
-6. Start **Phase 4** (visual baseline) at P4-1 — the first phase with a model in it.
+6. **CL-2/CL-3** on Kaggle, then re-run `make phase4` at dev-2k scale to clear P4-12.
 
 ### Mirror verified — CL-7 PASSED 10/10 (2026-08-29)
 
@@ -116,8 +122,8 @@ and delete per video. Audio is only 64 KB/video and is not a constraint.
 | 1 Dataset | 20 | ✅ **18/20** — gate 3/4; P1-3 blocked on PRE-1 |
 | 2 Video preproc | 15 | ✅ **13/15** — gate 8/8; P2-8 & P2-10 await ✋ |
 | 3 Audio preproc | 9 | ✅ **9/9** — gate 100/100, no manual checks |
-| 4 Visual baseline | 12 | ⬜ **Next** — 🔬 Experiment A + Decision D-1 |
-| 5 Audio baseline | 8 | ⬜ Not started |
+| 4 Visual baseline | 12 | 🟡 **11/12** — gate 2/3; D-1 ✅ ResNet-18; needs dev-2k |
+| 5 Audio baseline | 8 | ⬜ **Next** — 🔬 Experiment B + Decision C-1 |
 | 6 Fusion | 8 | ⬜ Not started |
 | 7 Temporal | 6 | ⬜ Not started |
 | 8 Self-attention | 10 | ⬜ Not started |
@@ -129,7 +135,7 @@ and delete per video. Audio is only 64 KB/video and is not a constraint.
 | 14 Frontend | 12 | ⬜ Not started (also gated by P14-0) |
 | 15 Testing | 9 | ⬜ Not started |
 | 16 Documentation | 11 | ⬜ Not started (needs PRE-1) |
-| Cloud (Kaggle) | 8 | 🟡 3/8 — CL-1 ✅, CL-7 ✅ 10/10; CL-2/CL-3 when Phase 2 runs on Kaggle |
+| Cloud (Kaggle) | 8 | 🟡 3/8 — CL-1 ✅, CL-7 ✅. **CL-2/CL-3 now on the critical path (PF-13)** |
 | Cross-cutting | 7 | 🔄 Continuous |
 
 ---
@@ -344,22 +350,65 @@ streaming constraint does not apply to audio. dev-10k log-mels would be ~0.6 GB.
 
 ---
 
-## PHASE 4 — Visual Baseline (🔬 Experiment A + Decision D-1)
+## PHASE 4 — Visual Baseline — 🟡 **11/12, gate 2/3 (2026-08-29)**
 
-| ID | Task |
-|---|---|
-| P4-1 | Frozen-backbone feature extractor for **both** ResNet-18 (512-d) and MobileNetV2 (1280-d → learned linear → 512-d for parity) |
-| P4-2 | `scripts/04_extract_visual.py` — batched, `torch.no_grad()` + autocast, fp16 output, resumable |
-| P4-3 | Extract over dev-2k with both backbones; record throughput and peak VRAM for each |
-| P4-4 | Determinism check (`model.eval()`, no dropout); embedding-norm sanity; t-SNE identity-separation plot |
-| P4-5 | Attention-pooling head + classifier (`Linear 256→64 → GELU → Dropout → Linear 64→1`, sigmoid + BCE) |
-| P4-6 | Build the training loop: `src/training/{trainer,loop,optim,callbacks}.py`, AMP fp16, grad accumulation, checkpoint every epoch |
-| P4-7 | ⛔ **Overfit-a-batch test** — 10 samples to ~zero loss before any real training |
-| P4-8 | Set up MLflow (local, file-backed): log git SHA, resolved config, all seeds, per-epoch metrics, checkpoint path, hardware, wall-clock |
-| P4-9 | Train B1a (ResNet-18) and B1b (MobileNetV2), 3 seeds each |
-| P4-10 | Implement Baseline 0 (majority-class + random) as the sanity floor |
-| P4-11 | 🔬 Record Experiment J; ⛔ **resolve Decision D-1** in `Appendix B` with the measurements that decided it |
-| P4-12 | ⛔ **Gate:** a working trained model, both backbones clearly beat majority-class, D-1 resolved by data |
+⛔ **Gate P4-12 not passed**: the models beat the majority-class floor but not *clearly*
+(+0.067 AUC), because Kaggle's download quota (**PF-13**) capped local training data at
+**58 clips** instead of dev-2k's 1,155. Every correctness diagnostic passes — overfit-a-batch
+1e-6, byte-identical re-extraction, identity separation 0.002 vs 0.193 — so this is a data
+volume ceiling, not a defect. Clearing it needs the Kaggle mount (CL-2/CL-3).
+
+⛔ **D-1 is resolved → ResNet-18** on the speed half of §5.2's rule, which is measured cleanly
+and is not scale-dependent.
+
+| ID | Task | Status |
+|---|---|---|
+| P4-1 | Frozen-backbone extractor for **both** ResNet-18 (512-d) and MobileNetV2 (1280-d → 512 for parity) | ✅ `src/models/backbones/visual.py`. Both frozen, `train()` **overridden** so a `Trainer.train()` call cannot flip BatchNorm into batch-statistics mode. Parity comes from the head's `Linear(D→256)`, applied to **both** arms — giving it only to MobileNetV2 would hand one arm extra capacity and confound D-1 |
+| P4-2 | `scripts/04_extract_visual.py` — batched, `no_grad`, fp16 output, resumable | ✅ `scripts/13_extract_visual.py` (04 was taken by Phase 1 stats). ⛔ **`--from-video` streams decode→align→featurise→discard**, so peak disk is one clip, not PF-10's 73.5 GB. **Compute fp32, store fp16** per PF-4 — fp16 arithmetic is 0.13× on this GPU |
+| P4-3 | Extract over dev-2k with both backbones; record throughput and peak VRAM | 🟡 **252 clips, not 2,000** — Kaggle's download quota (**PF-13**) made dev-2k unobtainable locally. Both backbones extracted. Throughput/VRAM measured two ways, which mattered: end-to-end **50.1 vs 40.3 frames/s**, but isolated backbone **2,277 vs 2,502 img/s** (`scripts/17_bench_backbones.py`) |
+| P4-4 | Determinism check; embedding-norm sanity; t-SNE identity separation | ✅ **5/5 both backbones** (`scripts/16_verify_features.py`). Re-extraction **byte-identical 4/4**; no dead clips; norms sane (median 25.0 / 21.1). Identity separation **within 0.002 vs between 0.193** — the features carry strong real signal |
+| P4-5 | Attention-pooling head + classifier | ✅ `Linear(D→256)` → attention-pool → LayerNorm → `Linear(256→64)` → GELU → Dropout → `Linear(64→1)`, single logit + `BCEWithLogitsLoss` per §J. Padding **and** `face_found=False` frames are masked out of pooling |
+| P4-6 | Training loop: AMP, grad accumulation, checkpoint every epoch | ✅ `src/training/trainer.py`. Early stopping on **dev** only; checkpoint every epoch with atomic writes; `resume()` restores model+optimiser+best. AMP present but **off by default** (PF-4) |
+| P4-7 | ⛔ **Overfit-a-batch** — 10 samples to ~zero loss | ✅ **PASS: 0.6879 → 0.000001** in 300 steps. Runs automatically before every training run and **aborts it on failure** |
+| P4-8 | MLflow: git SHA, config, seeds, metrics, checkpoint, hardware, wall-clock | ✅ All logged. ⚠️ **PF-14**: MLflow 3.15 *raises* on the file store the plan specifies; switched to SQLite (`experiments/mlflow.db`) — still one local file, nothing to host |
+| P4-9 | Train B1a (ResNet-18) and B1b (MobileNetV2), 3 seeds each | ✅ 6 runs. **ResNet-18 0.5667 ± 0.0121**, **MobileNetV2 0.5746 ± 0.0156** dev AUC. Plus a 3-seed mean-pool ablation: **0.5764 ± 0.0131** |
+| P4-10 | Baseline 0 (majority-class + random) as the sanity floor | ✅ majority AUC **0.5000** / acc **0.7200**; random AUC 0.5198. That accuracy is the point: the dataset is 72% fake on this dev split, so accuracy is worthless as a headline |
+| P4-11 | 🔬 Record Experiment J; ⛔ **resolve D-1** with the measurements | ✅ **D-1 → ResNet-18** (`reports/decision_d1.md`), decided by the §5.2 rule applied mechanically. See below |
+| P4-12 | ⛔ **Gate:** working trained model, both backbones clearly beat majority-class, D-1 resolved | 🟡 **2 of 3.** Working model ✅ · D-1 resolved ✅ · **"clearly beat majority-class" ✗** — +0.067/+0.075 AUC over the floor is a beat, not a clear one, on 58 training clips |
+
+**⛔ Gate P4-12 is NOT passed, and the reason is data volume, not code.** Every diagnostic says the
+pipeline is sound: the overfit test drives loss to 1e-6, features re-extract byte-identically, and
+identity separation is 0.002-within vs 0.193-between. What is missing is **training data** — 58
+clips, because Kaggle's download quota (**PF-13**) capped the local corpus at ~300 files. The plan's
+own troubleshooting table says "AUC ≈ 0.5 → Stop. Labels or crops are wrong"; that diagnosis is
+ruled out here by P4-4 and by Phase 2's 12/12 label verification. Passing this gate needs dev-2k,
+which needs the Kaggle mount (CL-2/CL-3), not more local work.
+
+**⛔ D-1 resolved → ResNet-18**, by applying §5.2's pre-committed rule rather than picking a winner
+after the fact:
+
+| Condition | Threshold | Measured | Met |
+|---|---|---|---|
+| AUC gap within noise | < 0.01 | **0.0079** (sd intervals overlap) | ✅ |
+| MobileNetV2 backbone ≥2× faster | ≥ 2.0× | **1.10×** | ❌ |
+
+The tie-break needed **both**. The gap is inside noise, so the experiment does not separate the
+arms; the speed condition fails outright; therefore §5.2's stated prior stands **unrebutted**.
+Picking MobileNetV2 on a 0.008 AUC lead between two noisy 3-seed runs would be dressing noise up
+as a finding.
+
+**⚠️ Measuring speed end-to-end would have given the wrong answer.** Through the full pipeline
+MobileNetV2 measures **0.80×** — *slower* — because decode and MediaPipe alignment swamp the
+backbone. Benchmarked in isolation it is 1.10× faster, and the backbone turns out to be only
+**2.2% of extraction wall-clock**. That is §5.2's first argument ("the efficiency argument mostly
+evaporates under the cached architecture") confirmed, and considerably stronger than it was stated.
+
+**⚠️ The mean-pool ablation scored *higher* than attention (0.5764 vs 0.5667) — reported, not
+buried.** It contradicts **PF-15**, which measured the forgery signal as **45× stronger at the peak
+frame than in the mean-pooled embedding**. Both can be true: PF-15 is a property of the *features*
+and is solid; whether a head can *exploit* it is a training question, and 58 clips cannot answer it.
+The 0.010 difference is inside the seed spread of both arms. Re-test at dev-2k scale before
+concluding anything about pooling.
 
 ---
 
@@ -624,4 +673,4 @@ Not a separate phase — these are the tasks the local+Kaggle strategy adds.
 
 *Phase −1 complete except PRE-1 (report retrieval), which does not block Phases 0–15.*
 
-*Completed as of 2026-08-29: ~61 of 203 tasks (≈30%). Phases −1, 0, 1, 2 and 3 done (Phase 1 at 18/20 with gate 3/4; Phase 2 at 13/15 with the automated gate 8/8; Phase 3 complete 9/9). CL-1 and CL-7 complete. 190 passing tests. Outstanding: P1-3 blocked on PRE-1, and the two ✋ Phase 2 manual checks.*
+*Completed as of 2026-08-29: ~72 of 203 tasks (≈35%). Phases −1, 0, 1, 2, 3 done; Phase 4 at 11/12 with gate 2/3. CL-1 and CL-7 complete. 223 passing tests. Outstanding: P4-12 needs dev-2k via the Kaggle mount (PF-13), P1-3 is blocked on PRE-1, and two ✋ Phase 2 manual checks remain.*

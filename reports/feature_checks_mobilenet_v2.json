@@ -1,0 +1,23 @@
+{
+  "backbone": "mobilenet_v2",
+  "config_hash": "0d8eaa32",
+  "n_clips": 252,
+  "norm": {
+    "min": 1.6059918403625488,
+    "p05": 15.3941650390625,
+    "median": 21.053699493408203,
+    "p95": 28.515926361083984,
+    "max": 40.272987365722656,
+    "mean": 21.416213989257812
+  },
+  "determinism_identical": 4,
+  "determinism_n": 4,
+  "identity": {
+    "within": 0.0036908984184265137,
+    "between": 0.2562074065208435,
+    "ratio": 0.014405900612473488,
+    "n_groups": 6,
+    "n_within_pairs": 12
+  },
+  "tsne_path": "reports\\figures\\tsne_identity_mobilenet_v2.png"
+}

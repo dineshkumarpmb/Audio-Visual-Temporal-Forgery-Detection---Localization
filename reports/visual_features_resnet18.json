@@ -1,0 +1,20 @@
+{
+  "subset": "dev-2k",
+  "backbone": "resnet18",
+  "config_hash": "baec77e1",
+  "feature_dim": 512,
+  "n_params": 11176512,
+  "n_extracted": 152,
+  "n_failed": 0,
+  "n_frames": 34824,
+  "wall_clock_s": 695.33,
+  "seconds_per_video": 4.5745,
+  "frames_per_second": 50.1,
+  "peak_vram_mb": 179.3,
+  "cache_bytes": 57305574,
+  "bytes_per_video": 377010,
+  "face_found_mean": 0.9377,
+  "n_missing": 1798,
+  "source": "video",
+  "device": "cuda"
+}

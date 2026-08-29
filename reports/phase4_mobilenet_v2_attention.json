@@ -1,0 +1,229 @@
+{
+  "backbone": "mobilenet_v2",
+  "pooling": "attention",
+  "git_sha": "120219f89b79",
+  "n_clips": 252,
+  "splits": {
+    "train": {
+      "n": 58,
+      "positive": 29,
+      "negative": 29,
+      "positive_rate": 0.5
+    },
+    "dev": {
+      "n": 175,
+      "positive": 126,
+      "negative": 49,
+      "positive_rate": 0.72
+    },
+    "test": {
+      "n": 19,
+      "positive": 9,
+      "negative": 10,
+      "positive_rate": 0.47368421052631576
+    }
+  },
+  "baseline_zero": {
+    "majority_class": {
+      "auc": 0.5,
+      "ap": 0.7383221144051165,
+      "accuracy": 0.72,
+      "eer": 0.5,
+      "precision": 0.72,
+      "recall": 1.0,
+      "f1": 0.8372093023255813,
+      "n": 175,
+      "positive_rate": 0.72
+    },
+    "random": {
+      "auc": 0.5197602850664075,
+      "ap": 0.7199794600518848,
+      "accuracy": 0.5142857142857142,
+      "eer": 0.5090702947845804,
+      "precision": 0.7469879518072289,
+      "recall": 0.49206349206349204,
+      "f1": 0.5933014354066986,
+      "n": 175,
+      "positive_rate": 0.72
+    }
+  },
+  "dev_auc_mean": 0.5746139725731562,
+  "dev_auc_std": 0.015605401649874983,
+  "dev_acc_mean": 0.5047619047619047,
+  "runs": [
+    {
+      "seed": 1337,
+      "backbone": "mobilenet_v2",
+      "pooling": "attention",
+      "git_sha": "120219f89b79",
+      "feature_config": "0d8eaa32",
+      "n_params": 377986,
+      "epochs_run": 17,
+      "best_epoch": 1,
+      "wall_clock_s": 32.04,
+      "n_clips_train": 58,
+      "dev": {
+        "loss": 0.6289827305930001,
+        "auc": 0.5711046323291221,
+        "ap": 0.7695591933490452,
+        "accuracy": 0.72,
+        "eer": 0.42857142857142855,
+        "precision": 0.72,
+        "recall": 1.0,
+        "f1": 0.8372093023255813,
+        "n": 175,
+        "positive_rate": 0.72,
+        "per_class": {
+          "visual_only": {
+            "n_fake": 37,
+            "auc": 0.6122448979591837,
+            "recall": 1.0
+          },
+          "audio_only": {
+            "n_fake": 45,
+            "auc": 0.5814058956916099,
+            "recall": 1.0
+          },
+          "both": {
+            "n_fake": 44,
+            "auc": 0.525974025974026,
+            "recall": 1.0
+          },
+          "real": {
+            "n": 49,
+            "specificity": 0.0
+          }
+        }
+      },
+      "train_config": {
+        "epochs": 60,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "batch_size": 32,
+        "grad_accum": 1,
+        "pos_weight": 1.0,
+        "patience": 15,
+        "amp": false,
+        "grad_clip": 1.0,
+        "seed": 1337,
+        "num_workers": 0
+      }
+    },
+    {
+      "seed": 1338,
+      "backbone": "mobilenet_v2",
+      "pooling": "attention",
+      "git_sha": "120219f89b79",
+      "feature_config": "0d8eaa32",
+      "n_params": 377986,
+      "epochs_run": 18,
+      "best_epoch": 2,
+      "wall_clock_s": 32.15,
+      "n_clips_train": 58,
+      "dev": {
+        "loss": 0.714387309551239,
+        "auc": 0.5952380952380952,
+        "ap": 0.7955487959406102,
+        "accuracy": 0.38285714285714284,
+        "eer": 0.42857142857142855,
+        "precision": 0.8461538461538461,
+        "recall": 0.1746031746031746,
+        "f1": 0.2894736842105263,
+        "n": 175,
+        "positive_rate": 0.72,
+        "per_class": {
+          "visual_only": {
+            "n_fake": 37,
+            "auc": 0.5990071704357418,
+            "recall": 0.1891891891891892
+          },
+          "audio_only": {
+            "n_fake": 45,
+            "auc": 0.6272108843537415,
+            "recall": 0.15555555555555556
+          },
+          "both": {
+            "n_fake": 44,
+            "auc": 0.5593692022263451,
+            "recall": 0.18181818181818182
+          },
+          "real": {
+            "n": 49,
+            "specificity": 0.9183673469387755
+          }
+        }
+      },
+      "train_config": {
+        "epochs": 60,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "batch_size": 32,
+        "grad_accum": 1,
+        "pos_weight": 1.0,
+        "patience": 15,
+        "amp": false,
+        "grad_clip": 1.0,
+        "seed": 1338,
+        "num_workers": 0
+      }
+    },
+    {
+      "seed": 1339,
+      "backbone": "mobilenet_v2",
+      "pooling": "attention",
+      "git_sha": "120219f89b79",
+      "feature_config": "0d8eaa32",
+      "n_params": 377986,
+      "epochs_run": 20,
+      "best_epoch": 4,
+      "wall_clock_s": 36.09,
+      "n_clips_train": 58,
+      "dev": {
+        "loss": 0.7226729852812631,
+        "auc": 0.5574991901522514,
+        "ap": 0.7664360395970704,
+        "accuracy": 0.4114285714285714,
+        "eer": 0.4467120181405896,
+        "precision": 0.7346938775510204,
+        "recall": 0.2857142857142857,
+        "f1": 0.4114285714285714,
+        "n": 175,
+        "positive_rate": 0.72,
+        "per_class": {
+          "visual_only": {
+            "n_fake": 37,
+            "auc": 0.5819084390512962,
+            "recall": 0.35135135135135137
+          },
+          "audio_only": {
+            "n_fake": 45,
+            "auc": 0.5705215419501134,
+            "recall": 0.24444444444444444
+          },
+          "both": {
+            "n_fake": 44,
+            "auc": 0.5236549165120594,
+            "recall": 0.2727272727272727
+          },
+          "real": {
+            "n": 49,
+            "specificity": 0.7346938775510204
+          }
+        }
+      },
+      "train_config": {
+        "epochs": 60,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "batch_size": 32,
+        "grad_accum": 1,
+        "pos_weight": 1.0,
+        "patience": 15,
+        "amp": false,
+        "grad_clip": 1.0,
+        "seed": 1339,
+        "num_workers": 0
+      }
+    }
+  ]
+}

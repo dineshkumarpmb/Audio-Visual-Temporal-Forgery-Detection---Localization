@@ -1,0 +1,58 @@
+{
+  "seed": 1339,
+  "backbone": "resnet18",
+  "pooling": "mean",
+  "git_sha": "120219f89b79",
+  "feature_config": "baec77e1",
+  "n_params": 181378,
+  "epochs_run": 34,
+  "best_epoch": 18,
+  "wall_clock_s": 31.01,
+  "n_clips_train": 58,
+  "dev": {
+    "loss": 1.0345308664866857,
+    "auc": 0.5643019112406867,
+    "ap": 0.7686925830575448,
+    "accuracy": 0.5657142857142857,
+    "eer": 0.4246031746031746,
+    "precision": 0.7840909090909091,
+    "recall": 0.5476190476190477,
+    "f1": 0.6448598130841122,
+    "n": 175,
+    "positive_rate": 0.72,
+    "per_class": {
+      "visual_only": {
+        "n_fake": 37,
+        "auc": 0.5995587424158852,
+        "recall": 0.6486486486486487
+      },
+      "audio_only": {
+        "n_fake": 45,
+        "auc": 0.5392290249433107,
+        "recall": 0.5111111111111111
+      },
+      "both": {
+        "n_fake": 44,
+        "auc": 0.5602968460111317,
+        "recall": 0.5
+      },
+      "real": {
+        "n": 49,
+        "specificity": 0.6122448979591837
+      }
+    }
+  },
+  "train_config": {
+    "epochs": 60,
+    "lr": 0.001,
+    "weight_decay": 0.0001,
+    "batch_size": 32,
+    "grad_accum": 1,
+    "pos_weight": 1.0,
+    "patience": 15,
+    "amp": false,
+    "grad_clip": 1.0,
+    "seed": 1339,
+    "num_workers": 0
+  }
+}

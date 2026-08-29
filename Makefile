@@ -13,8 +13,10 @@ TORCH_PINS  := torch==2.7.1+cu118 torchvision==0.22.1+cu118 torchaudio==2.7.1+cu
 
 .DEFAULT_GOAL := help
 .PHONY: help venv torch install install-dev check check-bench check-kaggle lint fmt \
-        typecheck test test-cov fetch-meta manifest subset verify-subsets verify-mirror \n        stats phase1 models faces verify-preproc verify-labels sheets overlays phase2 \n        audio audio-mfcc phase3 \n        features train evaluate ablations \
-        benchmark api frontend demo clean-bench
+        typecheck test test-cov fetch-meta manifest subset verify-subsets verify-mirror \
+        stats phase1 models faces verify-preproc verify-labels sheets overlays phase2 \
+        audio audio-mfcc phase3 visual overfit train-visual decide-d1 phase4 \
+        features train evaluate ablations benchmark api frontend demo clean-bench
 
 help:  ## Show this help
 	@echo Audio-Visual Temporal Forgery Detection ^& Localization
@@ -37,6 +39,7 @@ help:  ## Show this help
 	@echo     fetch-meta manifest subset verify-subsets verify-mirror stats phase1
 	@echo     models faces verify-preproc verify-labels sheets overlays phase2
 	@echo     audio audio-mfcc phase3
+	@echo     visual overfit train-visual decide-d1 phase4
 	@echo     features train evaluate ablations benchmark
 	@echo.
 	@echo   Serving
@@ -165,6 +168,26 @@ phase3:     ## Phase 3 - audio pipeline + the strict alignment gate
 # classes, and an audio-only run would overwrite the visual half.
 	$(PY) scripts/11_verify_labels.py --modality both
 	$(PY) -m pytest tests/unit/test_audio_align.py -q
+
+visual:     ## Phase 4 - extract frozen visual features (ARGS=--backbone mobilenet_v2)
+	$(PY) scripts/13_extract_visual.py --from-video $(ARGS)
+
+overfit:    ## Phase 4 - the P4-7 overfit-a-batch gate, on its own
+	$(PY) scripts/14_train.py --overfit-only $(ARGS)
+
+train-visual: ## Phase 4 - train the visual baseline, 3 seeds (ARGS=--backbone ...)
+	$(PY) scripts/14_train.py $(ARGS)
+
+decide-d1:  ## Phase 4 - resolve Decision D-1 from the measurements
+	$(PY) scripts/15_decide_d1.py
+
+phase4:     ## Phase 4 - both backbones end to end, then D-1
+	$(PY) scripts/13_extract_visual.py --subset smoke-100 --backbone resnet18     --from-video
+	$(PY) scripts/13_extract_visual.py --subset smoke-100 --backbone mobilenet_v2 --from-video
+	$(PY) scripts/14_train.py --backbone resnet18     --seeds 3
+	$(PY) scripts/14_train.py --backbone mobilenet_v2 --seeds 3
+	$(MAKE) decide-d1
+	$(PY) -m pytest tests/ -q
 
 features:   ## Phases 2-5 — Stage-A extraction (resumable; safe to re-run)
 	$(PY) scripts/04_extract_visual.py

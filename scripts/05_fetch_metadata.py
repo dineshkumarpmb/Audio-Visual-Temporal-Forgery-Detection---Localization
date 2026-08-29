@@ -12,6 +12,13 @@ has to be local:
   * with `--spotcheck N`, a stratified handful of videos for the ffprobe checks that
     metadata alone cannot answer (P1-13, and CL-7's re-encode test).
 
+⛔ **This endpoint has a volume quota -- see decision PF-13.** After roughly 300 files in
+a session Kaggle starts returning **404** for everything, including files that downloaded
+minutes earlier; it clears after about an hour. Concurrency brings it on sooner but is not
+the cause. So this path is for smoke-scale work and the Phase 2 manual checks only.
+Anything at dev-2k scale or above must run on Kaggle, where the dataset is *mounted* at
+`/kaggle/input` with no download at all (CL-2/CL-3, and the original point of PF-6).
+
 Why raw HTTP rather than the kaggle client: `KaggleApi.dataset_download_file()`
 404s on this dataset for every path form tried. The documented `?file_name=` query
 parameter works, and Kaggle returns each single-file download wrapped in a zip, which
@@ -73,6 +80,43 @@ def fetch(member: str, auth: tuple[str, str], timeout: int = 900) -> bytes:
     return r.content
 
 
+def _fetch_many(video_ids: list[str], dest: Path, auth: tuple[str, str], workers: int) -> None:
+    """Download many videos concurrently, writing each atomically.
+
+    Kaggle serves one small file per request, so the transfer is latency-bound rather than
+    bandwidth-bound and threads help a lot -- measured ~9 videos/min serially.
+
+    Each file lands via a temp name + rename. A partial file left by an interrupt would
+    otherwise be skipped as "already present" on the next run and then fail to decode much
+    later, which is a miserable thing to debug.
+    """
+    import threading
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    done = 0
+    lock = threading.Lock()
+
+    def one(vid: str) -> None:
+        split, num = vid.split("_", 1)
+        data = fetch(f"LAV-DF/{split}/{num}.mp4", auth)
+        tmp = dest / f".{vid}.part"
+        tmp.write_bytes(data)
+        tmp.replace(dest / f"{vid}.mp4")
+
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {pool.submit(one, v): v for v in video_ids}
+        for fut in as_completed(futures):
+            vid = futures[fut]
+            try:
+                fut.result()
+            except Exception as exc:  # noqa: BLE001 - one bad file must not kill the run
+                print(f"    {RED}FAIL{RESET} {vid}: {type(exc).__name__}: {exc}")
+            with lock:
+                done += 1
+                if done % 100 == 0 or done == len(video_ids):
+                    print(f"    {done}/{len(video_ids)}", flush=True)
+
+
 def main() -> int:
     init_console()
     ap = argparse.ArgumentParser(description="Fetch LAV-DF metadata from the Kaggle mirror")
@@ -93,6 +137,7 @@ def main() -> int:
         help="also fetch the real video each fake was built from -- needed by "
         "scripts/11_verify_labels.py to check fake_periods against pixel evidence",
     )
+    ap.add_argument("--workers", type=int, default=8, help="parallel downloads")
     ap.add_argument("--seed", type=int, default=1337)
     args = ap.parse_args()
 
@@ -162,12 +207,11 @@ def main() -> int:
         sdir.mkdir(parents=True, exist_ok=True)
         todo = [v for v in ids if not (sdir / f"{v}.mp4").exists()]
         print(f"\n  subset {args.subset}: {len(ids)} videos -> {sdir}")
-        print(f"  {len(ids) - len(todo)} already present, {len(todo)} to fetch")
-        for i, vid in enumerate(todo, 1):
-            split, num = vid.split("_", 1)
-            (sdir / f"{vid}.mp4").write_bytes(fetch(f"LAV-DF/{split}/{num}.mp4", auth))
-            if i % 20 == 0 or i == len(todo):
-                print(f"    {i}/{len(todo)}", flush=True)
+        print(
+            f"  {len(ids) - len(todo)} already present, {len(todo)} to fetch "
+            f"({args.workers} workers)"
+        )
+        _fetch_many(todo, sdir, auth, args.workers)
         total = sum(f.stat().st_size for f in sdir.glob("*.mp4"))
         print(
             f"  [{GREEN}OK{RESET}] {len(list(sdir.glob('*.mp4')))} videos, {total / 1024**2:.1f} MB"

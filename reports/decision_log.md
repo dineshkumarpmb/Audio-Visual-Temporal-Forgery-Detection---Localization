@@ -403,6 +403,114 @@ crops, so PF-10's streaming constraint does not apply here. dev-10k log-mels wou
 
 ---
 
+## Phase 4 decisions — resolved 2026-08-29
+
+### PF-13 · Kaggle's single-file download endpoint has a hard quota — scale requires the mount
+
+**Finding, recorded 2026-08-29.** Phase 4 needs dev-2k (2,000 videos). It could not be
+downloaded, and the reason is a hard external limit rather than anything fixable in code.
+
+**What happened.** `scripts/05_fetch_metadata.py --subset dev-2k` began returning **HTTP 404**
+for every file after roughly 300 successful downloads in a session. The 404 is misleading: the
+files exist, they are in the mirror's own listing, and the *same URLs* succeed again after a
+cooling-off period. Verified three ways:
+
+- files that had downloaded successfully an hour earlier — including `README.md` and
+  `metadata.min.json` — began 404ing too, so it is not per-file;
+- the block cleared on its own after roughly an hour, then re-triggered after ~16 more files;
+- the metadata API (`dataset_list`) kept working throughout, so the account is not blocked —
+  only the file-download endpoint is throttled.
+
+So Kaggle rate-limits this endpoint and signals it as 404 rather than 429. Concurrency made it
+arrive sooner (8 workers) but 3 workers hit it too: it is a **volume quota**, not a concurrency
+limit. Roughly 300 files per window.
+
+**Consequences accepted:**
+
+1. **Phase 4 ran at the scale actually obtainable: 262 clips** (train 58 / dev 185 / test 19)
+   rather than dev-2k's 2,000. Every number in `reports/phase4_*.json` and `decision_d1.md`
+   carries that caveat. The machinery is scale-independent and re-running is one command.
+2. **This is what CL-2/CL-3 are for, and PF-6 was righter than it knew.** On Kaggle the dataset
+   is *mounted* read-only at `/kaggle/input` — no downloads, no quota, no transfer. PF-6 chose
+   that for disk reasons; it turns out to be the *only* way to reach dev-2k and above at all.
+   Downloading was always a local convenience for Phases 1-3, where a 100-video smoke subset
+   sufficed.
+3. **The download path is now explicitly capped.** `--subset` fetching stays for smoke-scale work
+   and the manual checks; anything larger goes through the Kaggle notebook. A comment in
+   `05_fetch_metadata.py` says so, so nobody rediscovers this the slow way.
+4. **The download order matters and was unlucky.** Ids are fetched sorted, and `dev_*` sorts
+   before `test_*` and `train_*`, so the quota was spent almost entirely on dev clips. That is
+   why the local train split is 58 and the dev split 185. Not a design choice — an artefact worth
+   naming so the odd split sizes in Phase 4's report are not mistaken for stratification.
+
+**What was *not* done:** nothing was re-split to compensate. Section 3.5 RULE 1 forbids
+re-deriving splits, and a train set that borrowed from dev would make every number here
+meaningless in exactly the way R3 warns about.
+
+---
+
+### PF-14 · MLflow tracking uses SQLite, not the bare file store
+
+**Decision: `sqlite:///experiments/mlflow.db`.** ✅ Resolved 2026-08-29. Implements P4-8's
+"MLflow (local, file-backed)" against a library that no longer supports it as written.
+
+**What broke.** `mlflow 3.15.1` **raises** on a `file:` tracking URI:
+
+> The filesystem tracking backend (e.g., './mlruns') is in maintenance mode and will not
+> receive further updates. Please migrate to a database backend.
+
+It can be forced with `MLFLOW_ALLOW_FILE_STORE=true`, but opting out of a deprecation to keep
+using a store the vendor has frozen is borrowing trouble for a project that runs for many more
+phases.
+
+**Resolution.** SQLite — the migration path MLflow itself recommends. It preserves the part of
+P4-8's intent that matters: a **single local file, no server, nothing to host or configure**. The
+run directory layout under `experiments/` is unchanged, and checkpoints are still logged as
+artefacts.
+
+**Consequence:** `experiments/mlflow.db` is gitignored along with the rest of `experiments/`;
+`reports/phase4_*.json` remains the committed, human-readable record, so no result depends on
+having MLflow installed to read it.
+
+---
+
+### PF-15 · Mean pooling dilutes the forgery signal ~45x — measured, not assumed
+
+**Finding, recorded 2026-08-29.** PROJECT_PLAN section J deviates from the source report by
+specifying **attention pooling instead of mean pooling**, reasoning that "mean-pooling a
+250-frame sequence where 50 frames are fake dilutes the signal 5:1". Phase 4's cached features
+let that be measured rather than argued, and the real dilution is far worse than 5:1.
+
+**Method.** Every fake names its `original`, so the two clips differ *only* in the forged span.
+Comparing a fake against its original in the frozen ResNet-18 embedding space:
+
+| | cosine distance |
+|---|---|
+| Mean-pooled embeddings (fake vs its original) | **0.0045** |
+| Peak per-frame embedding distance | **0.2026** |
+| **Ratio** | **45x** |
+
+For context, the distance between two *different* identities' mean embeddings is **0.193** —
+essentially the same magnitude as the peak per-frame forgery signal, and **43x larger** than the
+mean-pooled forgery signal.
+
+**What this means.** In mean-pooled space the forgery is two orders of magnitude weaker than
+identity. A mean-pooling classifier is therefore being asked to find a 0.0045 perturbation
+against a 0.193 nuisance axis. Attention pooling can concentrate on the frames where the signal
+is 45x stronger; mean pooling structurally cannot.
+
+This also predicts the shape of the failure: mean pooling should not merely score lower, it
+should latch onto *identity* rather than manipulation. `MeanPoolBaseline` exists as the ablation
+arm to demonstrate exactly that, with matched parameter count so the comparison isolates the
+pooling operator.
+
+**Corroborates P1-11.** The mean forged span is 0.650 s = 16 frames against clips averaging
+~200 frames — roughly 8% of the timeline. A ~1/12 dilution of a localised signal, compounded by
+averaging over a high-variance embedding, lands in the right order of magnitude for the 45x
+measured here.
+
+---
+
 ## Appendix B — architectural decisions
 
 | ID | Decision | Options | Resolved by | Date | Outcome |

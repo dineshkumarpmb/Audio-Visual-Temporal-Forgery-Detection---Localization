@@ -124,6 +124,28 @@ class AudioPreprocessConfig(StrictModel):
         return self
 
 
+class VisualFeatureConfig(StrictModel):
+    """Stage-A visual feature extraction (Phase 4, section 5.1).
+
+    Composes the video preprocessing config so the cache key covers **both** how the crops
+    were made and which backbone consumed them. Extracting `resnet18` and `mobilenet_v2`
+    for Decision D-1 therefore writes to two directories that cannot be confused, and
+    changing `crop_size` invalidates both, which is correct -- the features are no longer
+    comparable.
+    """
+
+    backbone: Literal["resnet18", "mobilenet_v2"] = "resnet18"
+    video: VideoPreprocessConfig = VideoPreprocessConfig()
+    batch_size: int = Field(default=64, gt=0)
+    # fp16 for storage only. Phase 0 measured fp16 *arithmetic* at 0.13x fp32 on this
+    # GTX 1650 (TU117 has no tensor cores), so compute stays fp32 -- decision PF-4.
+    store_fp16: bool = True
+
+    @property
+    def feature_dim(self) -> int:
+        return {"resnet18": 512, "mobilenet_v2": 1280}[self.backbone]
+
+
 class SubsetConfig(StrictModel):
     """§3.9 development subsets. Sizes are targets; stratification may round down."""
 
