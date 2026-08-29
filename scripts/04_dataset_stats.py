@@ -347,6 +347,10 @@ def _write_report(path: Path, facts: dict, probe_rows: list[dict]) -> None:
         "",
     ]
     path.parent.mkdir(parents=True, exist_ok=True)
+    # Drop trailing blanks so regenerating the report is idempotent -- otherwise
+    # pre-commit's end-of-file-fixer rewrites it after every run.
+    while lines and not lines[-1].strip():
+        lines.pop()
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 

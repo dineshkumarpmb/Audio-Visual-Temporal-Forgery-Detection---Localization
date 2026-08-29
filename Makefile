@@ -110,10 +110,14 @@ verify-mirror: ## CL-7 - prove the Kaggle mirror equals the authors' release (ga
 stats:      ## Phase 1 - measure the dataset, write reports/dataset_statistics.md
 	$(PY) scripts/04_dataset_stats.py --probe-dir data/raw/_spotcheck
 
-phase1:     ## Phase 1 - the whole pipeline, in order, from a clean checkout
+phase1:     ## Phase 1 - the whole pipeline, in order, reproducibly
+# --force on the manifest step is deliberate. write_manifest() refuses to overwrite so
+# that a stray run cannot silently mutate an artefact other stages already read; an
+# explicit full-pipeline rebuild is the one case where regeneration IS the intent, and
+# it is deterministic, so the rebuilt file is byte-identical unless the data changed.
 	$(MAKE) fetch-meta
 	$(MAKE) verify-mirror
-	$(MAKE) manifest
+	$(MAKE) manifest ARGS=--force
 	$(MAKE) subset
 	$(MAKE) stats
 	$(PY) -m pytest tests/ -q

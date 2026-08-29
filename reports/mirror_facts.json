@@ -5,9 +5,9 @@
   "n_real": 36431,
   "n_fake": 99873,
   "splits": {
-    "train": 78703,
     "dev": 31501,
-    "test": 26100
+    "test": 26100,
+    "train": 78703
   },
   "metadata_sha256": "96d5f79bef1aa92f0b8d0f803a48ff0e9935ccf463b688ec2b58a751e5a89251",
   "metadata_bytes": 33837990,

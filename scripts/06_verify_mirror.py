@@ -162,7 +162,9 @@ def main() -> int:
     )
 
     splits = Counter(f.split("/")[0] for f in mp4)
-    facts["splits"] = dict(splits)
+    # Sorted: `splits` is counted over a set, whose iteration order varies between
+    # runs, and an unsorted dict makes the emitted facts file differ run to run.
+    facts["splits"] = dict(sorted(splits.items()))
     c.add(
         "per-split counts match",
         dict(splits) == EXPECTED_SPLITS,
@@ -293,6 +295,10 @@ def _write_report(path: Path, c: Checks, facts: dict) -> None:
         "",
     ]
     path.parent.mkdir(parents=True, exist_ok=True)
+    # Drop trailing blanks so regenerating the report is idempotent -- otherwise
+    # pre-commit's end-of-file-fixer rewrites it after every run.
+    while lines and not lines[-1].strip():
+        lines.pop()
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
