@@ -7,14 +7,15 @@ Legend: ⛔ = blocking gate item · ⭐ = headline capability · 🔬 = experime
 
 ---
 
-## 📍 CURRENT STATUS — 2026-08-29, blocked on two manual Kaggle attestations
+## 📍 CURRENT STATUS — 2026-08-29, CL-1 green · next is CL-2
 
 | | |
 |---|---|
 | **Done** | Phase −1 (pre-flight) · Phase 0 (environment) — **gate green, 33/33** |
-| **In progress** | **CL-1** — Kaggle access. **8/8 automated checks pass**; ✋ two manual attestations outstanding |
-| **Next** | ✋ attest phone verification + GPU quota → **CL-2** (attach mirror) → ⛔ **CL-7** (prove equivalence) → **P1-2** |
-| **Progress** | ~18 of 203 tasks (≈9%) · 2 of 18 phases complete |
+| **In progress** | **Cloud track** — CL-1 ✅ done (10/10). CL-2 is next |
+| **Next** | **CL-2** (attach mirror at `/kaggle/input`) → **CL-3** (notebook entrypoint) → ⛔ **CL-7** (prove equivalence) → **P1-2** |
+| **Progress** | ~19 of 203 tasks (≈9%) · 2 of 18 phases complete |
+| **Kaggle** | `dinesh1234567` · phone verified · **30 GPU h/week** · P100 16 GB or T4×2 · 12 h/session · 20 GB `/kaggle/working` |
 | **Branch** | `master`, working tree clean |
 | **Commits** | `ab2b620` baseline · `c53922b` decisions PF-1/2/3 · `ebf3196` Phase 0 · `badb58b` PF-6 · `3c0d0dc` CL-1 gate · `c872158` CL-1 credentials + API-drift fix |
 
@@ -22,28 +23,24 @@ Legend: ⛔ = blocking gate item · ⭐ = headline capability · 🔬 = experime
 stub. Phases 2–16 are untouched. The only executable code is `scripts/00_check_env.py` and
 `scripts/01_check_kaggle.py` — both gates, not pipeline.
 
-### ✋ The one thing blocking everything
+### ⛔ The one thing blocking everything
 
-`reports/kaggle_report.md` reports CL-1 as **PARTIAL**. Kaggle exposes neither fact through its
-API, so both are attested by flag and recorded as attested — never inferred (P16-11 gate).
+**CL-7** — the mirror is a community re-upload, not the authors' bucket. Nothing may be built on it
+until it is proven equivalent: file count = 136,304 · real/fake = 36,431/99,873 ·
+`metadata.min.json` byte-identical to the HF/GitHub copy · ⛔ 20 `ffprobe` spot-checks for fps = 25
+and unchanged `duration`/`video_frames`. **A silent re-encode shifts every `fake_periods` target and
+no training curve would show it.** Fallback if it fails: CL-2's private-upload path.
 
-At **kaggle.com/settings**, read:
+Two open questions CL-7 must answer, both raised by the CL-1 sampling:
 
-1. **Phone Verification** — ⛔ gates GPU **and** notebook internet. Without it CL-3's `git clone`
-   fails for the same reason a GPU run does.
-2. **Remaining GPU hours** this week.
-
-Then close CL-1:
-
-```
-make check-kaggle ARGS="--phone-verified --gpu-hours N"
-```
+- The mirror is **24.84 GB vs 25.6 GB published** (~97%).
+- `metadata.min.json` did not appear in the 1,000-file sample.
 
 ### Resume checklist
 
 1. `make check` — should print **GATE PASSED**, exit 0. If not, the environment changed; fix
    before anything else.
-2. `make check-kaggle` with the two attestations above → CL-1 green.
+2. ~~`make check-kaggle` attestations~~ — ✅ CL-1 green, 10/10.
 3. **CL-2 → CL-3 → ⛔ CL-7**, *then* P1-2. Per **decision PF-6 (2026-08-27)** the 25.6 GB raw
    dataset is **never downloaded locally** — it is attached read-only on Kaggle at `/kaggle/input`,
    which costs no transfer and does not consume the 20 GB `/kaggle/working` budget. Only the
@@ -81,7 +78,6 @@ anything is built on it.** See `reports/dataset_access.md` §9 and `reports/deci
 
 | Item | Blocks | Notes |
 |---|---|---|
-| ✋ CL-1 phone verification + GPU quota | **CL-2 → CL-7 → all of Phase 1** | Not exposed by the API. `make check-kaggle ARGS="--phone-verified --gpu-hours N"` |
 | Mirror is 24.84 GB vs 25.6 GB published | CL-7 | ~97% of the published figure. Not alarming alone, but **CL-7 must explain the gap** before P1-2 |
 | `metadata.min.json` not in the sampled pages | CL-7 | The sample covers 1,000 of ~136k files. Confirm on the mounted copy, where the whole tree is visible at once |
 | PRE-1 — original report missing | Phase 16 only | Not on this machine; drop at `docs/original_report.pdf`. Phases 0–15 do not need it |
@@ -112,7 +108,7 @@ anything is built on it.** See `reports/dataset_access.md` §9 and `reports/deci
 | 14 Frontend | 12 | ⬜ Not started (also gated by P14-0) |
 | 15 Testing | 9 | ⬜ Not started |
 | 16 Documentation | 11 | ⬜ Not started (needs PRE-1) |
-| Cloud (Kaggle) | 8 | 🟡 CL-1 partial — 8/8 automated, 2 attestations pending |
+| Cloud (Kaggle) | 8 | 🟡 1/8 — CL-1 ✅ complete (10/10); CL-2 next |
 | Cross-cutting | 7 | 🔄 Continuous |
 
 ---
@@ -487,7 +483,7 @@ Not a separate phase — these are the tasks the local+Kaggle strategy adds.
 
 | ID | Task |
 |---|---|
-| CL-1 | 🟡 **PARTIAL (2026-08-29)** — account `dinesh1234567` verified, **8/8 automated checks pass** (`reports/kaggle_report.md`). Credentials at `~/.kaggle/kaggle.json`, ACL-restricted. ✋ **Still outstanding: phone verification + GPU quota** — re-run `make check-kaggle ARGS="--phone-verified --gpu-hours N"`. Original task: confirm GPU quota (free tier: ~30 h/week, P100 16 GB or T4×2, 12 h/session, 20 GB writable `/kaggle/working`). ⚠️ **Phone verification gates GPU *and* internet in notebooks**, so without it CL-3's `git clone` fails too |
+| CL-1 | ✅ **COMPLETE (2026-08-29)** — account `dinesh1234567`, **10/10 checks passed** (`reports/kaggle_report.md`). Credentials at `~/.kaggle/kaggle.json`, ACL-restricted. ✋ Phone verification **attested yes**; ✋ GPU quota **attested 30 h remaining**. Free tier confirmed: ~30 h/week, P100 16 GB or T4×2, 12 h/session, 20 GB writable `/kaggle/working`. Re-verify quota before each long run — it resets weekly |
 | CL-2 | Attach the public LAV-DF mirror `elin75/localized-audio-visual-deepfake-dataset-lav-df` read-only at `/kaggle/input` (no download, does not count against `/kaggle/working`). Fallback if CL-7 fails: upload the authors' copy as a private Kaggle Dataset |
 | CL-3 | Write a thin Kaggle notebook entrypoint that clones the repo and calls the **same** `scripts/` — no logic duplicated in notebook cells (drift here silently invalidates cross-environment comparisons) |
 | CL-4 | ⛔ Verify device-agnosticism: run one Phase-4 experiment on both local and Kaggle from the same config and confirm metrics match within seed variance |
@@ -540,4 +536,4 @@ Not a separate phase — these are the tasks the local+Kaggle strategy adds.
 
 *Phase −1 complete except PRE-1 (report retrieval), which does not block Phases 0–15.*
 
-*Completed as of 2026-08-29: ~18 of 203 tasks (≈9%). Phases −1 and 0 done; CL-1 partial; Phase 1 at 1/20 (P1-1, resolved in PRE-4). No `src/` implementation code exists yet.*
+*Completed as of 2026-08-29: ~19 of 203 tasks (≈9%). Phases −1 and 0 done; CL-1 complete; Phase 1 at 1/20 (P1-1, resolved in PRE-4). No `src/` implementation code exists yet.*
