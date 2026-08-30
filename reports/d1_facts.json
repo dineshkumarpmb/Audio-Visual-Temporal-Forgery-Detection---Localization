@@ -1,12 +1,12 @@
 {
-  "decision": "resnet18",
-  "reason": "the AUC gap (-0.0079) is inside seed noise, so the experiment does not separate the arms; and the tie-break's speed condition fails (1.10x, below 2.0x). Section 5.2's stated prior therefore stands unrebutted.",
-  "auc_gap": -0.007882518086599566,
-  "speedup": 1.0986,
-  "within_noise": true,
+  "decision": "mobilenet_v2",
+  "reason": "the AUC gap (-0.0870) exceeds seed noise, so it is treated as real and the higher-scoring arm wins.",
+  "auc_gap": -0.08703163805204617,
+  "speedup": 1.1459,
+  "within_noise": false,
   "fast_enough": false,
-  "sd_overlap": true,
-  "backbone_share_of_pipeline": 0.022,
+  "sd_overlap": false,
+  "backbone_share_of_pipeline": 0.0187,
   "rule": {
     "auc_noise_threshold": 0.01,
     "speed_threshold": 2.0
@@ -15,28 +15,42 @@
     "resnet18": {
       "feature_dim": 512,
       "n_params": 11176512,
-      "seconds_per_video": 4.5745,
-      "frames_per_second": 50.1,
+      "seconds_per_video": 5.8993,
+      "frames_per_second": 42.9,
       "peak_vram_mb": 179.3,
-      "bytes_per_video": 377010,
-      "auc_mean": 0.5667314544865566,
-      "auc_std": 0.012125740479506698,
+      "bytes_per_video": 228110,
+      "auc_mean": 0.6318972033257747,
+      "auc_std": 0.011028475862238834,
       "n_seeds": 3,
-      "n_clips": 252,
-      "baseline_auc": 0.5
+      "n_clips": 786,
+      "baseline_auc": 0.5,
+      "splits": {
+        "train": 592,
+        "dev": 175,
+        "test": 19
+      },
+      "n_extracted": 21,
+      "throughput_comparable": false
     },
     "mobilenet_v2": {
       "feature_dim": 1280,
       "n_params": 2223872,
-      "seconds_per_video": 5.6909,
-      "frames_per_second": 40.3,
+      "seconds_per_video": 3.6537,
+      "frames_per_second": 60.8,
       "peak_vram_mb": 180.4,
-      "bytes_per_video": 940702,
-      "auc_mean": 0.5746139725731562,
-      "auc_std": 0.015605401649874983,
+      "bytes_per_video": 569175,
+      "auc_mean": 0.7189288413778209,
+      "auc_std": 0.00860151676246489,
       "n_seeds": 3,
-      "n_clips": 252,
-      "baseline_auc": 0.5
+      "n_clips": 786,
+      "baseline_auc": 0.5,
+      "splits": {
+        "train": 592,
+        "dev": 175,
+        "test": 19
+      },
+      "n_extracted": 533,
+      "throughput_comparable": true
     }
   }
 }

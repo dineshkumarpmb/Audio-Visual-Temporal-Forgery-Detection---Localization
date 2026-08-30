@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import subprocess
 import sys
 import time
 from dataclasses import asdict
@@ -30,7 +29,6 @@ from pathlib import Path
 
 import numpy as np
 import torch
-from torch.utils.data import DataLoader
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
@@ -39,39 +37,13 @@ from src.config import VisualFeatureConfig, config_hash  # noqa: E402
 from src.data.dataset import VisualFeatureDataset, collate  # noqa: E402
 from src.data.manifest import read_manifest  # noqa: E402
 from src.data.subset import load_subset  # noqa: E402
-from src.evaluation.metrics import summary  # noqa: E402
 from src.models.heads.classification import MeanPoolBaseline, VisualBaseline  # noqa: E402
 from src.seed import seed_everything  # noqa: E402
+from src.training.reporting import baseline_zero, git_sha, loader_for  # noqa: E402
 from src.training.trainer import TrainConfig, Trainer, evaluate_split  # noqa: E402
 from src.utils.console import init_console  # noqa: E402
 
 GREEN, RED, YELLOW, DIM, RESET = "\033[32m", "\033[31m", "\033[33m", "\033[2m", "\033[0m"
-
-
-def git_sha() -> str:
-    """Logged with every run (section 3.8 rule 4) so a number can be traced to code."""
-    try:
-        out = subprocess.run(
-            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, timeout=10, check=False
-        )
-        return out.stdout.strip()[:12] or "unknown"
-    except (subprocess.SubprocessError, OSError):
-        return "unknown"
-
-
-def baseline_zero(labels: np.ndarray, seed: int = 1337) -> dict[str, dict]:
-    """P4-10: the sanity floors every real number must clear.
-
-    Majority-class emits a constant, so its AUC is exactly 0.5 by construction — that is
-    the point. Its *accuracy* is the dataset's fake rate, which is the number that makes
-    accuracy an untrustworthy headline here.
-    """
-    rng = np.random.default_rng(seed)
-    majority = float(labels.mean() >= 0.5)
-    return {
-        "majority_class": summary(np.full(len(labels), majority), labels),
-        "random": summary(rng.random(len(labels)), labels),
-    }
 
 
 def build_loaders(args, manifest, cfg: VisualFeatureConfig):
@@ -96,19 +68,6 @@ def build_loaders(args, manifest, cfg: VisualFeatureConfig):
         if v
     }
     return full, datasets
-
-
-def loader_for(ds, batch_size: int, *, shuffle: bool, seed: int) -> DataLoader:
-    g = torch.Generator()
-    g.manual_seed(seed)
-    return DataLoader(
-        ds,
-        batch_size=batch_size,
-        shuffle=shuffle,
-        collate_fn=collate,
-        num_workers=0,
-        generator=g if shuffle else None,
-    )
 
 
 def main() -> int:

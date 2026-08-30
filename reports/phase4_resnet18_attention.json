@@ -1,14 +1,14 @@
 {
   "backbone": "resnet18",
   "pooling": "attention",
-  "git_sha": "120219f89b79",
-  "n_clips": 252,
+  "git_sha": "21a2c0fae118",
+  "n_clips": 786,
   "splits": {
     "train": {
-      "n": 58,
-      "positive": 29,
-      "negative": 29,
-      "positive_rate": 0.5
+      "n": 592,
+      "positive": 429,
+      "negative": 163,
+      "positive_rate": 0.7246621621621622
     },
     "dev": {
       "n": 175,
@@ -47,62 +47,62 @@
       "positive_rate": 0.72
     }
   },
-  "dev_auc_mean": 0.5667314544865566,
-  "dev_auc_std": 0.012125740479506698,
-  "dev_acc_mean": 0.3847619047619048,
+  "dev_auc_mean": 0.6318972033257747,
+  "dev_auc_std": 0.011028475862238834,
+  "dev_acc_mean": 0.64,
   "runs": [
     {
       "seed": 1337,
       "backbone": "resnet18",
       "pooling": "attention",
-      "git_sha": "120219f89b79",
+      "git_sha": "21a2c0fae118",
       "feature_config": "baec77e1",
       "n_params": 181378,
-      "epochs_run": 32,
-      "best_epoch": 16,
-      "wall_clock_s": 27.36,
-      "n_clips_train": 58,
+      "epochs_run": 20,
+      "best_epoch": 9,
+      "wall_clock_s": 43.26,
+      "n_clips_train": 592,
       "dev": {
-        "loss": 1.4080446525982449,
-        "auc": 0.5704567541302236,
-        "ap": 0.7634838742023982,
-        "accuracy": 0.44,
-        "eer": 0.45068027210884354,
-        "precision": 0.78,
-        "recall": 0.30952380952380953,
-        "f1": 0.4431818181818182,
+        "loss": 0.40002872569220405,
+        "auc": 0.6303854875283447,
+        "ap": 0.804439271877354,
+        "accuracy": 0.5085714285714286,
+        "eer": 0.39229024943310653,
+        "precision": 0.7941176470588235,
+        "recall": 0.42857142857142855,
+        "f1": 0.5567010309278351,
         "n": 175,
         "positive_rate": 0.72,
         "per_class": {
           "visual_only": {
             "n_fake": 37,
-            "auc": 0.6111417539988968,
-            "recall": 0.32432432432432434
+            "auc": 0.6321014892443464,
+            "recall": 0.4864864864864865
           },
           "audio_only": {
             "n_fake": 45,
-            "auc": 0.5351473922902494,
-            "recall": 0.3111111111111111
+            "auc": 0.6290249433106576,
+            "recall": 0.3333333333333333
           },
           "both": {
             "n_fake": 44,
-            "auc": 0.5723562152133581,
-            "recall": 0.29545454545454547
+            "auc": 0.6303339517625232,
+            "recall": 0.4772727272727273
           },
           "real": {
             "n": 49,
-            "specificity": 0.7755102040816326
+            "specificity": 0.7142857142857143
           }
         }
       },
       "train_config": {
-        "epochs": 60,
+        "epochs": 40,
         "lr": 0.001,
         "weight_decay": 0.0001,
         "batch_size": 32,
         "grad_accum": 1,
-        "pos_weight": 1.0,
-        "patience": 15,
+        "pos_weight": 0.3799533799533799,
+        "patience": 10,
         "amp": false,
         "grad_clip": 1.0,
         "seed": 1337,
@@ -113,54 +113,54 @@
       "seed": 1338,
       "backbone": "resnet18",
       "pooling": "attention",
-      "git_sha": "120219f89b79",
+      "git_sha": "21a2c0fae118",
       "feature_config": "baec77e1",
       "n_params": 181378,
-      "epochs_run": 16,
-      "best_epoch": 0,
-      "wall_clock_s": 13.76,
-      "n_clips_train": 58,
+      "epochs_run": 28,
+      "best_epoch": 17,
+      "wall_clock_s": 60.79,
+      "n_clips_train": 592,
       "dev": {
-        "loss": 0.736555723122188,
-        "auc": 0.5793650793650794,
-        "ap": 0.7723868518297432,
-        "accuracy": 0.2857142857142857,
-        "eer": 0.4064625850340136,
-        "precision": 1.0,
-        "recall": 0.007936507936507936,
-        "f1": 0.015748031496062992,
+        "loss": 0.5771640399524144,
+        "auc": 0.6460965338516359,
+        "ap": 0.7981758778830782,
+        "accuracy": 0.7028571428571428,
+        "eer": 0.3883219954648526,
+        "precision": 0.7569444444444444,
+        "recall": 0.8650793650793651,
+        "f1": 0.8074074074074075,
         "n": 175,
         "positive_rate": 0.72,
         "per_class": {
           "visual_only": {
             "n_fake": 37,
-            "auc": 0.6116933259790402,
-            "recall": 0.0
+            "auc": 0.6359624931053502,
+            "recall": 0.8378378378378378
           },
           "audio_only": {
             "n_fake": 45,
-            "auc": 0.5551020408163265,
-            "recall": 0.0
+            "auc": 0.6566893424036281,
+            "recall": 0.8666666666666667
           },
           "both": {
             "n_fake": 44,
-            "auc": 0.5769944341372912,
-            "recall": 0.022727272727272728
+            "auc": 0.6437847866419295,
+            "recall": 0.8863636363636364
           },
           "real": {
             "n": 49,
-            "specificity": 1.0
+            "specificity": 0.2857142857142857
           }
         }
       },
       "train_config": {
-        "epochs": 60,
+        "epochs": 40,
         "lr": 0.001,
         "weight_decay": 0.0001,
         "batch_size": 32,
         "grad_accum": 1,
-        "pos_weight": 1.0,
-        "patience": 15,
+        "pos_weight": 0.3799533799533799,
+        "patience": 10,
         "amp": false,
         "grad_clip": 1.0,
         "seed": 1338,
@@ -171,54 +171,54 @@
       "seed": 1339,
       "backbone": "resnet18",
       "pooling": "attention",
-      "git_sha": "120219f89b79",
+      "git_sha": "21a2c0fae118",
       "feature_config": "baec77e1",
       "n_params": 181378,
-      "epochs_run": 26,
+      "epochs_run": 21,
       "best_epoch": 10,
-      "wall_clock_s": 22.36,
-      "n_clips_train": 58,
+      "wall_clock_s": 45.22,
+      "n_clips_train": 592,
       "dev": {
-        "loss": 1.0293943279130118,
-        "auc": 0.5503725299643667,
-        "ap": 0.7476970239417597,
-        "accuracy": 0.42857142857142855,
-        "eer": 0.4688208616780045,
-        "precision": 0.7321428571428571,
-        "recall": 0.3253968253968254,
-        "f1": 0.4505494505494505,
+        "loss": 0.39559191124779836,
+        "auc": 0.6192095885973437,
+        "ap": 0.8030287480574216,
+        "accuracy": 0.7085714285714285,
+        "eer": 0.4064625850340136,
+        "precision": 0.7388535031847133,
+        "recall": 0.9206349206349206,
+        "f1": 0.8197879858657243,
         "n": 175,
         "positive_rate": 0.72,
         "per_class": {
           "visual_only": {
             "n_fake": 37,
-            "auc": 0.5719801434087148,
-            "recall": 0.3783783783783784
+            "auc": 0.6199669056811914,
+            "recall": 0.9459459459459459
           },
           "audio_only": {
             "n_fake": 45,
-            "auc": 0.5197278911564626,
-            "recall": 0.3333333333333333
+            "auc": 0.6031746031746031,
+            "recall": 0.9111111111111111
           },
           "both": {
             "n_fake": 44,
-            "auc": 0.563543599257885,
-            "recall": 0.2727272727272727
+            "auc": 0.6349721706864564,
+            "recall": 0.9090909090909091
           },
           "real": {
             "n": 49,
-            "specificity": 0.6938775510204082
+            "specificity": 0.16326530612244897
           }
         }
       },
       "train_config": {
-        "epochs": 60,
+        "epochs": 40,
         "lr": 0.001,
         "weight_decay": 0.0001,
         "batch_size": 32,
         "grad_accum": 1,
-        "pos_weight": 1.0,
-        "patience": 15,
+        "pos_weight": 0.3799533799533799,
+        "patience": 10,
         "amp": false,
         "grad_clip": 1.0,
         "seed": 1339,

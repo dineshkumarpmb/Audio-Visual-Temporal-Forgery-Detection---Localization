@@ -10,8 +10,8 @@
       "feature_dim": 512,
       "n_params": 11176512,
       "n_trainable": 0,
-      "images_per_second": 2277.4,
-      "ms_per_batch": 28.102,
+      "images_per_second": 2292.2,
+      "ms_per_batch": 27.921,
       "peak_vram_mb": 159.2
     },
     "mobilenet_v2": {
@@ -19,11 +19,11 @@
       "feature_dim": 1280,
       "n_params": 2223872,
       "n_trainable": 0,
-      "images_per_second": 2501.9,
-      "ms_per_batch": 25.581,
+      "images_per_second": 2626.7,
+      "ms_per_batch": 24.365,
       "peak_vram_mb": 180.4
     }
   },
-  "mobilenet_speedup_vs_resnet": 1.0986,
-  "backbone_share_of_pipeline": 0.022
+  "mobilenet_speedup_vs_resnet": 1.1459,
+  "backbone_share_of_pipeline": 0.0187
 }

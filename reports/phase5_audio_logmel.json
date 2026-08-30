@@ -1,0 +1,237 @@
+{
+  "feature": "logmel",
+  "norm": "batch",
+  "git_sha": "21a2c0fae118",
+  "n_clips": 786,
+  "n_params": 574978,
+  "receptive_field": 31,
+  "splits": {
+    "train": {
+      "n": 592,
+      "positive": 429,
+      "negative": 163,
+      "positive_rate": 0.7246621621621622
+    },
+    "dev": {
+      "n": 175,
+      "positive": 126,
+      "negative": 49,
+      "positive_rate": 0.72
+    },
+    "test": {
+      "n": 19,
+      "positive": 9,
+      "negative": 10,
+      "positive_rate": 0.47368421052631576
+    }
+  },
+  "baseline_zero": {
+    "majority_class": {
+      "auc": 0.5,
+      "ap": 0.7383221144051165,
+      "accuracy": 0.72,
+      "eer": 0.5,
+      "precision": 0.72,
+      "recall": 1.0,
+      "f1": 0.8372093023255813,
+      "n": 175,
+      "positive_rate": 0.72
+    },
+    "random": {
+      "auc": 0.5197602850664075,
+      "ap": 0.7199794600518848,
+      "accuracy": 0.5142857142857142,
+      "eer": 0.5090702947845804,
+      "precision": 0.7469879518072289,
+      "recall": 0.49206349206349204,
+      "f1": 0.5933014354066986,
+      "n": 175,
+      "positive_rate": 0.72
+    }
+  },
+  "dev_auc_mean": 0.9838030450275349,
+  "dev_auc_std": 0.0018181036864790895,
+  "dev_acc_mean": 0.9066666666666667,
+  "audio_only_auc_mean": 0.9912320483749055,
+  "visual_audio_only_auc": 0.7551,
+  "beats_visual_on_audio_only": true,
+  "runs": [
+    {
+      "seed": 1337,
+      "feature": "logmel",
+      "norm": "batch",
+      "git_sha": "21a2c0fae118",
+      "feature_config": "6cc74f25",
+      "n_params": 574978,
+      "receptive_field": 31,
+      "epochs_run": 14,
+      "best_epoch": 3,
+      "wall_clock_s": 314.18,
+      "n_clips_train": 592,
+      "dev": {
+        "loss": 0.21508392121110645,
+        "auc": 0.981373501781665,
+        "ap": 0.9932166798141691,
+        "accuracy": 0.9142857142857143,
+        "eer": 0.07653061224489796,
+        "precision": 0.9111111111111111,
+        "recall": 0.9761904761904762,
+        "f1": 0.9425287356321839,
+        "n": 175,
+        "positive_rate": 0.72,
+        "per_class": {
+          "visual_only": {
+            "n_fake": 37,
+            "auc": 0.9630446773303916,
+            "recall": 0.9459459459459459
+          },
+          "audio_only": {
+            "n_fake": 45,
+            "auc": 0.9904761904761905,
+            "recall": 0.9777777777777777
+          },
+          "both": {
+            "n_fake": 44,
+            "auc": 0.9874768089053804,
+            "recall": 1.0
+          },
+          "real": {
+            "n": 49,
+            "specificity": 0.7551020408163265
+          }
+        }
+      },
+      "train_config": {
+        "epochs": 40,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "batch_size": 32,
+        "grad_accum": 1,
+        "pos_weight": 0.3799533799533799,
+        "patience": 10,
+        "amp": false,
+        "grad_clip": 1.0,
+        "seed": 1337,
+        "num_workers": 0
+      }
+    },
+    {
+      "seed": 1338,
+      "feature": "logmel",
+      "norm": "batch",
+      "git_sha": "21a2c0fae118",
+      "feature_config": "6cc74f25",
+      "n_params": 574978,
+      "receptive_field": 31,
+      "epochs_run": 27,
+      "best_epoch": 16,
+      "wall_clock_s": 616.26,
+      "n_clips_train": 592,
+      "dev": {
+        "loss": 0.5288353361402239,
+        "auc": 0.9842889536767088,
+        "ap": 0.9941684504863436,
+        "accuracy": 0.8742857142857143,
+        "eer": 0.08049886621315192,
+        "precision": 0.8561643835616438,
+        "recall": 0.9920634920634921,
+        "f1": 0.9191176470588235,
+        "n": 175,
+        "positive_rate": 0.72,
+        "per_class": {
+          "visual_only": {
+            "n_fake": 37,
+            "auc": 0.9751792608935466,
+            "recall": 0.972972972972973
+          },
+          "audio_only": {
+            "n_fake": 45,
+            "auc": 0.9900226757369615,
+            "recall": 1.0
+          },
+          "both": {
+            "n_fake": 44,
+            "auc": 0.9860853432282004,
+            "recall": 1.0
+          },
+          "real": {
+            "n": 49,
+            "specificity": 0.5714285714285714
+          }
+        }
+      },
+      "train_config": {
+        "epochs": 40,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "batch_size": 32,
+        "grad_accum": 1,
+        "pos_weight": 0.3799533799533799,
+        "patience": 10,
+        "amp": false,
+        "grad_clip": 1.0,
+        "seed": 1338,
+        "num_workers": 0
+      }
+    },
+    {
+      "seed": 1339,
+      "feature": "logmel",
+      "norm": "batch",
+      "git_sha": "21a2c0fae118",
+      "feature_config": "6cc74f25",
+      "n_params": 574978,
+      "receptive_field": 31,
+      "epochs_run": 15,
+      "best_epoch": 4,
+      "wall_clock_s": 362.86,
+      "n_clips_train": 592,
+      "dev": {
+        "loss": 0.16436544248035975,
+        "auc": 0.9857466796242307,
+        "ap": 0.994845784123016,
+        "accuracy": 0.9314285714285714,
+        "eer": 0.06235827664399093,
+        "precision": 0.9318181818181818,
+        "recall": 0.9761904761904762,
+        "f1": 0.9534883720930233,
+        "n": 175,
+        "positive_rate": 0.72,
+        "per_class": {
+          "visual_only": {
+            "n_fake": 37,
+            "auc": 0.9801434087148373,
+            "recall": 0.972972972972973
+          },
+          "audio_only": {
+            "n_fake": 45,
+            "auc": 0.9931972789115646,
+            "recall": 1.0
+          },
+          "both": {
+            "n_fake": 44,
+            "auc": 0.9828385899814471,
+            "recall": 0.9545454545454546
+          },
+          "real": {
+            "n": 49,
+            "specificity": 0.8163265306122449
+          }
+        }
+      },
+      "train_config": {
+        "epochs": 40,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "batch_size": 32,
+        "grad_accum": 1,
+        "pos_weight": 0.3799533799533799,
+        "patience": 10,
+        "amp": false,
+        "grad_clip": 1.0,
+        "seed": 1339,
+        "num_workers": 0
+      }
+    }
+  ]
+}

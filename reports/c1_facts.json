@@ -1,0 +1,58 @@
+{
+  "decision": "logmel",
+  "reason": "the dev-AUC gap (+0.2161 in log-Mel's favour) exceeds the 0.01 noise threshold and the seed sd intervals are disjoint, so the experiment separates the arms and the higher-scoring one wins.",
+  "auc_gap_logmel_minus_mfcc": 0.2160673793326855,
+  "within_noise": false,
+  "sd_overlap": false,
+  "separated": true,
+  "prior": "logmel",
+  "rule": {
+    "auc_noise_threshold": 0.01
+  },
+  "arms": {
+    "mfcc": {
+      "input_dim": 40,
+      "n_params": 559618,
+      "receptive_field": 31,
+      "auc_mean": 0.7677356656948494,
+      "auc_std": 0.048772650633931644,
+      "acc_mean": 0.5561904761904762,
+      "n_seeds": 3,
+      "n_clips": 786,
+      "baseline_auc": 0.5,
+      "audio_only_auc": 0.8683295540438398,
+      "splits": {
+        "train": 592,
+        "dev": 175,
+        "test": 19
+      },
+      "per_class": {
+        "visual_only": 0.5364956793528223,
+        "audio_only": 0.8683295540438398,
+        "both": 0.8593073593073594
+      }
+    },
+    "logmel": {
+      "input_dim": 80,
+      "n_params": 574978,
+      "receptive_field": 31,
+      "auc_mean": 0.9838030450275349,
+      "auc_std": 0.0018181036864790895,
+      "acc_mean": 0.9066666666666667,
+      "n_seeds": 3,
+      "n_clips": 786,
+      "baseline_auc": 0.5,
+      "audio_only_auc": 0.9912320483749055,
+      "splits": {
+        "train": 592,
+        "dev": 175,
+        "test": 19
+      },
+      "per_class": {
+        "visual_only": 0.9727891156462585,
+        "audio_only": 0.9912320483749055,
+        "both": 0.9854669140383425
+      }
+    }
+  }
+}

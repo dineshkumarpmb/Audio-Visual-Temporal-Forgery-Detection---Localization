@@ -42,6 +42,9 @@ class TrainConfig:
     grad_clip: float = 1.0
     seed: int = 1337
     num_workers: int = 0
+    # P6-5: weight on the per-modality auxiliary heads. 0 keeps the Phase 4/5 objective
+    # exactly as it was; the fusion runs set it.
+    aux_weight: float = 0.0
 
 
 @dataclass
@@ -90,11 +93,35 @@ class Trainer:
     # ---------------------------------------------------------------- one pass
 
     def _forward(self, batch: dict) -> tuple[torch.Tensor, torch.Tensor]:
-        features = batch["features"].to(self.device, non_blocking=True)
+        """One batch -> (loss, logits), for either a single-stream or a fused model.
+
+        The two-stream branch is selected by the *batch* carrying an `audio` key, which only
+        `collate_paired` produces. Phase 4 and Phase 5 batches take the original path
+        unchanged, and with `aux_weight` defaulting to 0 their objective is byte-identical.
+        """
         mask = batch["mask"].to(self.device, non_blocking=True)
         labels = batch["label"].to(self.device, non_blocking=True)
-        logits = self.model(features, mask)["logit"]
-        return self.criterion(logits, labels), logits
+
+        if "audio" in batch:
+            out = self.model(
+                batch["features"].to(self.device, non_blocking=True),
+                batch["audio"].to(self.device, non_blocking=True),
+                mask,
+                batch["face"].to(self.device, non_blocking=True) if "face" in batch else None,
+            )
+        else:
+            out = self.model(batch["features"].to(self.device, non_blocking=True), mask)
+
+        logits = out["logit"]
+        loss = self.criterion(logits, labels)
+
+        # P6-5: auxiliary per-modality heads. Their gradients are the reason the visual
+        # pathway keeps learning even once the fused head can score well on audio alone.
+        aux = out.get("aux_logits")
+        if aux is not None and self.cfg.aux_weight:
+            aux_loss = torch.stack([self.criterion(a, labels) for a in aux]).mean()
+            loss = loss + self.cfg.aux_weight * aux_loss
+        return loss, logits
 
     def train_epoch(self, loader: DataLoader) -> float:
         self.model.train()

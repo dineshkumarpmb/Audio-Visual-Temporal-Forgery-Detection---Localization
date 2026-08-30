@@ -15,7 +15,7 @@ TORCH_PINS  := torch==2.7.1+cu118 torchvision==0.22.1+cu118 torchaudio==2.7.1+cu
 .PHONY: help venv torch install install-dev check check-bench check-kaggle lint fmt \
         typecheck test test-cov fetch-meta manifest subset verify-subsets verify-mirror \
         stats phase1 models faces verify-preproc verify-labels sheets overlays phase2 \
-        audio audio-mfcc phase3 visual overfit train-visual decide-d1 phase4 \
+        audio audio-mfcc phase3 visual overfit train-visual decide-d1 confound phase4 \n        train-audio decide-c1 provenance phase5 \n        train-fusion experiment-c phase6 \
         features train evaluate ablations benchmark api frontend demo clean-bench
 
 help:  ## Show this help
@@ -39,7 +39,9 @@ help:  ## Show this help
 	@echo     fetch-meta manifest subset verify-subsets verify-mirror stats phase1
 	@echo     models faces verify-preproc verify-labels sheets overlays phase2
 	@echo     audio audio-mfcc phase3
-	@echo     visual overfit train-visual decide-d1 phase4
+	@echo     visual overfit train-visual decide-d1 confound phase4
+	@echo     train-audio decide-c1 provenance phase5
+	@echo     train-fusion experiment-c phase6
 	@echo     features train evaluate ablations benchmark
 	@echo.
 	@echo   Serving
@@ -181,12 +183,66 @@ train-visual: ## Phase 4 - train the visual baseline, 3 seeds (ARGS=--backbone .
 decide-d1:  ## Phase 4 - resolve Decision D-1 from the measurements
 	$(PY) scripts/15_decide_d1.py
 
-phase4:     ## Phase 4 - both backbones end to end, then D-1
+confound:   ## Phase 4 - P4-12 validity check (R4 shortcut learning, PF-17)
+	$(PY) scripts/18_check_confound.py
+
+phase4:     ## Phase 4 - both backbones end to end, then D-1 and the validity check
+# Extract over dev-2k as well as smoke-100: P4-3 specifies dev-2k, and training defaults
+# to the union of both. Extraction is resumable and skips videos not yet fetched, so this
+# is safe to run against a partially downloaded subset.
 	$(PY) scripts/13_extract_visual.py --subset smoke-100 --backbone resnet18     --from-video
 	$(PY) scripts/13_extract_visual.py --subset smoke-100 --backbone mobilenet_v2 --from-video
+	$(PY) scripts/13_extract_visual.py --subset dev-2k    --backbone resnet18     --from-video
+	$(PY) scripts/13_extract_visual.py --subset dev-2k    --backbone mobilenet_v2 --from-video
+	$(PY) scripts/16_verify_features.py --backbone resnet18
+	$(PY) scripts/16_verify_features.py --backbone mobilenet_v2
 	$(PY) scripts/14_train.py --backbone resnet18     --seeds 3
 	$(PY) scripts/14_train.py --backbone mobilenet_v2 --seeds 3
+	$(PY) scripts/14_train.py --backbone resnet18 --pooling mean --seeds 3
 	$(MAKE) decide-d1
+# ⛔ PF-17: the gate number is not trustworthy without this. Runs last so it reads the
+# freshly written reports/phase4_*.json.
+	$(MAKE) confound
+	$(PY) -m pytest tests/ -q
+
+train-audio: ## Phase 5 - train one audio arm (ARGS=--feature mfcc)
+	$(PY) scripts/19_train_audio.py $(ARGS)
+
+decide-c1:  ## Phase 5 - resolve Decision C-1 from the measurements
+	$(PY) scripts/20_decide_c1.py
+
+provenance: ## Phase 5 - PF-19: is visual_only audio a faithful copy of its original?
+	$(PY) scripts/21_check_audio_provenance.py
+
+phase5:     ## Phase 5 - audio baseline, both arms, then C-1 and the validity check
+# Audio extraction is Phase 3's; re-run it over the same corpus Phase 4 used so the two
+# modalities are scored on identical clips. Cheap (~0.09 s/video) and resumable.
+	$(PY) scripts/12_extract_audio.py --subset dev-2k    --feature logmel
+	$(PY) scripts/12_extract_audio.py --subset smoke-100 --feature logmel
+	$(PY) scripts/12_extract_audio.py --subset dev-2k    --feature mfcc
+	$(PY) scripts/12_extract_audio.py --subset smoke-100 --feature mfcc
+	$(PY) scripts/19_train_audio.py --feature logmel --seeds 3
+	$(PY) scripts/19_train_audio.py --feature mfcc   --seeds 3
+	$(MAKE) decide-c1
+# ⛔ PF-19: log-Mel scores 0.97 on clips whose audio is unmodified. The gate number is not
+# trustworthy without these two.
+	$(MAKE) confound
+	$(MAKE) provenance
+	$(PY) -m pytest tests/ -q
+
+train-fusion: ## Phase 6 - train Baseline 3 (ARGS=--no-defences for the control)
+	$(PY) scripts/22_train_fusion.py $(ARGS)
+
+experiment-c: ## Phase 6 - Experiment C and the P6-8 gate
+	$(PY) scripts/23_experiment_c.py
+
+phase6:     ## Phase 6 - fusion baseline, its control arm, then Experiment C
+	$(PY) scripts/22_train_fusion.py --seeds 3
+# ⛔ The control arm is not optional. Without it "we defended against modality collapse"
+# is a claim about code rather than a measurement -- and it is what showed the defences
+# backfiring here (PF-20).
+	$(PY) scripts/22_train_fusion.py --seeds 3 --no-defences
+	$(MAKE) experiment-c
 	$(PY) -m pytest tests/ -q
 
 features:   ## Phases 2-5 — Stage-A extraction (resumable; safe to re-run)

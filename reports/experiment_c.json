@@ -1,0 +1,39 @@
+{
+  "arms": {
+    "A visual only": {
+      "auc_mean": 0.7189288413778209,
+      "auc_std": 0.00860151676246489
+    },
+    "B audio only": {
+      "auc_mean": 0.9838030450275349,
+      "auc_std": 0.0018181036864790895
+    },
+    "C fusion": {
+      "auc_mean": 0.9038440773134652,
+      "auc_std": 0.027450958537717476
+    },
+    "C control (no defences)": {
+      "auc_mean": 0.9098369506532772,
+      "auc_std": 0.024874267023723303
+    }
+  },
+  "best_unimodal": 0.9838030450275349,
+  "best_unimodal_name": "audio",
+  "delta_vs_best_unimodal": -0.07995896771406974,
+  "beats_best_unimodal": false,
+  "drop_visual_delta": 0.002105604146420507,
+  "drop_visual_sd": 0.006580563215718628,
+  "uses_video": false,
+  "drop_audio_delta": 0.24705755318000233,
+  "collapsed": true,
+  "collapse_tolerance": 0.01,
+  "defence_effect": {
+    "auc": -0.0059928733398120215,
+    "drop_visual": -0.010689990281826971,
+    "ctrl_drop_visual": 0.012795594428247478,
+    "ctrl_drop_visual_sd": 0.004242241935117834,
+    "ctrl_collapsed": false,
+    "backfired": true
+  },
+  "gate_passed": true
+}

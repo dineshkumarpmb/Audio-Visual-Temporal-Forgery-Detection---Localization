@@ -1,23 +1,23 @@
 {
   "backbone": "mobilenet_v2",
   "config_hash": "0d8eaa32",
-  "n_clips": 252,
+  "n_clips": 786,
   "norm": {
     "min": 1.6059918403625488,
-    "p05": 15.3941650390625,
-    "median": 21.053699493408203,
-    "p95": 28.515926361083984,
-    "max": 40.272987365722656,
-    "mean": 21.416213989257812
+    "p05": 16.035274505615234,
+    "median": 21.639854431152344,
+    "p95": 29.944311141967773,
+    "max": 45.88642120361328,
+    "mean": 22.125131607055664
   },
   "determinism_identical": 4,
   "determinism_n": 4,
   "identity": {
-    "within": 0.0036908984184265137,
-    "between": 0.2562074065208435,
-    "ratio": 0.014405900612473488,
-    "n_groups": 6,
-    "n_within_pairs": 12
+    "within": 0.0022645399440079927,
+    "between": 0.2692241668701172,
+    "ratio": 0.008411354385316372,
+    "n_groups": 27,
+    "n_within_pairs": 62
   },
   "tsne_path": "reports\\figures\\tsne_identity_mobilenet_v2.png"
 }

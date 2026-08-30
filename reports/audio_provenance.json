@@ -1,0 +1,90 @@
+{
+  "n_pairs": 8,
+  "n_diverging_from_start": 8,
+  "median_onset_s": 0.0,
+  "median_labelled_start_s": 3.85,
+  "tolerance": 0.0001,
+  "verdict": "8/8 diverge from t=0: the whole audio stream is rebuilt, so a global processing fingerprint is available to any model reading fine spectral structure",
+  "pairs": [
+    {
+      "fake": "dev_004791",
+      "original": "dev_004789",
+      "n_fake": 94208,
+      "n_original": 91136,
+      "divergence_onset_s": 0.0,
+      "labelled_span_start_s": 0.3,
+      "identical_prefix_samples": 0,
+      "diverges_from_start": true
+    },
+    {
+      "fake": "dev_004795",
+      "original": "dev_004793",
+      "n_fake": 216064,
+      "n_original": 214016,
+      "divergence_onset_s": 0.0,
+      "labelled_span_start_s": 6.4,
+      "identical_prefix_samples": 0,
+      "diverges_from_start": true
+    },
+    {
+      "fake": "dev_005020",
+      "original": "dev_005018",
+      "n_fake": 148480,
+      "n_original": 146432,
+      "divergence_onset_s": 0.0,
+      "labelled_span_start_s": 7.6,
+      "identical_prefix_samples": 0,
+      "diverges_from_start": true
+    },
+    {
+      "fake": "dev_005302",
+      "original": "dev_005300",
+      "n_fake": 88064,
+      "n_original": 86016,
+      "divergence_onset_s": 0.0,
+      "labelled_span_start_s": 4.2,
+      "identical_prefix_samples": 0,
+      "diverges_from_start": true
+    },
+    {
+      "fake": "dev_005357",
+      "original": "dev_005355",
+      "n_fake": 76800,
+      "n_original": 74752,
+      "divergence_onset_s": 0.0,
+      "labelled_span_start_s": 0.2,
+      "identical_prefix_samples": 0,
+      "diverges_from_start": true
+    },
+    {
+      "fake": "dev_005675",
+      "original": "dev_005673",
+      "n_fake": 268288,
+      "n_original": 264192,
+      "divergence_onset_s": 0.0,
+      "labelled_span_start_s": 5.5,
+      "identical_prefix_samples": 0,
+      "diverges_from_start": true
+    },
+    {
+      "fake": "dev_006453",
+      "original": "dev_006451",
+      "n_fake": 314368,
+      "n_original": 311296,
+      "divergence_onset_s": 0.0024375,
+      "labelled_span_start_s": 1.4,
+      "identical_prefix_samples": 39,
+      "diverges_from_start": true
+    },
+    {
+      "fake": "dev_007039",
+      "original": "dev_007037",
+      "n_fake": 68608,
+      "n_original": 66560,
+      "divergence_onset_s": 0.0,
+      "labelled_span_start_s": 3.5,
+      "identical_prefix_samples": 0,
+      "diverges_from_start": true
+    }
+  ]
+}

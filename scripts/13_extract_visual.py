@@ -181,7 +181,14 @@ def main() -> int:
     elapsed = time.time() - start
     peak_mb = torch.cuda.max_memory_allocated() / 1024**2 if args.device == "cuda" else 0.0
     root = cache_root(cfg, out_root)
-    size = sum(f.stat().st_size for f in root.glob("*.npz")) if root.exists() else 0
+    # `size` covers the whole cache, so the per-video figure must divide by what is *in*
+    # the cache, not by what this run happened to extract. Dividing by `done` reported
+    # 8.5 MB/video for ResNet-18 off a resumed run that extracted 21 of 786 files --
+    # inverting the true ordering, since 512-d features are smaller than MobileNetV2's
+    # 1280-d ones (228 KB vs 546 KB).
+    cached = list(root.glob("*.npz")) if root.exists() else []
+    size = sum(f.stat().st_size for f in cached)
+    n_cached = len(cached)
 
     print(f"\n{DIM}{'-' * 72}{RESET}")
     print(
@@ -198,7 +205,7 @@ def main() -> int:
     )
     print(
         f"  peak VRAM {peak_mb:.0f} MB   cache {root}  {size / 1024**2:.1f} MB"
-        + (f" ({size / done / 1024:.0f} KB/video)" if done else "")
+        + (f" ({size / n_cached / 1024:.0f} KB/video over {n_cached} cached)" if n_cached else "")
     )
     for vid, err in failed[:8]:
         print(f"  [{RED}FAIL{RESET}] {vid}: {err[:100]}")
@@ -218,7 +225,8 @@ def main() -> int:
             "frames_per_second": round(n_frames_total / elapsed, 1),
             "peak_vram_mb": round(peak_mb, 1),
             "cache_bytes": size,
-            "bytes_per_video": round(size / done),
+            "n_cached": n_cached,
+            "bytes_per_video": round(size / n_cached) if n_cached else 0,
             "face_found_mean": round(float(np.mean(found_fractions)), 4),
             "n_missing": len(missing),
             "source": "video" if args.from_video else "crops",

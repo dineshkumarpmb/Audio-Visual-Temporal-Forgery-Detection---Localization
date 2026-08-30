@@ -86,6 +86,9 @@ def main() -> int:
             "n_seeds": len(t["runs"]),
             "n_clips": t["n_clips"],
             "baseline_auc": t["baseline_zero"]["majority_class"]["auc"],
+            "splits": {k: v["n"] for k, v in t.get("splits", {}).items()},
+            "n_extracted": e.get("n_extracted"),
+            "throughput_comparable": e.get("throughput_comparable", True),
         }
 
     r, m = rows["resnet18"], rows["mobilenet_v2"]
@@ -183,6 +186,63 @@ def main() -> int:
     return 0
 
 
+def _extracted(arm: dict) -> str:
+    n = arm.get("n_extracted")
+    return f"{n} videos" if n is not None else "an unrecorded number"
+
+
+def _splits(arm: dict) -> str:
+    s = arm.get("splits") or {}
+    if not s:
+        return "split sizes unrecorded"
+    return " / ".join(f"{k} {s[k]}" for k in ("train", "dev", "test") if k in s)
+
+
+def _verdict_lines(f: dict, r: dict, m: dict) -> list[str]:
+    """The narrative must follow the outcome, not be written for one of them.
+
+    An earlier version hardcoded the "gap is inside noise, the prior stands" story. When
+    more training data moved the gap outside noise and the decision flipped, the header
+    said `mobilenet_v2` while the body still argued for ResNet-18 — a report that
+    contradicted itself. Deriving the prose from the same facts the verdict uses makes
+    that class of error impossible.
+    """
+    gap, speedup = f["auc_gap"], f["speedup"]
+    thr = f["rule"]["speed_threshold"]
+    winner = "ResNet-18" if f["decision"] == "resnet18" else "MobileNetV2"
+    loser = "MobileNetV2" if f["decision"] == "resnet18" else "ResNet-18"
+    win, lose = (r, m) if f["decision"] == "resnet18" else (m, r)
+
+    if f["within_noise"] and f["fast_enough"]:
+        return [
+            f"The AUC gap is **{gap:+.4f}** — inside seed noise — and MobileNetV2's backbone is",
+            f"**{speedup:.2f}×** faster, clearing the {thr}× the tie-break requires. The rule needed",
+            "*both*, and got both, so the faster arm wins on a pre-committed criterion rather than",
+            "on a fractional AUC difference that the experiment cannot resolve.",
+        ]
+    if f["within_noise"]:
+        return [
+            f"The AUC gap is **{gap:+.4f}** — inside seed noise, so the experiment does not",
+            f"separate the arms — and MobileNetV2's speedup is **{speedup:.2f}×**, short of the",
+            f"{thr}× the tie-break requires. The rule needed *both*; neither supports switching, so",
+            "section 5.2's stated prior stands unrebutted.",
+        ]
+    return [
+        f"The AUC gap is **{gap:+.4f}**, which is **{abs(gap) / f['rule']['auc_noise_threshold']:.1f}×**",
+        f"the {f['rule']['auc_noise_threshold']} noise threshold, and the seed sd intervals do not",
+        f"overlap ({win['auc_mean']:.4f} ± {win['auc_std']:.4f} vs {lose['auc_mean']:.4f} ±",
+        f"{lose['auc_std']:.4f}). So the experiment **does** separate the arms, and the tie-break",
+        "never applies — it exists for the case where the measurement is inconclusive, which this",
+        f"is not. **{winner}** wins on the measurement itself; {loser} is not rejected on the",
+        f"speed condition, which neither arm meets ({speedup:.2f}×).",
+        "",
+        "⚠️ **This reverses the earlier call.** At 58 training clips the gap was 0.0079 — inside",
+        "noise — so the tie-break decided it and section 5.2's ResNet-18 prior stood. That was the",
+        "correct reading of the evidence then available, and is exactly why PF-3 required D-1 to be",
+        "settled by experiment: more data moved the gap an order of magnitude outside noise.",
+    ]
+
+
 def _write(path: Path, f: dict) -> None:
     r, m = f["arms"]["resnet18"], f["arms"]["mobilenet_v2"]
     lines = [
@@ -229,29 +289,21 @@ def _write(path: Path, f: dict) -> None:
         "a prior gets dressed up as a finding — and section 5.2 states a prior (ResNet-18) that",
         "this measurement was free to overturn.",
         "",
-        "## ⚠️ Read the AUC numbers with the data scale in mind",
+        "## Scale these numbers come from",
         "",
-        f"These runs used **{r['n_clips']} clips** (train 58 / dev 175 / test 19), not dev-2k's",
-        "2,000. Kaggle's per-file download quota made dev-2k unobtainable locally — see decision",
-        "PF-13. A 58-clip training set is far too small to separate two backbones, and the seed",
-        "spread here (± {:.4f} and ± {:.4f}) is comparable to the gap between them.".format(
-            r["auc_std"], m["auc_std"]
-        ),
-        "",
-        "So this resolution rests on the **speed** half of the rule, which is measured cleanly and",
-        "is not scale-dependent, rather than on the AUC half, which at this scale is noise. Re-run",
-        "`make decide-d1` after a dev-2k extraction on Kaggle to confirm or overturn it.",
+        f"**{r['n_clips']} clips** — {_splits(r)} — on the locally available corpus. dev-2k's full",
+        "2,000 are not all fetched; PF-16 established that this is wall-clock, not a capability",
+        "limit, so re-running at full scale tightens these numbers rather than changing the",
+        "method. The dev split is **unchanged** from the 58-train-clip first pass, so the",
+        "comparison against it is like-for-like.",
         "",
         "## What decided it",
         "",
-        f"The AUC gap is **{f['auc_gap']:+.4f}** — inside seed noise — and MobileNetV2's backbone",
-        f"speedup is **{f['speedup']:.2f}×**, well short of the 2× the tie-break requires. The rule",
-        "needed *both*; neither the gap nor the speedup supports switching, so section 5.2's stated",
-        "prior stands unrebutted.",
+        *_verdict_lines(f, r, m),
         "",
-        "**Section 5.2's first argument is now measured, and it is stronger than stated.** The plan",
-        'predicted that "the efficiency argument mostly evaporates under the cached architecture".',
-        "It does not merely evaporate — it is negligible:",
+        "**Section 5.2's efficiency argument is measured, and it is stronger than stated.** The",
+        'plan predicted that "the efficiency argument mostly evaporates under the cached',
+        'architecture". It does not merely evaporate — it is negligible:',
         "",
         f"- On the backbone alone, MobileNetV2 is **{f['speedup']:.2f}×** faster, not the ~4× its",
         "  FLOP count suggests. At 112×112 neither model is compute-bound on this GPU.",
@@ -262,14 +314,26 @@ def _write(path: Path, f: dict) -> None:
             else "- The backbone is a small fraction of end-to-end extraction; decode and alignment dominate."
         ),
         "",
-        "So a faster backbone buys almost nothing in wall clock, and ResNet-18's advantages that",
-        "section 5.2 lists — stable fine-tuning on small data, robust small-batch behaviour, a",
-        "512-d output needing no projection for parity — are unopposed.",
+        "So neither arm can be chosen for speed: the tie-break's 2× condition is unreachable on",
+        "this hardware, which is precisely why the AUC half of the rule is what settles it.",
         "",
-        "⚠️ **Measuring speed end-to-end would have given the wrong answer.** Through the full",
-        f"`--from-video` pipeline MobileNetV2 comes out at {m['frames_per_second'] / r['frames_per_second']:.2f}× —",
-        "i.e. *slower* — because the shared decode path swamps the difference. D-1 asks about the",
-        "backbone, so the backbone is benchmarked in isolation (`scripts/17_bench_backbones.py`).",
+        f"**What ResNet-18 keeps.** Its features are {r['bytes_per_video'] / m['bytes_per_video']:.1f}×"
+        f" the size — {r['bytes_per_video']:,} vs {m['bytes_per_video']:,} bytes/video — so"
+        if r["bytes_per_video"] > m["bytes_per_video"]
+        else f"**What ResNet-18 keeps.** Its features are "
+        f"{m['bytes_per_video'] / r['bytes_per_video']:.1f}× *smaller* — {r['bytes_per_video']:,} vs "
+        f"{m['bytes_per_video']:,} bytes/video — so",
+        "the winning arm is the more expensive one to cache. That matters for CL-8, which has to",
+        "shard a feature set against Kaggle's 20 GB `/kaggle/working`, and it is a cost to plan",
+        "for rather than a reason to overturn a measured AUC gap.",
+        "",
+        "⚠️ **End-to-end extraction rate is the wrong instrument for this question, and is not",
+        "even comparable between these two runs.** The table's frames/s figures were measured over",
+        "very different numbers of videos on a resumed cache "
+        f"({_extracted(r)} vs {_extracted(m)}), which is why D-1 reads speed from the isolated",
+        "benchmark (`scripts/17_bench_backbones.py`) instead. Even measured cleanly it would be the",
+        "wrong instrument: the shared decode and MediaPipe alignment path is ~98% of the wall clock,",
+        "so an end-to-end ratio mostly measures ffmpeg.",
         "",
         "## Option C, rejected",
         "",

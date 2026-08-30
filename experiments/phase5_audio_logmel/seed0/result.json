@@ -1,0 +1,59 @@
+{
+  "seed": 1337,
+  "feature": "logmel",
+  "norm": "batch",
+  "git_sha": "21a2c0fae118",
+  "feature_config": "6cc74f25",
+  "n_params": 574978,
+  "receptive_field": 31,
+  "epochs_run": 14,
+  "best_epoch": 3,
+  "wall_clock_s": 314.18,
+  "n_clips_train": 592,
+  "dev": {
+    "loss": 0.21508392121110645,
+    "auc": 0.981373501781665,
+    "ap": 0.9932166798141691,
+    "accuracy": 0.9142857142857143,
+    "eer": 0.07653061224489796,
+    "precision": 0.9111111111111111,
+    "recall": 0.9761904761904762,
+    "f1": 0.9425287356321839,
+    "n": 175,
+    "positive_rate": 0.72,
+    "per_class": {
+      "visual_only": {
+        "n_fake": 37,
+        "auc": 0.9630446773303916,
+        "recall": 0.9459459459459459
+      },
+      "audio_only": {
+        "n_fake": 45,
+        "auc": 0.9904761904761905,
+        "recall": 0.9777777777777777
+      },
+      "both": {
+        "n_fake": 44,
+        "auc": 0.9874768089053804,
+        "recall": 1.0
+      },
+      "real": {
+        "n": 49,
+        "specificity": 0.7551020408163265
+      }
+    }
+  },
+  "train_config": {
+    "epochs": 40,
+    "lr": 0.001,
+    "weight_decay": 0.0001,
+    "batch_size": 32,
+    "grad_accum": 1,
+    "pos_weight": 0.3799533799533799,
+    "patience": 10,
+    "amp": false,
+    "grad_clip": 1.0,
+    "seed": 1337,
+    "num_workers": 0
+  }
+}

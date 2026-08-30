@@ -1,0 +1,237 @@
+{
+  "feature": "mfcc",
+  "norm": "batch",
+  "git_sha": "21a2c0fae118",
+  "n_clips": 786,
+  "n_params": 559618,
+  "receptive_field": 31,
+  "splits": {
+    "train": {
+      "n": 592,
+      "positive": 429,
+      "negative": 163,
+      "positive_rate": 0.7246621621621622
+    },
+    "dev": {
+      "n": 175,
+      "positive": 126,
+      "negative": 49,
+      "positive_rate": 0.72
+    },
+    "test": {
+      "n": 19,
+      "positive": 9,
+      "negative": 10,
+      "positive_rate": 0.47368421052631576
+    }
+  },
+  "baseline_zero": {
+    "majority_class": {
+      "auc": 0.5,
+      "ap": 0.7383221144051165,
+      "accuracy": 0.72,
+      "eer": 0.5,
+      "precision": 0.72,
+      "recall": 1.0,
+      "f1": 0.8372093023255813,
+      "n": 175,
+      "positive_rate": 0.72
+    },
+    "random": {
+      "auc": 0.5197602850664075,
+      "ap": 0.7199794600518848,
+      "accuracy": 0.5142857142857142,
+      "eer": 0.5090702947845804,
+      "precision": 0.7469879518072289,
+      "recall": 0.49206349206349204,
+      "f1": 0.5933014354066986,
+      "n": 175,
+      "positive_rate": 0.72
+    }
+  },
+  "dev_auc_mean": 0.7677356656948494,
+  "dev_auc_std": 0.048772650633931644,
+  "dev_acc_mean": 0.5561904761904762,
+  "audio_only_auc_mean": 0.8683295540438398,
+  "visual_audio_only_auc": 0.7551,
+  "beats_visual_on_audio_only": true,
+  "runs": [
+    {
+      "seed": 1337,
+      "feature": "mfcc",
+      "norm": "batch",
+      "git_sha": "21a2c0fae118",
+      "feature_config": "9acf799c",
+      "n_params": 559618,
+      "receptive_field": 31,
+      "epochs_run": 18,
+      "best_epoch": 7,
+      "wall_clock_s": 495.28,
+      "n_clips_train": 592,
+      "dev": {
+        "loss": 0.8103326889446804,
+        "auc": 0.8296080336896663,
+        "ap": 0.9133008559663053,
+        "accuracy": 0.5085714285714286,
+        "eer": 0.22732426303854875,
+        "precision": 0.9761904761904762,
+        "recall": 0.3253968253968254,
+        "f1": 0.488095238095238,
+        "n": 175,
+        "positive_rate": 0.72,
+        "per_class": {
+          "visual_only": {
+            "n_fake": 37,
+            "auc": 0.5785990071704358,
+            "recall": 0.05405405405405406
+          },
+          "audio_only": {
+            "n_fake": 45,
+            "auc": 0.9405895691609978,
+            "recall": 0.4666666666666667
+          },
+          "both": {
+            "n_fake": 44,
+            "auc": 0.9271799628942486,
+            "recall": 0.4090909090909091
+          },
+          "real": {
+            "n": 49,
+            "specificity": 0.9795918367346939
+          }
+        }
+      },
+      "train_config": {
+        "epochs": 40,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "batch_size": 32,
+        "grad_accum": 1,
+        "pos_weight": 0.3799533799533799,
+        "patience": 10,
+        "amp": false,
+        "grad_clip": 1.0,
+        "seed": 1337,
+        "num_workers": 0
+      }
+    },
+    {
+      "seed": 1338,
+      "feature": "mfcc",
+      "norm": "batch",
+      "git_sha": "21a2c0fae118",
+      "feature_config": "9acf799c",
+      "n_params": 559618,
+      "receptive_field": 31,
+      "epochs_run": 32,
+      "best_epoch": 21,
+      "wall_clock_s": 579.85,
+      "n_clips_train": 592,
+      "dev": {
+        "loss": 1.3681678513118198,
+        "auc": 0.7103984450923226,
+        "ap": 0.858825579457773,
+        "accuracy": 0.7085714285714285,
+        "eer": 0.32596371882086167,
+        "precision": 0.7659574468085106,
+        "recall": 0.8571428571428571,
+        "f1": 0.8089887640449439,
+        "n": 175,
+        "positive_rate": 0.72,
+        "per_class": {
+          "visual_only": {
+            "n_fake": 37,
+            "auc": 0.5515719801434087,
+            "recall": 0.6756756756756757
+          },
+          "audio_only": {
+            "n_fake": 45,
+            "auc": 0.7791383219954648,
+            "recall": 0.9555555555555556
+          },
+          "both": {
+            "n_fake": 44,
+            "auc": 0.7736549165120594,
+            "recall": 0.9090909090909091
+          },
+          "real": {
+            "n": 49,
+            "specificity": 0.32653061224489793
+          }
+        }
+      },
+      "train_config": {
+        "epochs": 40,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "batch_size": 32,
+        "grad_accum": 1,
+        "pos_weight": 0.3799533799533799,
+        "patience": 10,
+        "amp": false,
+        "grad_clip": 1.0,
+        "seed": 1338,
+        "num_workers": 0
+      }
+    },
+    {
+      "seed": 1339,
+      "feature": "mfcc",
+      "norm": "batch",
+      "git_sha": "21a2c0fae118",
+      "feature_config": "9acf799c",
+      "n_params": 559618,
+      "receptive_field": 31,
+      "epochs_run": 26,
+      "best_epoch": 15,
+      "wall_clock_s": 403.74,
+      "n_clips_train": 592,
+      "dev": {
+        "loss": 1.2130761766433715,
+        "auc": 0.7632005183025591,
+        "ap": 0.8906888540620739,
+        "accuracy": 0.4514285714285714,
+        "eer": 0.28968253968253965,
+        "precision": 0.9166666666666666,
+        "recall": 0.2619047619047619,
+        "f1": 0.4074074074074074,
+        "n": 175,
+        "positive_rate": 0.72,
+        "per_class": {
+          "visual_only": {
+            "n_fake": 37,
+            "auc": 0.4793160507446222,
+            "recall": 0.08108108108108109
+          },
+          "audio_only": {
+            "n_fake": 45,
+            "auc": 0.8852607709750567,
+            "recall": 0.3111111111111111
+          },
+          "both": {
+            "n_fake": 44,
+            "auc": 0.87708719851577,
+            "recall": 0.36363636363636365
+          },
+          "real": {
+            "n": 49,
+            "specificity": 0.9387755102040817
+          }
+        }
+      },
+      "train_config": {
+        "epochs": 40,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "batch_size": 32,
+        "grad_accum": 1,
+        "pos_weight": 0.3799533799533799,
+        "patience": 10,
+        "amp": false,
+        "grad_clip": 1.0,
+        "seed": 1339,
+        "num_workers": 0
+      }
+    }
+  ]
+}

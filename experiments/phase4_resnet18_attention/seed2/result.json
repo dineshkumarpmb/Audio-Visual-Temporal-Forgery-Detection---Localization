@@ -2,54 +2,54 @@
   "seed": 1339,
   "backbone": "resnet18",
   "pooling": "attention",
-  "git_sha": "120219f89b79",
+  "git_sha": "21a2c0fae118",
   "feature_config": "baec77e1",
   "n_params": 181378,
-  "epochs_run": 26,
+  "epochs_run": 21,
   "best_epoch": 10,
-  "wall_clock_s": 22.36,
-  "n_clips_train": 58,
+  "wall_clock_s": 45.22,
+  "n_clips_train": 592,
   "dev": {
-    "loss": 1.0293943279130118,
-    "auc": 0.5503725299643667,
-    "ap": 0.7476970239417597,
-    "accuracy": 0.42857142857142855,
-    "eer": 0.4688208616780045,
-    "precision": 0.7321428571428571,
-    "recall": 0.3253968253968254,
-    "f1": 0.4505494505494505,
+    "loss": 0.39559191124779836,
+    "auc": 0.6192095885973437,
+    "ap": 0.8030287480574216,
+    "accuracy": 0.7085714285714285,
+    "eer": 0.4064625850340136,
+    "precision": 0.7388535031847133,
+    "recall": 0.9206349206349206,
+    "f1": 0.8197879858657243,
     "n": 175,
     "positive_rate": 0.72,
     "per_class": {
       "visual_only": {
         "n_fake": 37,
-        "auc": 0.5719801434087148,
-        "recall": 0.3783783783783784
+        "auc": 0.6199669056811914,
+        "recall": 0.9459459459459459
       },
       "audio_only": {
         "n_fake": 45,
-        "auc": 0.5197278911564626,
-        "recall": 0.3333333333333333
+        "auc": 0.6031746031746031,
+        "recall": 0.9111111111111111
       },
       "both": {
         "n_fake": 44,
-        "auc": 0.563543599257885,
-        "recall": 0.2727272727272727
+        "auc": 0.6349721706864564,
+        "recall": 0.9090909090909091
       },
       "real": {
         "n": 49,
-        "specificity": 0.6938775510204082
+        "specificity": 0.16326530612244897
       }
     }
   },
   "train_config": {
-    "epochs": 60,
+    "epochs": 40,
     "lr": 0.001,
     "weight_decay": 0.0001,
     "batch_size": 32,
     "grad_accum": 1,
-    "pos_weight": 1.0,
-    "patience": 15,
+    "pos_weight": 0.3799533799533799,
+    "patience": 10,
     "amp": false,
     "grad_clip": 1.0,
     "seed": 1339,

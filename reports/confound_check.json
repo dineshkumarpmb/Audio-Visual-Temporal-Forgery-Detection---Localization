@@ -1,0 +1,92 @@
+{
+  "n_dev": 175,
+  "length_auc_overall": 0.6157,
+  "length_auc_per_class": {
+    "visual_only": 0.5916,
+    "audio_only": 0.6381,
+    "both": 0.6132
+  },
+  "median_frames_per_class": {
+    "real": {
+      "n": 49,
+      "median_frames": 171.0
+    },
+    "visual_only": {
+      "n": 37,
+      "median_frames": 225.0
+    },
+    "audio_only": {
+      "n": 45,
+      "median_frames": 226.0
+    },
+    "both": {
+      "n": 44,
+      "median_frames": 207.0
+    }
+  },
+  "identity_overlap_train_dev": 0,
+  "r3_identity_clean": true,
+  "chance_tolerance": 0.05,
+  "arms": {
+    "visual:resnet18": {
+      "modality": "visual",
+      "name": "resnet18",
+      "blind_class": "audio_only",
+      "overall_auc": 0.6318972033257747,
+      "per_class": {
+        "visual_only": 0.6293436293436293,
+        "audio_only": 0.6296296296296297,
+        "both": 0.6363636363636364
+      },
+      "blind_auc": 0.6296296296296297,
+      "blind_above_chance": 0.1296,
+      "blind_above_length": -0.0085,
+      "clean": false
+    },
+    "visual:mobilenet_v2": {
+      "modality": "visual",
+      "name": "mobilenet_v2",
+      "blind_class": "audio_only",
+      "overall_auc": 0.7189288413778209,
+      "per_class": {
+        "visual_only": 0.7473800330943189,
+        "audio_only": 0.7551020408163266,
+        "both": 0.658008658008658
+      },
+      "blind_auc": 0.7551020408163266,
+      "blind_above_chance": 0.2551,
+      "blind_above_length": 0.117,
+      "clean": false
+    },
+    "audio:logmel": {
+      "modality": "audio",
+      "name": "logmel",
+      "blind_class": "visual_only",
+      "overall_auc": 0.9838030450275349,
+      "per_class": {
+        "visual_only": 0.9727891156462585,
+        "audio_only": 0.9912320483749055,
+        "both": 0.9854669140383425
+      },
+      "blind_auc": 0.9727891156462585,
+      "blind_above_chance": 0.4728,
+      "blind_above_length": 0.3812,
+      "clean": false
+    },
+    "audio:mfcc": {
+      "modality": "audio",
+      "name": "mfcc",
+      "blind_class": "visual_only",
+      "overall_auc": 0.7677356656948494,
+      "per_class": {
+        "visual_only": 0.5364956793528223,
+        "audio_only": 0.8683295540438398,
+        "both": 0.8593073593073594
+      },
+      "blind_auc": 0.5364956793528223,
+      "blind_above_chance": 0.0365,
+      "blind_above_length": -0.0551,
+      "clean": true
+    }
+  }
+}

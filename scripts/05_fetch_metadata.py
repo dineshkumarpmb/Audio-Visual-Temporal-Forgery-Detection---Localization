@@ -12,12 +12,29 @@ has to be local:
   * with `--spotcheck N`, a stratified handful of videos for the ffprobe checks that
     metadata alone cannot answer (P1-13, and CL-7's re-encode test).
 
-⛔ **This endpoint has a volume quota -- see decision PF-13.** After roughly 300 files in
-a session Kaggle starts returning **404** for everything, including files that downloaded
-minutes earlier; it clears after about an hour. Concurrency brings it on sooner but is not
-the cause. So this path is for smoke-scale work and the Phase 2 manual checks only.
-Anything at dev-2k scale or above must run on Kaggle, where the dataset is *mounted* at
-`/kaggle/input` with no download at all (CL-2/CL-3, and the original point of PF-6).
+⚠️ **This endpoint is rate-limited two separate ways -- see PF-16, which supersedes
+PF-13.** PF-13 saw only the first and concluded dev-2k was unobtainable locally. It is
+not. Measured 2026-08-30:
+
+  1. **Too much concurrency -> HTTP 404** on files that plainly exist, which is what
+     made PF-13 read this as a per-file or per-session *quota*:
+
+         workers=1   60/60 ok    31 files/min
+         workers=3   45/45 ok    67 files/min
+         workers=5   45/45 ok   108 files/min
+         workers=8   64 ok, then a run of 404s -- while a serial probe kept getting 200
+
+  2. **Sustained volume -> HTTP 429 with `Retry-After: 180`.** After ~500 files in a
+     burst every request 429s for three minutes, then serves normally again. This is a
+     scheduling instruction, not an error, and `fetch()` sleeps on it via a shared
+     `THROTTLE` so all workers back off together.
+
+The practical lesson is that **pacing beats bursting**: an unpaced 5-worker pool spends
+most of its time inside `Retry-After` and settles at ~6 files/min, while `--rate 25` never
+trips the limiter and holds ~25. Defaults are `--workers 5 --rate 25`; `--max-hours`
+bounds the whole thing.
+
+PF-6 still keeps the *full* 25.5 GB corpus on Kaggle; this path is for subset-scale work.
 
 Why raw HTTP rather than the kaggle client: `KaggleApi.dataset_download_file()`
 404s on this dataset for every path form tried. The documented `?file_name=` query
@@ -68,53 +85,255 @@ def credentials() -> tuple[str, str]:
     return c["username"], c["key"]
 
 
-def fetch(member: str, auth: tuple[str, str], timeout: int = 900) -> bytes:
-    """Download one dataset member, unwrapping Kaggle's zip envelope."""
+class _Throttle:
+    """Process-wide pacing + cooldown shared by every download thread.
+
+    Two jobs, and the first is the one that actually matters:
+
+    * **Pace under the limit.** Bursting and then absorbing `Retry-After` is far slower
+      than never tripping the limiter. Measured: 60 serial files at 31/min drew *zero*
+      429s, while 5 workers at full tilt settled into a burst-then-wait cycle worth about
+      6 files/min. `rate` spaces request starts globally so the whole pool stays under
+      the line.
+    * **Back off together when it still trips.** When Kaggle answers 429 it sets
+      `Retry-After` (measured 180 s, decaying to 5 s as the window refills). One worker
+      seeing that is enough to know *all* of them must stop, so the deadline is shared
+      and threads arriving during a cooldown wait rather than each earning their own 429.
+
+    Jitter on wake keeps the pool from resuming in lockstep.
+    """
+
+    def __init__(self, rate_per_min: float = 0.0) -> None:
+        import threading
+
+        self._lock = threading.Lock()
+        self._resume_at = 0.0
+        self._next_slot = 0.0
+        self._interval = 60.0 / rate_per_min if rate_per_min > 0 else 0.0
+        self.pauses = 0
+
+    def wait(self) -> None:
+        import random
+        import time
+
+        while True:
+            with self._lock:
+                remaining = self._resume_at - time.monotonic()
+            if remaining <= 0:
+                break
+            time.sleep(min(remaining, 5.0) + random.uniform(0, 0.4))
+        if not self._interval:
+            return
+        with self._lock:
+            now = time.monotonic()
+            slot = max(now, self._next_slot)
+            self._next_slot = slot + self._interval
+        delay = slot - time.monotonic()
+        if delay > 0:
+            time.sleep(delay)
+
+    def pause(self, seconds: float) -> None:
+        import time
+
+        with self._lock:
+            deadline = time.monotonic() + seconds
+            if deadline > self._resume_at:
+                self._resume_at = deadline
+                self.pauses += 1
+                print(
+                    f"    {DIM}429 -- backing off {seconds:.0f}s (Retry-After){RESET}",
+                    flush=True,
+                )
+
+
+THROTTLE = _Throttle()  # replaced in main() once --rate is known
+
+
+def fetch(member: str, auth: tuple[str, str], timeout: int = 300, *, max_wait: int = 1800) -> bytes:
+    """Download one dataset member, unwrapping Kaggle's zip envelope.
+
+    Honours **HTTP 429 + `Retry-After`** (PF-16). This endpoint rate-limits by request
+    volume and says exactly how long to wait; sleeping on that header is the whole
+    difference between a subset that downloads in minutes and one that reads as
+    "unobtainable". A 429 is *not* a failure -- it is a scheduling instruction.
+    """
     import requests
 
-    r = requests.get(f"{BASE}/{MIRROR}?file_name={quote(member)}", auth=auth, timeout=timeout)
-    r.raise_for_status()
-    if r.content[:2] == b"PK":
-        with zipfile.ZipFile(io.BytesIO(r.content)) as z:
-            return z.read(z.namelist()[0])
-    return r.content
+    waited = 0
+    while True:
+        THROTTLE.wait()
+        r = requests.get(f"{BASE}/{MIRROR}?file_name={quote(member)}", auth=auth, timeout=timeout)
+        if r.status_code == 429 and waited < max_wait:
+            delay = int(r.headers.get("Retry-After", 60))
+            THROTTLE.pause(delay)
+            waited += delay
+            continue
+        r.raise_for_status()
+        if r.content[:2] == b"PK":
+            with zipfile.ZipFile(io.BytesIO(r.content)) as z:
+                return z.read(z.namelist()[0])
+        return r.content
 
 
-def _fetch_many(video_ids: list[str], dest: Path, auth: tuple[str, str], workers: int) -> None:
-    """Download many videos concurrently, writing each atomically.
+# PF-13 note 4: subset ids sort `dev_* < test_* < train_*`, so the first quota-limited
+# run spent itself almost entirely on dev and left the train split at 58 clips -- the
+# one split that actually limits learning. Fetch train first. This reorders *arrival*
+# only; split membership still comes from the committed subset, so section 3.5 RULE 1
+# is untouched.
+SPLIT_PRIORITY = {"train": 0, "dev": 1, "test": 2}
 
-    Kaggle serves one small file per request, so the transfer is latency-bound rather than
-    bandwidth-bound and threads help a lot -- measured ~9 videos/min serially.
+
+def _prioritised(video_ids: list[str]) -> list[str]:
+    return sorted(video_ids, key=lambda v: (SPLIT_PRIORITY.get(v.split("_", 1)[0], 3), v))
+
+
+def _fetch_window(
+    video_ids: list[str],
+    dest: Path,
+    auth: tuple[str, str],
+    workers: int,
+    *,
+    trip: int = 25,
+    attempts: int = 3,
+) -> tuple[int, list[str]]:
+    """Download as much of `video_ids` as the current quota window allows.
+
+    Returns `(n_fetched, still_missing)`.
+
+    Kaggle serves one small file per request, so the transfer is latency-bound rather
+    than bandwidth-bound and threads help a lot -- measured ~9 videos/min serially.
 
     Each file lands via a temp name + rename. A partial file left by an interrupt would
-    otherwise be skipped as "already present" on the next run and then fail to decode much
-    later, which is a miserable thing to debug.
+    otherwise be skipped as "already present" on the next run and then fail to decode
+    much later, which is a miserable thing to debug.
+
+    PF-13: the volume quota is signalled as a **404 on every file**, so a *run* of
+    consecutive failures -- never a single one -- is the signal to stop and wait.
+
+    Two refinements, both learned the hard way on 2026-08-30:
+
+    * **Retry before counting a failure.** Eight-way concurrency produces occasional
+      bursts of transient connection errors. A first cut counted those toward the trip
+      and stopped a *healthy* window after 66 files -- a serial probe seconds later got
+      HTTP 200 on the very next ids. Only a file that fails every attempt counts.
+    * **Only 404 counts toward the trip.** That is the specific signal PF-13 identified.
+      Any other error resets the run, so a network blip cannot masquerade as the quota.
     """
     import threading
-    from concurrent.futures import ThreadPoolExecutor, as_completed
+    import time
+    from concurrent.futures import ThreadPoolExecutor
 
-    done = 0
+    stop = threading.Event()
     lock = threading.Lock()
+    state = {"consecutive": 0, "ok": 0, "failed": 0}
 
     def one(vid: str) -> None:
+        if stop.is_set():
+            return
         split, num = vid.split("_", 1)
-        data = fetch(f"LAV-DF/{split}/{num}.mp4", auth)
+        member = f"LAV-DF/{split}/{num}.mp4"
+        data, saw_404 = None, False
+        for attempt in range(attempts):
+            if stop.is_set():
+                return
+            try:
+                data = fetch(member, auth)
+                break
+            except Exception as exc:  # noqa: BLE001 - one bad file must not kill the run
+                saw_404 = "404" in str(exc)
+                if attempt + 1 < attempts:
+                    time.sleep(1.5 * (attempt + 1))
+        if data is None:
+            with lock:
+                state["failed"] += 1
+                state["consecutive"] = state["consecutive"] + 1 if saw_404 else 0
+                if state["consecutive"] >= trip:
+                    stop.set()
+            return
         tmp = dest / f".{vid}.part"
         tmp.write_bytes(data)
         tmp.replace(dest / f"{vid}.mp4")
+        with lock:
+            state["consecutive"] = 0
+            state["ok"] += 1
+            if state["ok"] % 100 == 0:
+                print(
+                    f"    {state['ok']} fetched this window ({state['failed']} failed)",
+                    flush=True,
+                )
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = {pool.submit(one, v): v for v in video_ids}
-        for fut in as_completed(futures):
-            vid = futures[fut]
-            try:
-                fut.result()
-            except Exception as exc:  # noqa: BLE001 - one bad file must not kill the run
-                print(f"    {RED}FAIL{RESET} {vid}: {type(exc).__name__}: {exc}")
-            with lock:
-                done += 1
-                if done % 100 == 0 or done == len(video_ids):
-                    print(f"    {done}/{len(video_ids)}", flush=True)
+        list(pool.map(one, video_ids))
+
+    missing = [v for v in video_ids if not (dest / f"{v}.mp4").exists()]
+    return state["ok"], missing
+
+
+def _wait_for_quota(
+    probe_id: str, dest: Path, auth: tuple[str, str], *, step: int = 300, cap: int = 5400
+) -> bool:
+    """Sleep until the download endpoint answers again, probing every `step` seconds.
+
+    PF-13 measured the window as clearing "after about an hour", but that was one
+    observation; probing costs one file and finds the real edge instead of assuming it.
+    The probe *keeps* what it downloads, so a successful probe is not wasted quota.
+    """
+    import time
+
+    waited = 0
+    split, num = probe_id.split("_", 1)
+    while waited < cap:
+        time.sleep(step)
+        waited += step
+        try:
+            data = fetch(f"LAV-DF/{split}/{num}.mp4", auth, timeout=120)
+        except Exception:  # noqa: BLE001 - still throttled
+            print(f"    {DIM}still throttled after {waited // 60} min{RESET}", flush=True)
+            continue
+        tmp = dest / f".{probe_id}.part"
+        tmp.write_bytes(data)
+        tmp.replace(dest / f"{probe_id}.mp4")
+        print(f"  {GREEN}quota cleared{RESET} after ~{waited // 60} min", flush=True)
+        return True
+    return False
+
+
+def _fetch_many(
+    video_ids: list[str],
+    dest: Path,
+    auth: tuple[str, str],
+    workers: int,
+    *,
+    max_hours: float = 0.0,
+) -> list[str]:
+    """Fetch every id, riding out PF-13's quota windows. Returns what is still missing.
+
+    With `max_hours == 0` this is a single window and behaves exactly as before -- the
+    smoke-scale path Phases 1-3 used. A positive `max_hours` opts into the wait-and-resume
+    loop needed to pull a full subset locally.
+    """
+    import time
+
+    todo = _prioritised(video_ids)
+    deadline = time.time() + max_hours * 3600 if max_hours else 0.0
+    window = 0
+    while todo:
+        window += 1
+        got, todo = _fetch_window(todo, dest, auth, workers)
+        print(f"  window {window}: +{got} fetched, {len(todo)} remaining", flush=True)
+        if not todo or not deadline:
+            break
+        if time.time() >= deadline:
+            print(f"  {YELLOW}--max-hours reached with {len(todo)} remaining{RESET}")
+            break
+        if got == 0:
+            print(f"  {YELLOW}window {window} fetched nothing -- giving up{RESET}")
+            break
+        if not _wait_for_quota(todo[0], dest, auth):
+            print(f"  {YELLOW}quota did not clear within 90 min -- stopping{RESET}")
+            break
+        todo = [v for v in todo if not (dest / f"{v}.mp4").exists()]
+    return todo
 
 
 def main() -> int:
@@ -137,9 +356,34 @@ def main() -> int:
         help="also fetch the real video each fake was built from -- needed by "
         "scripts/11_verify_labels.py to check fake_periods against pixel evidence",
     )
-    ap.add_argument("--workers", type=int, default=8, help="parallel downloads")
+    ap.add_argument(
+        "--workers",
+        type=int,
+        default=5,
+        help="parallel downloads. PF-16: >5 makes Kaggle 404 files that exist; 5 is the "
+        "measured ceiling and gives ~108 files/min.",
+    )
+    ap.add_argument(
+        "--rate",
+        type=float,
+        default=25.0,
+        help="target files/min across all workers. PF-16: staying just under the limit "
+        "beats bursting into Retry-After penalties -- 31/min drew zero 429s, while an "
+        "unpaced pool settled at ~6/min. 0 disables pacing.",
+    )
+    ap.add_argument(
+        "--max-hours",
+        type=float,
+        default=0.0,
+        help="ride out PF-13's quota windows for up to this many hours, waiting and "
+        "resuming instead of stopping at the first run of 404s. 0 (default) = a single "
+        "window, the smoke-scale behaviour Phases 1-3 used.",
+    )
     ap.add_argument("--seed", type=int, default=1337)
     args = ap.parse_args()
+
+    global THROTTLE
+    THROTTLE = _Throttle(args.rate)
 
     auth = credentials()
     out = Path(args.out)
@@ -209,13 +453,23 @@ def main() -> int:
         print(f"\n  subset {args.subset}: {len(ids)} videos -> {sdir}")
         print(
             f"  {len(ids) - len(todo)} already present, {len(todo)} to fetch "
-            f"({args.workers} workers)"
+            f"({args.workers} workers, "
+            f"{'single window' if not args.max_hours else str(args.max_hours) + 'h budget'})"
         )
-        _fetch_many(todo, sdir, auth, args.workers)
+        missing = _fetch_many(todo, sdir, auth, args.workers, max_hours=args.max_hours)
+        have = sorted(f.stem for f in sdir.glob("*.mp4"))
         total = sum(f.stat().st_size for f in sdir.glob("*.mp4"))
-        print(
-            f"  [{GREEN}OK{RESET}] {len(list(sdir.glob('*.mp4')))} videos, {total / 1024**2:.1f} MB"
-        )
+        by_split: dict[str, int] = {}
+        for v in have:
+            by_split[v.split("_", 1)[0]] = by_split.get(v.split("_", 1)[0], 0) + 1
+        mark = GREEN if not missing else YELLOW
+        print(f"  [{mark}OK{RESET}] {len(have)}/{len(ids)} videos, {total / 1024**2:.1f} MB")
+        print("       splits: " + "  ".join(f"{k} {n}" for k, n in sorted(by_split.items())))
+        if missing:
+            # Anything downstream has to know it is running on a partial subset. Carrying
+            # this by hand through every report is exactly what made Phase 4's first pass
+            # so easy to misread.
+            print(f"       {YELLOW}{len(missing)} still missing (PF-13 quota){RESET}")
 
     print(f"\n{GREEN}DONE{RESET} -- next: python scripts/02_build_manifest.py")
     return 0

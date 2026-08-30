@@ -124,6 +124,77 @@ class VisualBaseline(nn.Module):
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
 
+class AudioBaseline(nn.Module):
+    """Baseline 2 of section 4.2: raw audio features -> video-level real/fake logit (P5-1).
+
+        [T, 80|40] -> DilatedAudioEncoder -> [T, 256] -> attention-pool -> LayerNorm
+                   -> Linear(256 -> 64) -> GELU -> Dropout -> Linear(64 -> 1)
+
+    **Deliberately the same head as the visual arm.** Everything after the encoder is
+    identical to `VisualBaseline` -- same pooling, same norm, same classifier widths, same
+    single logit + BCE. So Experiment B's audio-vs-visual comparison, and Phase 6's fusion,
+    measure the *modality*, not an incidental difference in head capacity.
+
+    **Unlike the visual arm, this encoder is trained.** There is no pretrained audio trunk
+    here, so features are read from the Phase 3 cache and the 1D-CNN learns from scratch.
+    That makes P5-6's overfit-a-batch check load-bearing in a way it is not for a frozen
+    backbone: it is the only cheap proof gradients reach all four conv blocks.
+
+    ⚠️ The mask reaching the encoder marks **padding only**. Audio has no `face_found`
+    analogue -- every frame of a real waveform is valid evidence -- so a silent stretch is
+    signal, not a hole, and must not be masked away.
+    """
+
+    def __init__(
+        self,
+        feature: str = "logmel",
+        d_model: int = 256,
+        hidden: int = 64,
+        dropout: float = 0.3,
+        *,
+        norm: str = "batch",
+        encoder_dropout: float = 0.0,
+    ) -> None:
+        super().__init__()
+        from src.models.backbones.audio import build_audio_encoder
+
+        self.encoder = build_audio_encoder(feature, norm=norm, dropout=encoder_dropout)
+        self.feature = feature
+        self.feature_dim = self.encoder.in_dim
+        self.d_model = d_model
+
+        if self.encoder.feature_dim != d_model:
+            raise ValueError(
+                f"encoder emits {self.encoder.feature_dim}-d but d_model is {d_model}; "
+                "section E fixes the last channel width at 256 to match the head"
+            )
+
+        self.pool = AttentionPooling(d_model)
+        self.norm = nn.LayerNorm(d_model)
+        self.classifier = nn.Sequential(
+            nn.Linear(d_model, hidden),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden, 1),
+        )
+
+    def forward(
+        self, features: torch.Tensor, mask: torch.Tensor | None = None
+    ) -> dict[str, torch.Tensor]:
+        """`features` is `(B, T, 80|40)`, `mask` is `(B, T)` with True = real frame."""
+        if features.ndim != 3:
+            raise ValueError(f"expected (B, T, F), got {tuple(features.shape)}")
+
+        x = self.encoder(features, mask)  # (B, T, 256), T preserved -- P5-2
+        pooled, weights = self.pool(x, mask)
+        logit = self.classifier(self.norm(pooled)).squeeze(-1)
+        return {"logit": logit, "attention": weights, "pooled": pooled, "sequence": x}
+
+    @property
+    def n_parameters(self) -> int:
+        return sum(p.numel() for p in self.parameters() if p.requires_grad)
+
+
 class MeanPoolBaseline(VisualBaseline):
     """Ablation arm for section J deviation 1: identical, but mean-pools.
 

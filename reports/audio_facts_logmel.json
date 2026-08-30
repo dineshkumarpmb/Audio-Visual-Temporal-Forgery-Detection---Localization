@@ -1,5 +1,5 @@
 {
-  "subset": "smoke-100",
+  "subset": "dev-2k",
   "config_hash": "6cc74f25",
   "config": {
     "sample_rate": 16000,
@@ -14,15 +14,15 @@
     "feature": "logmel",
     "n_mfcc": 40
   },
-  "n_extracted": 100,
+  "n_extracted": 686,
   "n_failed": 0,
   "n_silent": 0,
   "n_alignment_violations": 0,
-  "n_checked": 100,
-  "wall_clock_s": 9.26,
-  "seconds_per_video": 0.0926,
-  "pad_frames_mean": -1.316,
-  "pad_frames_min": -3.4,
-  "pad_frames_max": 0.0,
-  "cache_bytes": 6719360
+  "n_checked": 698,
+  "wall_clock_s": 62.06,
+  "seconds_per_video": 0.0905,
+  "pad_frames_mean": -1.388,
+  "pad_frames_min": -3.6,
+  "pad_frames_max": 0.2,
+  "cache_bytes": 55949888
 }

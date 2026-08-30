@@ -1,23 +1,23 @@
 {
   "backbone": "resnet18",
   "config_hash": "baec77e1",
-  "n_clips": 252,
+  "n_clips": 786,
   "norm": {
     "min": 9.628263473510742,
-    "p05": 20.301210403442383,
-    "median": 24.98651885986328,
-    "p95": 30.982044219970703,
-    "max": 41.201148986816406,
-    "mean": 25.227149963378906
+    "p05": 20.661378860473633,
+    "median": 25.467182159423828,
+    "p95": 32.93212890625,
+    "max": 51.65465545654297,
+    "mean": 25.919830322265625
   },
   "determinism_identical": 4,
   "determinism_n": 4,
   "identity": {
-    "within": 0.002414137125015259,
-    "between": 0.19307520985603333,
-    "ratio": 0.012503609992563725,
-    "n_groups": 6,
-    "n_within_pairs": 12
+    "within": 0.0015123755438253284,
+    "between": 0.20536434650421143,
+    "ratio": 0.007364353165030479,
+    "n_groups": 27,
+    "n_within_pairs": 62
   },
   "tsne_path": "reports\\figures\\tsne_identity_resnet18.png"
 }

@@ -2,54 +2,54 @@
   "seed": 1339,
   "backbone": "mobilenet_v2",
   "pooling": "attention",
-  "git_sha": "120219f89b79",
+  "git_sha": "21a2c0fae118",
   "feature_config": "0d8eaa32",
   "n_params": 377986,
-  "epochs_run": 20,
-  "best_epoch": 4,
-  "wall_clock_s": 36.09,
-  "n_clips_train": 58,
+  "epochs_run": 18,
+  "best_epoch": 7,
+  "wall_clock_s": 85.3,
+  "n_clips_train": 592,
   "dev": {
-    "loss": 0.7226729852812631,
-    "auc": 0.5574991901522514,
-    "ap": 0.7664360395970704,
-    "accuracy": 0.4114285714285714,
-    "eer": 0.4467120181405896,
-    "precision": 0.7346938775510204,
-    "recall": 0.2857142857142857,
-    "f1": 0.4114285714285714,
+    "loss": 0.3691898058141981,
+    "auc": 0.7306446388079041,
+    "ap": 0.8593963384768717,
+    "accuracy": 0.5028571428571429,
+    "eer": 0.3078231292517007,
+    "precision": 0.8979591836734694,
+    "recall": 0.3492063492063492,
+    "f1": 0.5028571428571428,
     "n": 175,
     "positive_rate": 0.72,
     "per_class": {
       "visual_only": {
         "n_fake": 37,
-        "auc": 0.5819084390512962,
-        "recall": 0.35135135135135137
+        "auc": 0.7628240485383343,
+        "recall": 0.3783783783783784
       },
       "audio_only": {
         "n_fake": 45,
-        "auc": 0.5705215419501134,
-        "recall": 0.24444444444444444
+        "auc": 0.7696145124716554,
+        "recall": 0.3333333333333333
       },
       "both": {
         "n_fake": 44,
-        "auc": 0.5236549165120594,
-        "recall": 0.2727272727272727
+        "auc": 0.6637291280148423,
+        "recall": 0.3409090909090909
       },
       "real": {
         "n": 49,
-        "specificity": 0.7346938775510204
+        "specificity": 0.8979591836734694
       }
     }
   },
   "train_config": {
-    "epochs": 60,
+    "epochs": 40,
     "lr": 0.001,
     "weight_decay": 0.0001,
     "batch_size": 32,
     "grad_accum": 1,
-    "pos_weight": 1.0,
-    "patience": 15,
+    "pos_weight": 0.3799533799533799,
+    "patience": 10,
     "amp": false,
     "grad_clip": 1.0,
     "seed": 1339,

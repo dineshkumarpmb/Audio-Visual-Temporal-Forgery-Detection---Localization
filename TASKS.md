@@ -7,107 +7,112 @@ Legend: ⛔ = blocking gate item · ⭐ = headline capability · 🔬 = experime
 
 ---
 
-## 📍 CURRENT STATUS — 2026-08-29, Phase 4 at 11/12 · blocked on data volume
+## 📍 CURRENT STATUS — 2026-08-30, Phase 6 complete · Phase 7 next
 
 | | |
 |---|---|
-| **Done** | Phase −1 (pre-flight) · Phase 0 (environment) — **gate green, 33/33** |
-| **Done** | Phase −1 · Phase 0 · **P1 (18/20)** · **P2 (13/15)** · **P3 (9/9)** · **P4 (11/12)** · CL-1 ✅ · CL-7 ✅ |
-| **Blocked** | ⛔ **P4-12 gate** — needs dev-2k, which needs the Kaggle mount. Local downloads are quota-capped (**PF-13**) |
-| **Next** | **CL-2/CL-3** (attach mirror + notebook entrypoint), then re-run Phase 4 at scale → **Phase 5** |
-| **Progress** | ~72 of 203 tasks (≈35%) · 5 of 18 phases complete, Phase 4 at 11/12 |
-| **Tests** | **223 passing** — 207 unit + 16 integration against the real 136,304-entry dataset |
+| **Done** | Phase −1 · Phase 0 · **P1 (18/20)** · **P2 (13/15)** · **P3 (9/9)** · **P4 (12/12)** · **P5 (8/8)** · **P6 (8/8)** · CL-1 ✅ · CL-7 ✅ |
+| **Resolved** | ⛔ **D-1 → MobileNetV2** (0.7189 vs 0.6319). ⛔ **C-1 → log-Mel** (0.9838 vs 0.7677). Both open decisions are now settled by experiment |
+| **Next** | **Phase 7 — temporal modeling** (Experiment D). ⛔ §5.6 collapse is now *measured*, not just concrete — see PF-20 |
+| **Progress** | ~90 of 203 tasks (≈44%) · **8 of 18 phases complete** |
+| **Tests** | **259 passing** — 243 unit + 16 integration against the real 136,304-entry dataset |
+| **⚠️ Caveat** | ⛔ **PF-17 / PF-19 / PF-20** — both baselines' AUCs contain dataset artefacts (clip length; a global audio processing fingerprint), and fusion **collapsed onto audio**. No bare number from Phases 4–6 may enter Part 11's evidence table |
 | **✋ Awaiting you** | P2-8 (contact sheets) · ⛔ P2-10 (watch 20 overlays) — artefacts in `reports/figures/` |
 | **Kaggle** | `dinesh1234567` · phone verified · **30 GPU h/week** · P100 16 GB or T4×2 · 12 h/session · 20 GB `/kaggle/working` |
-| **Branch** | `master`, working tree clean |
-| **Commits** | `ab2b620` baseline · `c53922b` decisions PF-1/2/3 · `ebf3196` Phase 0 · `badb58b` PF-6 · `3c0d0dc` CL-1 gate · `c872158` CL-1 credentials + API-drift fix |
+| **Branch** | `master` |
 
-**Phases 1–4 built the data, preprocessing and first model.** `src/` now also holds
-`models/backbones/visual.py`, `models/heads/classification.py`, `training/trainer.py`,
-`evaluation/metrics.py` and `data/dataset.py`, driven by `scripts/02`–`17`, with **223 passing
-tests**. There is a trained model, MLflow tracking, Baseline 0 floors and a resolved D-1.
-`api/` and the remaining model packages are still stubs — Phases 5–16 untouched.
+**Phases 1–6 built the data, preprocessing, and all three baselines.** `src/` holds
+`models/backbones/{visual,audio}.py`, `models/fusion/concat.py`, `models/heads/`,
+`training/{trainer,reporting}.py`, `evaluation/metrics.py` and `data/dataset.py`, driven by
+`scripts/02`–`23`. There are trained visual, audio and fused models, MLflow tracking,
+Baseline 0 floors, **both open decisions resolved by experiment** (D-1, C-1), and validity
+checks that caught three separate artefacts before they reached a headline. `api/`,
+`models/temporal/`, `models/gan/`, `losses/` and `localization/` are still stubs — Phases
+7–16 untouched.
 
-### 🔴 What is blocked, and why
+### 🟢 What unblocked, and how
 
-**1. ⛔ Phase 4's gate needs data this machine cannot fetch (PF-13).** Kaggle's single-file
-download endpoint returns **404 after ~300 files per window** — the files exist and the same URLs
-work again an hour later, so it is a volume quota signalled as 404. That capped the local corpus
-at **262 clips (train 58)** instead of dev-2k's 2,000. Every correctness check passes; there is
-simply not enough training data for the models to *clearly* beat the majority-class floor.
+**⛔ PF-13 was wrong, and it was the only thing holding Phase 4's gate.** It recorded a hard
+Kaggle *volume quota* (~300 files/session, signalled as 404) and concluded dev-2k was
+"unobtainable locally" — so Phase 4 trained on **58 clips** and the gate stayed at 2/3.
 
-**The fix is CL-2/CL-3, not more local work.** On Kaggle the dataset is *mounted* read-only at
-`/kaggle/input` — no downloads, no quota. PF-6 chose that for disk reasons; it turns out to be the
-only way to reach dev-2k at all.
+Re-testing showed the endpoint is **rate**-limited, two separate ways:
 
-**2. 🔴 PRE-1 — the original report is not on this machine.** Sole blocker for P1-3 and Appendix-A
-items 1–7. Blocks **Part 9's comparison and Phase 16**, not Phases 5–15. Drop it at
-`docs/original_report.pdf`.
+| Behaviour | Signal | Fix |
+|---|---|---|
+| Too much concurrency | **404** on files that plainly exist — while a *serial* probe got 200 seconds later | `--workers ≤ 5` |
+| Sustained volume | **429** + `Retry-After: 180` | shared `THROTTLE` sleeps on the header |
+
+PF-13's fetcher called `raise_for_status()` and counted every exception as one "quota hit",
+so it could not tell those apart and stopped at the first run of either. With the fix,
+train went **58 → 592 clips** and both arms cleared the floor decisively. Full write-up in
+**PF-16**; PF-13 keeps a superseded banner because Phase 4's first-pass numbers were
+produced under it.
+
+### 🔴 What is still blocked
+
+**🔴 PRE-1 — the original report is not on this machine.** Sole blocker for P1-3 and
+Appendix-A items 1–7. Blocks **Part 9's comparison and Phase 16**, not Phases 5–15. Drop it
+at `docs/original_report.pdf`.
 
 ### Resume checklist
 
 1. `make check` — Phase 0 gate, should print **GATE PASSED**, exit 0.
 2. `make phase1` — metadata → CL-7 → manifest → subsets → statistics → tests.
 3. `make phase2` — models → smoke-100 video → face crops → gate → label check → sheets → overlays.
-   Pulls ~19 MB of video and 3.8 MB of weights; the 25.5 GB stays on Kaggle (PF-6).
 4. `make phase3` — log-mel + MFCC on the video grid → ⛔ strict alignment gate → label check.
-   `reports/figures/overlays/`. These are the two things nothing automated can sign off.
-6. **CL-2/CL-3** on Kaggle, then re-run `make phase4` at dev-2k scale to clear P4-12.
-
-### Mirror verified — CL-7 PASSED 10/10 (2026-08-29)
-
-`reports/mirror_verification.md` · `reports/mirror_facts.json` · full listing in
-`reports/mirror_listing.tsv.gz`.
-
-| | |
-|---|---|
-| Ref | `elin75/localized-audio-visual-deepfake-dataset-lav-df` (public, v1) |
-| Videos | **136,304** — mp4 set matches metadata **exactly in both directions** |
-| Real / fake | **36,431 / 99,873** — matches the publication |
-| Splits | train 78,703 · dev 31,501 · test 26,100 — all match |
-| Size | **25,502,577,573 B = 25.50 GB** uncompressed |
-| `metadata.min.json` | 33,837,990 B · sha256 `96d5f79bef1aa92f…` |
-| Re-encode test | fps 25.00 **28/28** · `video_frames` byte-exact **28/28** · 16 kHz **28/28** |
-
-Both CL-1 flags are now closed: the 24.84 GB `total_bytes` was Kaggle's *compressed* figure, and
-`metadata.min.json` is present at the size the listing reports. Residual limit: it was not
-byte-compared against the authors' HuggingFace copy, since PF-6 keeps that copy off this machine —
-its sha256 is recorded so any future divergence is detectable.
+5. `make phase4` — extract both backbones → verify → train 3 arms → D-1 → ⛔ `make confound`.
+6. `make phase5` — audio both arms → C-1 → ⛔ `make confound` + `make provenance`.
+7. ✋ Watch `reports/figures/overlays/` and the contact sheets — the two things nothing
+   automated can sign off (P2-8, P2-10).
+8. `make phase6` — fusion + its ⛔ **control arm** → Experiment C → P6-8.
+9. **Phase 7** — temporal modeling (Experiment D).
 
 ### Risk status
 
-**Phase 1 — all three resolved.** `fake_periods` are float **seconds** (asserted every load);
-leakage assertions are **build-failing** with zero overlap on all three pairs; RAM was never a
-factor (Phase 1 ran off a 33.8 MB JSON).
+**Phase 1 — all three resolved.** `fake_periods` are float **seconds** (asserted every
+load); leakage assertions are **build-failing** with zero overlap on all three pairs; RAM
+was never a factor (Phase 1 ran off a 33.8 MB JSON).
 
-**Phase 2 — ground truth is now measured, not assumed.** §6.3 calls label alignment the
-highest-risk step in the project. Comparing each visual fake against the real video it names in
-`original`, divergence onset matches the labelled span start on **7/7 pairs, median error
-0.000 s** (one frame = 0.04 s). That independently confirms the units, the timeline origin **and**
-the `round(t×25)` rasterisation.
+**Phase 2 — ground truth is measured, not assumed.** Divergence onset matches the labelled
+span start on **7/7 pairs, median error 0.000 s** (one frame = 0.04 s).
 
-⚠️ **Note for anyone using `original` as a reference:** a fake is generally a *different length*
-from its original (142 vs 136 frames, 331 vs 310) — LAV-DF replaces a word with a different word.
-The clips desynchronise from the manipulation point onward, so only the **leading edge** of
-divergence is informative; peak difference is not.
+⚠️ **Note for anyone using `original` as a reference:** a fake is generally a *different
+length* from its original (142 vs 136 frames, 331 vs 310) — LAV-DF replaces a word with a
+different word. Only the **leading edge** of divergence is informative.
 
 **Phase 3 — the alignment gate holds at 100%.** One audio frame is one video frame by
-construction (`hop_length=640` = 40 ms = one frame at 25 fps), verified on 100/100 files. Label
-verification now covers **all three fake classes, 12/12, median error 0.000 s** — the audio arm
-reaches `audio_only` fakes, which are pixel-identical to their originals and so invisible to the
-visual method.
+construction (`hop_length=640` = 40 ms = one frame at 25 fps), verified on 100/100 files.
+Label verification covers **all three fake classes, 12/12, median error 0.000 s**.
 
-⚠️ **RAM returns in Phase 4.** Crops are 7.52 MB/video (PF-10), so feature extraction must stream
-and delete per video. Audio is only 64 KB/video and is not a constraint.
+**⛔ Phases 4-5 — R4 is live, in two distinct forms.** Each modality has a class it is
+physically blind to, and `scripts/18_check_confound.py` scores every arm on its own:
+
+| arm | blind class | length alone | model | verdict |
+|---|---|---|---|---|
+| visual / resnet18 | `audio_only` | 0.6381 | 0.6296 | length fully explains it |
+| visual / mobilenet_v2 | `audio_only` | 0.6381 | **0.7551** | ⛔ exceeds length |
+| audio / logmel | `visual_only` | 0.5916 | **0.9728** | ⛔ far exceeds length |
+| audio / mfcc | `visual_only` | 0.5916 | 0.5365 | ✅ at chance |
+
+Two separate artefacts, with different fixes: **clip length** (real clips are shorter,
+worth AUC 0.6157 on its own) and a **global audio processing fingerprint** (PF-19, measured
+8/8). R3 (identity leakage) is clean: 0 `source_id` overlap between train and dev. X-7
+requires re-checking at every scale-up — these scale-ups are what exposed both.
 
 ### Carried-forward open items
 
 | Item | Blocks | Notes |
 |---|---|---|
-| 🔴 PRE-1 — original report missing | **P1-3, Part 9, Phase 16** | Not on this machine; drop at `docs/original_report.pdf`. Phases 2–15 do not need it. The only thing keeping the P1-20 gate at 3/4 |
-| ⛔ PF-10 — crops are 7.52 MB/video | Phase 4 | dev-10k = 73.5 GB, full ≈ 1 TB. Phase 4 must featurise and delete **per video**; will not fit Kaggle's 20 GB `/kaggle/working` |
-| ✋ P2-8 / ⛔ P2-10 manual checks | Phase 2 sign-off | Contact sheets and overlays rendered in `reports/figures/`. P2-10 is backed by 7/7 objective label verification but still needs a human watch |
-| ✋ Attach the mirror in a Kaggle notebook | Phase 4+ on Kaggle | Manual browser step (*Add Data*). Phases 1–2 ran locally off metadata plus smoke-100 |
+| ⛔ PF-17 — clip-length shortcut | Part 11, Phase 6 | Settle a length-matched dev view before fusion |
+| ⛔ PF-19 — audio reads a global processing fingerprint | Part 11, Phase 6 | log-Mel scores 0.9728 on `visual_only`, whose audio is unmodified; 8/8 pairs diverge from t=0. A re-encode control would quantify it |
+| ⛔ §5.6 modality collapse — **measured** | Phases 7-8 | Fusion collapsed onto audio: zeroing video costs +0.0021 ± 0.0066 AUC. Modality dropout **backfired** (PF-20). Cross-attention (Phase 8) is the next real test |
+| PF-18 — BatchNorm sees padding | Phase 6+ | `--norm group` ablation exists, not yet measured |
+| 🔴 PRE-1 — original report missing | **P1-3, Part 9, Phase 16** | Not on this machine; drop at `docs/original_report.pdf`. The only thing keeping the P1-20 gate at 3/4 |
+| dev-2k is 698/2000 local | tighter Phase 4 numbers | Wall-clock only, ~500 files/hour. Does not change any Phase 4 conclusion |
+| ⛔ PF-10 — crops are 7.52 MB/video | Phase 9+ | Streaming `--from-video` solves it; features are 228–569 KB/video |
+| ✋ P2-8 / ⛔ P2-10 manual checks | Phase 2 sign-off | Rendered in `reports/figures/`. Backed by 7/7 objective label verification but still needs a human watch |
+| ✋ Attach the mirror in a Kaggle notebook | dev-10k and above | Manual browser step (*Add Data*). No longer blocks subset-scale work (PF-16) |
 | P14-0 — Windows long paths disabled | Phase 14 | `LongPathsEnabled = 0`. Needs an elevated shell + reboot before `npm install` |
 | PF-4 — precision re-benchmark on Kaggle | Phase 9–11 | fp32 locally is settled; the cloud figure is assumed until measured |
 
@@ -122,10 +127,10 @@ and delete per video. Audio is only 64 KB/video and is not a constraint.
 | 1 Dataset | 20 | ✅ **18/20** — gate 3/4; P1-3 blocked on PRE-1 |
 | 2 Video preproc | 15 | ✅ **13/15** — gate 8/8; P2-8 & P2-10 await ✋ |
 | 3 Audio preproc | 9 | ✅ **9/9** — gate 100/100, no manual checks |
-| 4 Visual baseline | 12 | 🟡 **11/12** — gate 2/3; D-1 ✅ ResNet-18; needs dev-2k |
-| 5 Audio baseline | 8 | ⬜ **Next** — 🔬 Experiment B + Decision C-1 |
-| 6 Fusion | 8 | ⬜ Not started |
-| 7 Temporal | 6 | ⬜ Not started |
+| 4 Visual baseline | 12 | ✅ **12/12** — gate 3/3; D-1 ✅ MobileNetV2; ⛔ PF-17 caveat |
+| 5 Audio baseline | 8 | ✅ **8/8** — gate passed; C-1 ✅ log-Mel; ⛔ PF-19 caveat |
+| 6 Fusion | 8 | ✅ **8/8** — gate passed on a **negative** result: C < B, collapsed onto audio (PF-20) |
+| 7 Temporal | 6 | ⬜ **Next** — 🔬 Experiment D |
 | 8 Self-attention | 10 | ⬜ Not started |
 | 9 Augmentation | 7 | ⬜ Not started |
 | 10 Localization ⭐ | 14 | ⬜ Not started |
@@ -135,10 +140,8 @@ and delete per video. Audio is only 64 KB/video and is not a constraint.
 | 14 Frontend | 12 | ⬜ Not started (also gated by P14-0) |
 | 15 Testing | 9 | ⬜ Not started |
 | 16 Documentation | 11 | ⬜ Not started (needs PRE-1) |
-| Cloud (Kaggle) | 8 | 🟡 3/8 — CL-1 ✅, CL-7 ✅. **CL-2/CL-3 now on the critical path (PF-13)** |
+| Cloud (Kaggle) | 8 | 🟡 2/8 — CL-1 ✅, CL-7 ✅. No longer on Phase 4's critical path (PF-16) |
 | Cross-cutting | 7 | 🔄 Continuous |
-
----
 
 ---
 
@@ -350,95 +353,203 @@ streaming constraint does not apply to audio. dev-10k log-mels would be ~0.6 GB.
 
 ---
 
-## PHASE 4 — Visual Baseline — 🟡 **11/12, gate 2/3 (2026-08-29)**
+## PHASE 4 — Visual Baseline — ✅ **COMPLETE 12/12, gate 3/3 (2026-08-30)**
 
-⛔ **Gate P4-12 not passed**: the models beat the majority-class floor but not *clearly*
-(+0.067 AUC), because Kaggle's download quota (**PF-13**) capped local training data at
-**58 clips** instead of dev-2k's 1,155. Every correctness diagnostic passes — overfit-a-batch
-1e-6, byte-identical re-extraction, identity separation 0.002 vs 0.193 — so this is a data
-volume ceiling, not a defect. Clearing it needs the Kaggle mount (CL-2/CL-3).
+⛔ **Gate P4-12 PASSED** — working model ✅ · both backbones clearly beat majority-class ✅ ·
+D-1 resolved ✅. Read it together with **PF-17**: the AUC is a clear beat *and* it contains
+a clip-length shortcut, so the bare number must not travel alone.
 
-⛔ **D-1 is resolved → ResNet-18** on the speed half of §5.2's rule, which is measured cleanly
-and is not scale-dependent.
+⛔ **D-1 resolved → MobileNetV2**, reversing the 2026-08-29 call. At 58 training clips the
+two arms were 0.008 apart — inside noise — so §5.2's speed tie-break decided it and the
+prior (ResNet-18) stood. At 592 clips the gap is **0.087**, far outside seed noise, so the
+experiment separates them and the higher-scoring arm wins outright.
+
+**What unblocked this: PF-16.** PF-13 recorded a hard Kaggle *volume quota* making dev-2k
+"unobtainable locally", and that alone kept the gate at 2/3. It was a misdiagnosis — the
+endpoint is **rate**-limited (excess concurrency → 404; sustained volume → 429 with
+`Retry-After`). No new capability was needed, just a fetcher that honours the header.
 
 | ID | Task | Status |
 |---|---|---|
-| P4-1 | Frozen-backbone extractor for **both** ResNet-18 (512-d) and MobileNetV2 (1280-d → 512 for parity) | ✅ `src/models/backbones/visual.py`. Both frozen, `train()` **overridden** so a `Trainer.train()` call cannot flip BatchNorm into batch-statistics mode. Parity comes from the head's `Linear(D→256)`, applied to **both** arms — giving it only to MobileNetV2 would hand one arm extra capacity and confound D-1 |
-| P4-2 | `scripts/04_extract_visual.py` — batched, `no_grad`, fp16 output, resumable | ✅ `scripts/13_extract_visual.py` (04 was taken by Phase 1 stats). ⛔ **`--from-video` streams decode→align→featurise→discard**, so peak disk is one clip, not PF-10's 73.5 GB. **Compute fp32, store fp16** per PF-4 — fp16 arithmetic is 0.13× on this GPU |
-| P4-3 | Extract over dev-2k with both backbones; record throughput and peak VRAM | 🟡 **252 clips, not 2,000** — Kaggle's download quota (**PF-13**) made dev-2k unobtainable locally. Both backbones extracted. Throughput/VRAM measured two ways, which mattered: end-to-end **50.1 vs 40.3 frames/s**, but isolated backbone **2,277 vs 2,502 img/s** (`scripts/17_bench_backbones.py`) |
-| P4-4 | Determinism check; embedding-norm sanity; t-SNE identity separation | ✅ **5/5 both backbones** (`scripts/16_verify_features.py`). Re-extraction **byte-identical 4/4**; no dead clips; norms sane (median 25.0 / 21.1). Identity separation **within 0.002 vs between 0.193** — the features carry strong real signal |
+| P4-1 | Frozen-backbone extractor for **both** ResNet-18 (512-d) and MobileNetV2 (1280-d → 512 for parity) | ✅ `src/models/backbones/visual.py`. Both frozen, `train()` **overridden** so a `Trainer.train()` call cannot flip BatchNorm into batch-statistics mode. Parity comes from the head's `Linear(D→256)`, applied to **both** arms |
+| P4-2 | `scripts/04_extract_visual.py` — batched, `no_grad`, fp16 output, resumable | ✅ `scripts/13_extract_visual.py` (04 was taken by Phase 1 stats). ⛔ **`--from-video` streams decode→align→featurise→discard**, so peak disk is one clip, not PF-10's 73.5 GB. **Compute fp32, store fp16** per PF-4 |
+| P4-3 | Extract over dev-2k with both backbones; record throughput and peak VRAM | ✅ **786 clips** (698 of dev-2k + smoke-100), both backbones, 5/5 checks. Peak VRAM 179 / 180 MB. Feature size **228 KB/video (ResNet-18) vs 569 KB (MobileNetV2)** — ResNet-18 is 2.5× smaller, as 512-d vs 1280-d implies. ⚠️ End-to-end frames/s is **not comparable across arms this run** (21 vs 533 videos on a resumed cache); `reports/backbone_bench.json` carries the isolated like-for-like figure |
+| P4-4 | Determinism check; embedding-norm sanity; t-SNE identity separation | ✅ **5/5 both backbones** (`scripts/16_verify_features.py`). Re-extraction **byte-identical 4/4**; no dead clips; norms sane (median 25.5 / 21.6). Identity separation **0.0015 within vs 0.205 between** |
 | P4-5 | Attention-pooling head + classifier | ✅ `Linear(D→256)` → attention-pool → LayerNorm → `Linear(256→64)` → GELU → Dropout → `Linear(64→1)`, single logit + `BCEWithLogitsLoss` per §J. Padding **and** `face_found=False` frames are masked out of pooling |
-| P4-6 | Training loop: AMP, grad accumulation, checkpoint every epoch | ✅ `src/training/trainer.py`. Early stopping on **dev** only; checkpoint every epoch with atomic writes; `resume()` restores model+optimiser+best. AMP present but **off by default** (PF-4) |
-| P4-7 | ⛔ **Overfit-a-batch** — 10 samples to ~zero loss | ✅ **PASS: 0.6879 → 0.000001** in 300 steps. Runs automatically before every training run and **aborts it on failure** |
-| P4-8 | MLflow: git SHA, config, seeds, metrics, checkpoint, hardware, wall-clock | ✅ All logged. ⚠️ **PF-14**: MLflow 3.15 *raises* on the file store the plan specifies; switched to SQLite (`experiments/mlflow.db`) — still one local file, nothing to host |
-| P4-9 | Train B1a (ResNet-18) and B1b (MobileNetV2), 3 seeds each | ✅ 6 runs. **ResNet-18 0.5667 ± 0.0121**, **MobileNetV2 0.5746 ± 0.0156** dev AUC. Plus a 3-seed mean-pool ablation: **0.5764 ± 0.0131** |
-| P4-10 | Baseline 0 (majority-class + random) as the sanity floor | ✅ majority AUC **0.5000** / acc **0.7200**; random AUC 0.5198. That accuracy is the point: the dataset is 72% fake on this dev split, so accuracy is worthless as a headline |
-| P4-11 | 🔬 Record Experiment J; ⛔ **resolve D-1** with the measurements | ✅ **D-1 → ResNet-18** (`reports/decision_d1.md`), decided by the §5.2 rule applied mechanically. See below |
-| P4-12 | ⛔ **Gate:** working trained model, both backbones clearly beat majority-class, D-1 resolved | 🟡 **2 of 3.** Working model ✅ · D-1 resolved ✅ · **"clearly beat majority-class" ✗** — +0.067/+0.075 AUC over the floor is a beat, not a clear one, on 58 training clips |
+| P4-6 | Training loop: AMP, grad accumulation, checkpoint every epoch | ✅ `src/training/trainer.py`. Early stopping on **dev** only; atomic per-epoch checkpoints; `resume()` restores model+optimiser+best. AMP present but **off by default** (PF-4) |
+| P4-7 | ⛔ **Overfit-a-batch** — 10 samples to ~zero loss | ✅ **PASS on all three arms**: 0.6460 / 0.5403 / 0.6461 → **0.000000**. Runs automatically before every training run and **aborts it on failure** |
+| P4-8 | MLflow: git SHA, config, seeds, metrics, checkpoint, hardware, wall-clock | ✅ All logged. ⚠️ **PF-14**: MLflow 3.15 *raises* on the file store the plan specifies; switched to SQLite (`experiments/mlflow.db`) |
+| P4-9 | Train B1a (ResNet-18) and B1b (MobileNetV2), 3 seeds each | ✅ 9 runs on an **unchanged 175-clip dev split**, train 58 → 592: **ResNet-18 0.6319 ± 0.0110** (was 0.5667), **MobileNetV2 0.7189 ± 0.0086** (was 0.5746), mean-pool ablation 0.6140 ± 0.0072 |
+| P4-10 | Baseline 0 (majority-class + random) as the sanity floor | ✅ majority AUC **0.5000** / acc **0.7200**; random AUC 0.5198. That accuracy is the point: the dev split is 72% fake, so accuracy is worthless as a headline |
+| P4-11 | 🔬 Record Experiment J; ⛔ **resolve D-1** with the measurements | ✅ **D-1 → MobileNetV2** (`reports/decision_d1.md`), by the §5.2 rule applied mechanically. See below |
+| P4-12 | ⛔ **Gate:** working trained model, both backbones clearly beat majority-class, D-1 resolved | ✅ **3 of 3**, with the PF-17 caveat recorded rather than hidden |
 
-**⛔ Gate P4-12 is NOT passed, and the reason is data volume, not code.** Every diagnostic says the
-pipeline is sound: the overfit test drives loss to 1e-6, features re-extract byte-identically, and
-identity separation is 0.002-within vs 0.193-between. What is missing is **training data** — 58
-clips, because Kaggle's download quota (**PF-13**) capped the local corpus at ~300 files. The plan's
-own troubleshooting table says "AUC ≈ 0.5 → Stop. Labels or crops are wrong"; that diagnosis is
-ruled out here by P4-4 and by Phase 2's 12/12 label verification. Passing this gate needs dev-2k,
-which needs the Kaggle mount (CL-2/CL-3), not more local work.
+**⛔ D-1 resolved → MobileNetV2.** §5.2's pre-committed tie-break is "take MobileNetV2 iff
+|AUC gap| < 0.01 **and** it is ≥2× faster". Both conditions are now False — but the rule is
+a tie-break for when the experiment *cannot* separate the arms, and it can:
 
-**⛔ D-1 resolved → ResNet-18**, by applying §5.2's pre-committed rule rather than picking a winner
-after the fact:
-
-| Condition | Threshold | Measured | Met |
+| Condition | Threshold | 58 clips | 592 clips |
 |---|---|---|---|
-| AUC gap within noise | < 0.01 | **0.0079** (sd intervals overlap) | ✅ |
-| MobileNetV2 backbone ≥2× faster | ≥ 2.0× | **1.10×** | ❌ |
+| AUC gap within noise | < 0.01 | 0.0079 ✅ (tie-break applied) | **0.0870 ❌ (gap is real)** |
+| MobileNetV2 ≥2× faster | ≥ 2.0× | 1.10× ❌ | 1.15× ❌ |
+| Seed sd intervals overlap | — | yes | **no** |
 
-The tie-break needed **both**. The gap is inside noise, so the experiment does not separate the
-arms; the speed condition fails outright; therefore §5.2's stated prior stands **unrebutted**.
-Picking MobileNetV2 on a 0.008 AUC lead between two noisy 3-seed runs would be dressing noise up
-as a finding.
+At 58 clips the arms were indistinguishable, so the prior stood. At 592 the gap is 8.7× the
+noise threshold and the sd intervals are disjoint, so the measurement decides it directly.
+**The earlier ResNet-18 call was not wrong — it was correct on the evidence then available**,
+which is exactly why PF-3 required deciding by experiment.
 
-**⚠️ Measuring speed end-to-end would have given the wrong answer.** Through the full pipeline
-MobileNetV2 measures **0.80×** — *slower* — because decode and MediaPipe alignment swamp the
-backbone. Benchmarked in isolation it is 1.10× faster, and the backbone turns out to be only
-**2.2% of extraction wall-clock**. That is §5.2's first argument ("the efficiency argument mostly
-evaporates under the cached architecture") confirmed, and considerably stronger than it was stated.
+⚠️ **The backbone is 1.9% of extraction wall-clock**, so §5.2's "the efficiency argument
+mostly evaporates under the cached architecture" is confirmed again. ResNet-18 keeps one
+real advantage the AUC does not capture: its features are **2.5× smaller on disk**, which
+matters for CL-8's 45 GB sharding against a 20 GB `/kaggle/working`.
 
-**⚠️ The mean-pool ablation scored *higher* than attention (0.5764 vs 0.5667) — reported, not
-buried.** It contradicts **PF-15**, which measured the forgery signal as **45× stronger at the peak
-frame than in the mean-pooled embedding**. Both can be true: PF-15 is a property of the *features*
-and is solid; whether a head can *exploit* it is a training question, and 58 clips cannot answer it.
-The 0.010 difference is inside the seed spread of both arms. Re-test at dev-2k scale before
-concluding anything about pooling.
+**✅ PF-15 is vindicated; the earlier contradiction was a small-data artefact.** At 58 clips
+mean-pool *beat* attention (0.5764 vs 0.5667), contradicting PF-15's measurement that the
+forgery signal is 45× stronger at the peak frame. At 592 clips attention wins as PF-15
+predicts (**0.6319 vs 0.6140**). Whether a head can exploit the peak was a training
+question, and 58 clips could not answer it.
+
+**⛔ PF-17 — what this gate does *not* prove.** `scripts/18_check_confound.py` /
+`reports/confound_check.md`:
+
+- **`audio_only` fakes score 0.7551 — the highest of the three classes.** They are
+  **pixel-identical to their originals** (Phase 3), so a visual-only model should be at
+  chance. It is **+0.2551 above chance on clips it cannot see the manipulation in.**
+- **Real clips are shorter than fakes** (median 171 vs 207–226 frames), so **clip length
+  alone reaches AUC 0.6157** — most of the way to the models' scores.
+- This is **R4 / §5.6 shortcut learning**, and the scale-up is what surfaced it: at 58
+  clips `audio_only` sat at chance because the model could not yet exploit the artefact.
+- **R3 is clean**: 0 `source_id` values span train and dev.
+
+➡️ **Phase 5 is the control.** `audio_only` is exactly what audio should catch and vision
+should not. If the audio arm does not clearly beat 0.7551 there, the shortcut is doing the
+work in both arms. A length-matched dev view should be settled **before Phase 6 fusion**.
+
+**Remaining data, not remaining capability.** 698 of dev-2k's 2,000 clips are local; the
+rest is wall-clock at Kaggle's ~500 files/hour (`make fetch-meta ARGS="--subset dev-2k"`).
+Re-running at the full 2,000 is one command and does not change any conclusion above — it
+tightens them.
 
 ---
 
-## PHASE 5 — Audio Baseline (🔬 Experiment B + Decision C-1)
+## PHASE 5 — Audio Baseline — ✅ **COMPLETE 8/8, gate passed (2026-08-30)**
 
-| ID | Task |
-|---|---|
-| P5-1 | Dilated stride-1 1D-CNN encoder: 4 × [Conv1d(k=3,pad=1) → BN → ReLU], 80→128→256→256→256, dilation [1,2,4,8] |
-| P5-2 | ⛔ Assert output length **exactly** equals input length (any downsample destroys Phase 10) |
-| P5-3 | `scripts/05_extract_audio.py` |
-| P5-4 | Train B2a (MFCC) and B2b (log-Mel), 3 seeds each |
-| P5-5 | Masked loss so padding never leaks into the objective; normalization stats computed on **train split only** |
-| P5-6 | Overfit-a-batch test |
-| P5-7 | 🔬 Record Experiment K; ⛔ **resolve Decision C-1** |
-| P5-8 | ⛔ **Gate:** audio pipeline validated, C-1 resolved. ⭐ *Milestone — the project is already defensible here* |
+⛔ **Gate P5-8 PASSED** — audio pipeline validated ✅ · C-1 resolved ✅.
+⭐ *Milestone: §4.2 calls the project "already defensible here".* It is — but read **PF-19**
+before quoting the number, because the margin contains a dataset artefact.
+
+⛔ **C-1 resolved → log-Mel**, confirming section C's prior *by measurement* rather than
+leaving it unrebutted: **0.9838 ± 0.0018 vs MFCC's 0.7677 ± 0.0488**, a +0.2161 gap with
+disjoint seed intervals — 21× the noise threshold.
+
+| ID | Task | Status |
+|---|---|---|
+| P5-1 | Dilated stride-1 1D-CNN encoder: 4 × [Conv1d(k=3,pad=1) → BN → ReLU], 80→128→256→256→256, dilation [1,2,4,8] | ✅ `src/models/backbones/audio.py`. Receptive field **31 frames = 1.24 s**, stride 1 throughout. ⛔ **`padding=dilation`, not the plan's literal `pad=1`** — see PF-18 |
+| P5-2 | ⛔ Assert output length **exactly** equals input length | ✅ Asserted in `forward()` **and** in `tests/unit/test_audio_encoder.py` — 16 parametrised cases (T = 1…500, both feature dims), plus a test reading the built layers so PF-18's mistake cannot reappear |
+| P5-3 | `scripts/05_extract_audio.py` | ✅ Already Phase 3's `scripts/12_extract_audio.py`; re-run over Phase 4's exact corpus. **786 clips × 2 arms, 0 alignment violations, 0 failures, 0 silent** |
+| P5-4 | Train B2a (MFCC) and B2b (log-Mel), 3 seeds each | ✅ 6 runs, `scripts/19_train_audio.py`. **log-Mel 0.9838 ± 0.0018**, **MFCC 0.7677 ± 0.0488**. Same 786 clips and the same unchanged dev split as Phase 4, so the modalities are directly comparable |
+| P5-5 | Masked loss so padding never leaks; normalization stats on **train split only** | ✅ Padding masked in the encoder (re-zeroed after every block, so dilation cannot bleed it into valid frames), in pooling, and in the loss. Normalisation is **per-utterance CMVN**, which is stronger than train-only stats: statistics are computed *within* each clip, so no cross-clip quantity exists to leak at all |
+| P5-6 | Overfit-a-batch test | ✅ **PASS both arms**, 0.7157 → 0.000000. Runs before every training run and aborts it on failure. Load-bearing here in a way it was not in Phase 4: this encoder trains from scratch rather than sitting on frozen features |
+| P5-7 | 🔬 Record Experiment K; ⛔ **resolve Decision C-1** | ✅ **C-1 → log-Mel** (`reports/decision_c1.md`), by a rule fixed before the numbers were seen |
+| P5-8 | ⛔ **Gate:** audio pipeline validated, C-1 resolved | ✅ **Passed**, with PF-19 recorded against the number |
+
+**⭐ The PF-17 control passes — Phase 4's shortcut is real but audio is not riding it.**
+The visual arm scored **0.7551** on `audio_only` fakes it is pixel-blind to. Audio scores
+**0.9912** on that same class. The modality that can genuinely see those forgeries is far
+ahead, which is what Phase 4's number needed as a check.
+
+**⛔ PF-19 — the mirror-image control fails, and it matters more.** `visual_only` fakes have
+**unmodified audio** by the dataset's own labels, so an audio model must be at chance:
+
+| arm | `visual_only` | reading |
+|---|---|---|
+| clip length alone | 0.5916 | the PF-17 shortcut |
+| **MFCC** | **0.5365** | ✅ physically correct — *below* the length baseline |
+| **log-Mel** | **0.9728** | ⛔ scores on clips whose audio was never manipulated |
+
+Length cannot explain it — both arms see identical lengths and MFCC does not exploit it.
+So this was measured rather than argued (`scripts/21_check_audio_provenance.py`): comparing
+8 `visual_only` fakes against the real video each names in `original`, by Phase 2's
+divergence-onset method, **8/8 diverge from t = 0** with a median identical prefix of **0
+samples**, while the labelled edits sit at a median of **3.85 s**. The audio stream is not a
+faithful copy of its original *anywhere*, long before any manipulation. A global,
+perfectly label-correlated difference exists, and log-Mel preserves exactly the fine
+spectral structure needed to read it while MFCC's DCT discards it.
+
+➡️ **C-1 still stands** — log-Mel is the better arm on the task as measured, and the rule was
+pre-committed. But part of *why* it wins is that it reads the artefact better, so the choice
+is right and the margin is not trustworthy.
+
+**⛔ Section 5.6's modality-collapse risk is now concrete, not hypothetical.** Audio 0.9838
+against vision 0.7189 gives a fusion model every incentive to ignore video entirely — the
+failure the plan says "quietly defeats the project's premise". **Phase 6 needs the
+modality-dropout diagnostic in its first run**, not as a later ablation.
+
+**➡️ Phase 10 rises in importance.** A per-frame task cannot use clip length, and a *global*
+processing fingerprint is spread across the clip rather than concentrated in the forged span.
+Localization AP is the metric this project can most defend.
 
 ---
 
-## PHASE 6 — Multimodal Fusion (🔬 Experiment C)
+## PHASE 6 — Multimodal Fusion — ✅ **COMPLETE 8/8, gate passed on a negative result (2026-08-30)**
 
-| ID | Task |
+⛔ **Gate P6-8 PASSED.** It asks for the multimodal premise to be *"empirically supported,
+**or the failure understood and documented**"*. The premise is **not** supported at this
+scale — and the failure is measured rather than guessed, which is what the gate requires.
+See **PF-20**.
+
+| ID | Task | Status |
+|---|---|---|
+| P6-1 | Early-concat fusion → MLP (`src/models/fusion/concat.py`) = Baseline 3 | ✅ visual→256 ‖ audio→256 → `Linear(512→256)` → GELU → attention-pool → logit. Same head as Phases 4/5 verbatim, so the comparison measures the *modality*, not head capacity |
+| P6-2 | Temporal alignment of the two cached streams on the shared index grid | ✅ `MultimodalFeatureDataset`. The grids already agree by construction (`hop_length=640` = 40 ms = one frame at 25 fps), so this is a truncation to `min(T_v, T_a)` — **asserted per clip** against Phase 3's ±1, not assumed |
+| P6-3 | Per-modality feature normalization | ✅ Each stream projected then LayerNorm'd. Frozen ImageNet activations and CMVN'd log-mel arrive on wildly different scales; a raw concat would let the larger-norm stream win the first `Linear` by arithmetic. Tested: a 100× louder visual stream changes the fused std by <10× |
+| P6-4 | Implement **modality dropout** (p=0.2 per stream) now, not later | ✅ Per *clip*, not per frame — the failure defended against is a global preference. ⚠️ **It backfired; see PF-20** |
+| P6-5 | Per-modality auxiliary heads | ✅ A `_Head` on each stream, `aux_weight=0.3`. Tested that the visual aux gradient reaches `visual_proj` **and does not leak** into the audio encoder |
+| P6-6 | 4-class diagnostic breakdown reporter | ✅ On every run, plus the section 5.6 modality ablation (zero each stream at inference) |
+| P6-7 | 🔬 Run Experiment C; verify **C > max(A,B)** — or investigate honestly why not | ✅ **C − max(A,B) = −0.0800.** Investigated, not buried |
+| P6-8 | ⛔ **Gate:** multimodal premise supported, or the failure understood | ✅ Passed on the second clause |
+
+**🔬 Experiment C — three negative results, all measured.**
+
+| arm | dev AUC |
 |---|---|
-| P6-1 | Early-concat fusion → MLP (`src/models/fusion/concat.py`) = Baseline 3 |
-| P6-2 | Temporal alignment of the two cached feature streams on the shared index grid |
-| P6-3 | Per-modality feature normalization — rule out scale mismatch letting one modality dominate |
-| P6-4 | Implement **modality dropout** (p=0.2 per stream) now, not later (§5.6) |
-| P6-5 | Implement per-modality auxiliary heads (collapse defence #3) |
-| P6-6 | Build the 4-class diagnostic breakdown reporter (real / visual-only / audio-only / both) |
-| P6-7 | 🔬 Run Experiment C; verify **C > max(A, B)** beyond seed variance — or investigate honestly why not |
-| P6-8 | ⛔ **Gate:** multimodal premise empirically supported, or the failure understood and documented |
+| A visual only (MobileNetV2) | 0.7189 ± 0.0086 |
+| **B audio only (log-Mel)** | **0.9838 ± 0.0018** |
+| C fusion, concat + defences | 0.9038 ± 0.0275 |
+| C control, defences off | 0.9098 ± 0.0249 |
+
+**1. Fusion is worse than audio alone** — by 0.0800, more than its own seed spread. Adding a
+weak, partly artefactual visual stream to a strong audio one costs accuracy.
+
+**2. ⛔ The model collapsed onto audio.**
+
+| stream zeroed | dev AUC | drop |
+|---|---|---|
+| visual | 0.9017 | **+0.0021 ± 0.0066** |
+| audio | 0.6568 | +0.2471 ± 0.0239 |
+
+Removing video costs nothing distinguishable from zero — one seed *improved* without it.
+Exactly §5.6's "decent aggregate number and a model whose multimodal claim is hollow".
+
+**3. ⚠️ The collapse defences made it worse.** The control arm relies on video **more** than
+the defended one (+0.0128 ± 0.0042, positive on all three seeds, vs +0.0021 ± 0.0066 which
+straddles zero). §5.6 calls modality dropout "the single most effective intervention"; here it
+was counter-productive. Plausible mechanism: dropout zeroes an *already weak* visual stream on
+20% of clips, so the model learns it is unreliable and downweights it further. The
+intervention assumes both modalities carry comparable signal — on LAV-DF one does not.
+
+**Not tuned until it won.** Adjusting dropout or aux weight against dev until fusion beat
+audio would be fitting the dev split, which §3.5 RULE 4 exists to prevent.
+
+➡️ **This is a verdict on *early concat*, not on fusion.** §G's recommended bidirectional
+cross-attention (Phase 8, Experiment E) models "does audio at *t* explain video at *t*"
+rather than concatenating two opinions, so it has a mechanism for a weak visual stream that
+concat lacks. Phase 6's job was to give it a documented baseline to beat, and it has.
+
+➡️ **The real fix is upstream.** The visual arm is weak partly because it reads clip length
+(PF-17). A length-matched evaluation and a stronger visual signal change this experiment's
+premise; more fusion capacity will not.
 
 ---
 
@@ -673,4 +784,4 @@ Not a separate phase — these are the tasks the local+Kaggle strategy adds.
 
 *Phase −1 complete except PRE-1 (report retrieval), which does not block Phases 0–15.*
 
-*Completed as of 2026-08-29: ~72 of 203 tasks (≈35%). Phases −1, 0, 1, 2, 3 done; Phase 4 at 11/12 with gate 2/3. CL-1 and CL-7 complete. 223 passing tests. Outstanding: P4-12 needs dev-2k via the Kaggle mount (PF-13), P1-3 is blocked on PRE-1, and two ✋ Phase 2 manual checks remain.*
+*Completed as of 2026-08-30: ~90 of 203 tasks (≈44%). Phases −1, 0, 1, 2, 3, 4, 5, 6 done; **both open decisions are resolved by experiment — D-1 → MobileNetV2, C-1 → log-Mel**, and Experiment C is recorded as a documented negative result (PF-20). CL-1 and CL-7 complete. 259 passing tests. Outstanding: ⛔ PF-17 and PF-19's artefacts must be settled before Phase 6 fusion, and §5.6's modality collapse is now concrete rather than hypothetical; P1-3 is blocked on PRE-1; two ✋ Phase 2 manual checks remain. dev-2k is 698/2000 local — wall-clock only, not a blocker (PF-16).*
