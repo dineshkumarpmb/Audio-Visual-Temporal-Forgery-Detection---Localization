@@ -186,6 +186,36 @@ class AttentionFusionModel(ConcatFusionBaseline):
             out.update({k: val for k, val in cross.items() if k.endswith(tuple("0123456789"))})
         return out
 
+    def forward_fused(
+        self, fused: torch.Tensor, mask: torch.Tensor | None = None
+    ) -> dict[str, torch.Tensor]:
+        """Downstream half only: a fused `[B, T, d_model]` sequence -> logits (P9-3).
+
+        The entry point for GAN-generated samples, which are synthesised *in* the fused
+        space and so have no visual or audio stream to encode. Deliberately not a branch
+        inside `forward`: the augmentation must not be able to change the objective of any
+        arm that does not use it, and a separate method makes that structural rather than
+        conditional.
+
+        ⚠️ The auxiliary and sync terms are unavailable here by construction -- both are
+        defined on the pre-fusion streams. A generated sample therefore supervises the
+        temporal encoder and the two output heads only, which is the honest extent of what
+        feature-space augmentation can reach.
+        """
+        if self.temporal_kind == "transformer":
+            sequence = self.temporal(fused, mask)["sequence"]
+        elif self.temporal_kind == "lstm":
+            sequence = self.temporal(fused, mask)
+        else:
+            sequence = fused
+        logit, weights = self.head(sequence, mask)
+        return {
+            "logit": logit,
+            "frame_logits": self.frame_head(sequence, mask),
+            "attention": weights,
+            "sequence": sequence,
+        }
+
     @torch.no_grad()
     def sync_score(
         self,
