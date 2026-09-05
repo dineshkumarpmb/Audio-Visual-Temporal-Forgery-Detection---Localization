@@ -1,0 +1,11 @@
+{
+  "n_dev_frames": 39423,
+  "forged_frame_rate": 0.06062450853562641,
+  "chance_frame_ap": 0.060624508535626405,
+  "positional_frame_ap": 0.07438029668590157,
+  "positional_frame_auc": 0.5780227789598941,
+  "explains_threshold": 0.5,
+  "model_frame_ap": 0.9183145011368222,
+  "positional_share_of_model": 0.08099653941413634,
+  "explained_by_position": false
+}

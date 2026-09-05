@@ -1,0 +1,30 @@
+{
+  "arms": {
+    "C fusion (no temporal)": {
+      "auc_mean": 0.9038440773134652,
+      "auc_std": 0.027450958537717476
+    },
+    "D fusion + BiLSTM": {
+      "auc_mean": 0.9882842025699169,
+      "auc_std": 0.002182419061808435
+    }
+  },
+  "delta_vs_fusion": 0.08444012525645173,
+  "seed_spread": 0.027450958537717476,
+  "beats_fusion": true,
+  "isolated_from_attention": true,
+  "uncontrolled_differences": {},
+  "frame_ap_mean": 0.9183145011368222,
+  "frame_ap_std": 0.01798234909898202,
+  "frame_chance_floor": 0.06062450853562641,
+  "frame_positional_floor": 0.07438029668590157,
+  "frame_positional_share": 0.08099653941413634,
+  "drop_visual_delta": 0.001997624446604044,
+  "drop_visual_sd": 0.0021007533158777644,
+  "uses_video": false,
+  "fusion_drop_visual_delta": 0.002105604146420507,
+  "fusion_uses_video": false,
+  "collapse_tolerance": 0.01,
+  "n_seeds": 3,
+  "gate_passed": true
+}

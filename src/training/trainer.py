@@ -26,7 +26,7 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader
 
-from src.evaluation.metrics import per_class_breakdown, summary
+from src.evaluation.metrics import frame_metrics, per_class_breakdown, summary
 
 
 @dataclass
@@ -45,6 +45,13 @@ class TrainConfig:
     # P6-5: weight on the per-modality auxiliary heads. 0 keeps the Phase 4/5 objective
     # exactly as it was; the fusion runs set it.
     aux_weight: float = 0.0
+    # P7-3: weight on the per-frame head. 0 keeps Phases 4-6 unchanged; Phase 7 sets it.
+    # Phase 10 replaces this BCE term with focal loss (P10-3) and adds the boundary and
+    # sync terms -- doing that here would confound Experiment D with a loss change.
+    frame_weight: float = 0.0
+    # Frames are far more imbalanced than clips: ~5-10% of frames are forged against 73%
+    # of clips. Without this the frame head predicts "real" everywhere and looks fine.
+    frame_pos_weight: float | None = None
 
 
 @dataclass
@@ -92,12 +99,39 @@ class Trainer:
 
     # ---------------------------------------------------------------- one pass
 
-    def _forward(self, batch: dict) -> tuple[torch.Tensor, torch.Tensor]:
-        """One batch -> (loss, logits), for either a single-stream or a fused model.
+    def _frame_loss(
+        self, logits: torch.Tensor, targets: torch.Tensor, mask: torch.Tensor
+    ) -> torch.Tensor:
+        """⛔ P7-2's other half: masked BCE, so padding contributes nothing to the loss.
+
+        The plan's Phase 7 "Problems" note names padding contaminating the loss as the
+        failure to design against, and it is a quiet one — a padded frame's target is 0 and
+        its logit is ~0, so it *looks* like an easy correct prediction. Averaging over the
+        padded tensor would therefore make the loss shrink as batches got raggeder, and the
+        model would be rewarded for the batch's length mix rather than its predictions.
+
+        The mean is over valid positions only, so the loss is comparable across batches
+        regardless of how many frames were padding. `pos_weight` re-balances the ~5-10%
+        positive frame rate; unweighted, "real everywhere" is a strong local optimum.
+        """
+        pw = (
+            torch.tensor(self.cfg.frame_pos_weight, device=logits.device, dtype=logits.dtype)
+            if self.cfg.frame_pos_weight
+            else None
+        )
+        per_frame = nn.functional.binary_cross_entropy_with_logits(
+            logits, targets, reduction="none", pos_weight=pw
+        )
+        valid = mask.to(per_frame.dtype)
+        return (per_frame * valid).sum() / valid.sum().clamp(min=1.0)
+
+    def _forward(self, batch: dict) -> tuple[torch.Tensor, dict]:
+        """One batch -> (loss, model output), for a single-stream or a fused model.
 
         The two-stream branch is selected by the *batch* carrying an `audio` key, which only
         `collate_paired` produces. Phase 4 and Phase 5 batches take the original path
-        unchanged, and with `aux_weight` defaulting to 0 their objective is byte-identical.
+        unchanged, and with `aux_weight` and `frame_weight` defaulting to 0 their objective
+        is byte-identical.
         """
         mask = batch["mask"].to(self.device, non_blocking=True)
         labels = batch["label"].to(self.device, non_blocking=True)
@@ -121,7 +155,15 @@ class Trainer:
         if aux is not None and self.cfg.aux_weight:
             aux_loss = torch.stack([self.criterion(a, labels) for a in aux]).mean()
             loss = loss + self.cfg.aux_weight * aux_loss
-        return loss, logits
+
+        # P7-3: the per-frame head. Needs both a model that emits frame logits and a batch
+        # carrying targets, so a Phase 7 model evaluated on a Phase 6 loader still runs.
+        frame_logits, frames = out.get("frame_logits"), batch.get("frames")
+        if frame_logits is not None and frames is not None and self.cfg.frame_weight:
+            loss = loss + self.cfg.frame_weight * self._frame_loss(
+                frame_logits, frames.to(self.device, non_blocking=True), mask
+            )
+        return loss, out
 
     def train_epoch(self, loader: DataLoader) -> float:
         self.model.train()
@@ -151,17 +193,33 @@ class Trainer:
         self.model.eval()
         total, n = 0.0, 0
         scores, labels, classes = [], [], []
+        frame_scores, frame_targets = [], []
 
         for batch in loader:
-            loss, logits = self._forward(batch)
+            loss, out = self._forward(batch)
+            logits = out["logit"]
             total += float(loss.item()) * len(batch["label"])
             n += len(batch["label"])
             scores.append(torch.sigmoid(logits).float().cpu().numpy())
             labels.append(batch["label"].numpy())
             classes.extend(batch["class_name"])
 
+            # P7-4. Flatten to valid positions here rather than storing ragged (B, T)
+            # blocks: frame AP pools every frame in the split into one ranking, so the
+            # clip a frame came from stops mattering the moment it is masked.
+            fl, ft = out.get("frame_logits"), batch.get("frames")
+            if fl is not None and ft is not None:
+                keep = batch["mask"].cpu().numpy().ravel().astype(bool)
+                frame_scores.append(torch.sigmoid(fl).float().cpu().numpy().ravel()[keep])
+                frame_targets.append(ft.numpy().ravel()[keep])
+
         s, y = np.concatenate(scores), np.concatenate(labels)
-        return total / max(n, 1), summary(s, y), s, y, classes
+        metrics = summary(s, y)
+        if frame_scores:
+            metrics.update(
+                frame_metrics(np.concatenate(frame_scores), np.concatenate(frame_targets))
+            )
+        return total / max(n, 1), metrics, s, y, classes
 
     # ---------------------------------------------------------------- driving
 

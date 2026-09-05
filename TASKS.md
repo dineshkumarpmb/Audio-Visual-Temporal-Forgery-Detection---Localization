@@ -7,28 +7,54 @@ Legend: ⛔ = blocking gate item · ⭐ = headline capability · 🔬 = experime
 
 ---
 
-## 📍 CURRENT STATUS — 2026-08-30, Phase 6 complete · Phase 7 next
+## 📍 CURRENT STATUS — 2026-09-05, Phase 7 complete · Phase 8 in progress
 
 | | |
 |---|---|
-| **Done** | Phase −1 · Phase 0 · **P1 (18/20)** · **P2 (13/15)** · **P3 (9/9)** · **P4 (12/12)** · **P5 (8/8)** · **P6 (8/8)** · CL-1 ✅ · CL-7 ✅ |
-| **Resolved** | ⛔ **D-1 → MobileNetV2** (0.7189 vs 0.6319). ⛔ **C-1 → log-Mel** (0.9838 vs 0.7677). Both open decisions are now settled by experiment |
-| **Next** | **Phase 7 — temporal modeling** (Experiment D). ⛔ §5.6 collapse is now *measured*, not just concrete — see PF-20 |
-| **Progress** | ~90 of 203 tasks (≈44%) · **8 of 18 phases complete** |
-| **Tests** | **259 passing** — 243 unit + 16 integration against the real 136,304-entry dataset |
-| **⚠️ Caveat** | ⛔ **PF-17 / PF-19 / PF-20** — both baselines' AUCs contain dataset artefacts (clip length; a global audio processing fingerprint), and fusion **collapsed onto audio**. No bare number from Phases 4–6 may enter Part 11's evidence table |
+| **Done** | Phase −1 · Phase 0 · **P1 (18/20)** · **P2 (13/15)** · **P3 (9/9)** · **P4 (12/12)** · **P5 (8/8)** · **P6 (8/8)** · **P7 (6/6)** · CL-1 ✅ · CL-7 ✅ |
+| **Resolved** | ⛔ **D-1 → MobileNetV2** (0.7189 vs 0.6319). ⛔ **C-1 → log-Mel** (0.9838 vs 0.7677). Both open decisions settled by experiment |
+| **Next** | **Phase 8 — self-attention** (Experiment E). P8-1…P8-7 built and tested; P8-8/P8-9/P8-10 remain |
+| **Progress** | ~97 of 203 tasks (≈48%) · **9 of 18 phases complete** |
+| **Tests** | **319 passing** — 303 unit + 16 integration against the real 136,304-entry dataset |
+| **⚠️ Caveat** | ⛔ **PF-17 / PF-19 / PF-20** — the artefacts are inherited by every arm since. Phase 7's AUC 0.9883 is an **upper bound**; the trustworthy quantity is the `D − C` delta. No bare number from Phases 4–7 may enter Part 11's evidence table |
 | **✋ Awaiting you** | P2-8 (contact sheets) · ⛔ P2-10 (watch 20 overlays) — artefacts in `reports/figures/` |
 | **Kaggle** | `dinesh1234567` · phone verified · **30 GPU h/week** · P100 16 GB or T4×2 · 12 h/session · 20 GB `/kaggle/working` |
 | **Branch** | `master` |
 
-**Phases 1–6 built the data, preprocessing, and all three baselines.** `src/` holds
-`models/backbones/{visual,audio}.py`, `models/fusion/concat.py`, `models/heads/`,
-`training/{trainer,reporting}.py`, `evaluation/metrics.py` and `data/dataset.py`, driven by
-`scripts/02`–`23`. There are trained visual, audio and fused models, MLflow tracking,
-Baseline 0 floors, **both open decisions resolved by experiment** (D-1, C-1), and validity
-checks that caught three separate artefacts before they reached a headline. `api/`,
-`models/temporal/`, `models/gan/`, `losses/` and `localization/` are still stubs — Phases
-7–16 untouched.
+**Phases 1–7 built the data, preprocessing, all three baselines and the temporal model.**
+`src/` now holds `models/backbones/{visual,audio}.py`, `models/fusion/{concat,cross_attention}.py`,
+`models/temporal/{lstm,transformer}.py`, `models/heads/{classification,frame,sync}.py`,
+`losses/sync.py`, `localization/targets.py`, `training/{trainer,reporting}.py`,
+`evaluation/metrics.py` and `data/dataset.py`, driven by `scripts/02`–`26`. `api/`,
+`models/gan/` and `inference/` are still stubs — Phases 9–16 untouched apart from Phase 8's
+components, which are built but not yet run.
+
+### 🔬 Phase 7 result — Experiment D (2026-09-05)
+
+**D > C, decisively, and the gate passed.** `reports/experiment_d.md`.
+
+| arm | dev AUC | sd |
+|---|---|---|
+| C fusion (no temporal) | 0.9038 | 0.0275 |
+| **D fusion + BiLSTM** | **0.9883** | 0.0022 |
+
+`D − C = +0.0844`, well beyond the larger seed spread (0.0275). Section 5.3 predicted
+sequential memory would *lose* to global comparison; at this scale it comfortably beat early
+concat instead. Phase 8's Transformer now has a much higher bar than the plan anticipated.
+
+**P7-4 frame AP = 0.9183 ± 0.0180**, the first localization-relevant number in the project.
+⛔ It survived its validity check: a positional prior (frame index alone, fitted on train)
+scores 0.0744 against a 0.0606 chance floor and explains only **8.1%** of it
+(`scripts/26_check_frame_confound.py`, `reports/frame_confound.json`). The frame head is
+locating forgeries by content, not by clock position.
+
+**⛔ But PF-20's collapse survived the BiLSTM, and that is the finding that matters most.**
+Reliance on video went 0.0021 → **0.0020**: removing the entire visual stream costs nothing.
+Frame AP without video is 0.8986 vs 0.9012 — the *localization* is audio-driven too. Recurrence
+over an already-collapsed representation cannot un-collapse it, which is now measured rather
+than argued. `visual_only` fakes score AUC 0.9702 with the visual pathway contributing nothing;
+their audio is unmodified, so this is **PF-19's fingerprint, stronger than at Phase 6**.
+Cross-attention (P8-3) is the last untried defence — see PF-21.
 
 ### 🟢 What unblocked, and how
 
@@ -66,7 +92,8 @@ at `docs/original_report.pdf`.
 7. ✋ Watch `reports/figures/overlays/` and the contact sheets — the two things nothing
    automated can sign off (P2-8, P2-10).
 8. `make phase6` — fusion + its ⛔ **control arm** → Experiment C → P6-8.
-9. **Phase 7** — temporal modeling (Experiment D).
+9. `make phase7` — Baseline 4 + BiLSTM → ⛔ `make frame-confound` → Experiment D → P7-6 gate.
+10. **Phase 8** — `make phase8` once P8-9 exists (Experiment E).
 
 ### Risk status
 
@@ -106,7 +133,9 @@ requires re-checking at every scale-up — these scale-ups are what exposed both
 |---|---|---|
 | ⛔ PF-17 — clip-length shortcut | Part 11, Phase 6 | Settle a length-matched dev view before fusion |
 | ⛔ PF-19 — audio reads a global processing fingerprint | Part 11, Phase 6 | log-Mel scores 0.9728 on `visual_only`, whose audio is unmodified; 8/8 pairs diverge from t=0. A re-encode control would quantify it |
-| ⛔ §5.6 modality collapse — **measured** | Phases 7-8 | Fusion collapsed onto audio: zeroing video costs +0.0021 ± 0.0066 AUC. Modality dropout **backfired** (PF-20). Cross-attention (Phase 8) is the next real test |
+| ⛔ **PF-21** — §5.6 collapse survived the BiLSTM | Phase 8 | Zeroing video costs +0.0021 at C and **+0.0020 ± 0.0021** at D — recurrence over a collapsed representation cannot un-collapse it. Frame AP without video 0.8986 vs 0.9012, so **localization is audio-driven too**. Cross-attention (P8-3) is the last untried defence: its V→A *queries* come from video, so a dead visual stream cannot route attention |
+| ⛔ **PF-22** — PF-19's fingerprint is stronger at D | Phase 8, Part 11 | `visual_only` fakes score AUC **0.9702** with the visual pathway contributing nothing, and their audio is unmodified by definition. Phase 7's 0.9883 is an upper bound; the `D − C` delta is the trustworthy part |
+| **PF-23** — `average_precision` broke ties by row order | reports on disk | Fixed 2026-09-05 to resolve tie groups like `roc_auc` always has. Trained-model AP is unaffected (sigmoid outputs are never exactly tied), but the **`majority_class` Baseline-0 floor is a constant by construction**: Phases 4-6 recorded `ap 0.7383`, the correct value is **0.7200** (= the positive rate). Stale in three report JSONs; no headline moves. Mattered because a saturated frame head would have scored near-perfect frame AP |
 | PF-18 — BatchNorm sees padding | Phase 6+ | `--norm group` ablation exists, not yet measured |
 | 🔴 PRE-1 — original report missing | **P1-3, Part 9, Phase 16** | Not on this machine; drop at `docs/original_report.pdf`. The only thing keeping the P1-20 gate at 3/4 |
 | dev-2k is 698/2000 local | tighter Phase 4 numbers | Wall-clock only, ~500 files/hour. Does not change any Phase 4 conclusion |
@@ -130,8 +159,8 @@ requires re-checking at every scale-up — these scale-ups are what exposed both
 | 4 Visual baseline | 12 | ✅ **12/12** — gate 3/3; D-1 ✅ MobileNetV2; ⛔ PF-17 caveat |
 | 5 Audio baseline | 8 | ✅ **8/8** — gate passed; C-1 ✅ log-Mel; ⛔ PF-19 caveat |
 | 6 Fusion | 8 | ✅ **8/8** — gate passed on a **negative** result: C < B, collapsed onto audio (PF-20) |
-| 7 Temporal | 6 | ⬜ **Next** — 🔬 Experiment D |
-| 8 Self-attention | 10 | ⬜ Not started |
+| 7 Temporal | 6 | ✅ **6/6** — gate P7-6 passed; D − C = **+0.0844**; frame AP **0.9183** |
+| 8 Self-attention | 10 | 🟡 **7/10** — P8-1…P8-7 built + tested (⛔ P8-6 desync passes); P8-8/9/10 pending |
 | 9 Augmentation | 7 | ⬜ Not started |
 | 10 Localization ⭐ | 14 | ⬜ Not started |
 | 11 Ablations | 11 | ⬜ Not started |
@@ -553,33 +582,40 @@ premise; more fusion capacity will not.
 
 ---
 
-## PHASE 7 — Temporal Modeling (🔬 Experiment D)
+## PHASE 7 — Temporal Modeling (🔬 Experiment D) — ✅ **COMPLETE 6/6, gate passed (2026-09-05)**
 
-| ID | Task |
-|---|---|
-| P7-1 | 2-layer BiLSTM, 256 hidden (`src/models/temporal/lstm.py`) = Baseline 4 |
-| P7-2 | `pack_padded_sequence` for variable length; unit-test that **no gradient flows through padding** |
-| P7-3 | Add the **per-frame head** (`[T,256] → [T,1]`) — first localization-relevant output |
-| P7-4 | Add frame-level AP as a tracked metric |
-| P7-5 | 🔬 Run Experiment D; verify D > C |
-| P7-6 | ⛔ **Gate:** temporal contribution measured independently of attention |
+Baseline 4 = Phase 6's fusion + a 2-layer BiLSTM, reusing `ConcatFusionBaseline.encode_streams`
+verbatim so `D − C` isolates the recurrence. 3.91 M params, 3 seeds, same 786 clips and dev split.
+
+| ID | Task | Status |
+|---|---|---|
+| P7-1 | 2-layer BiLSTM, 256 hidden (`src/models/temporal/lstm.py`) = Baseline 4 | ✅ `src/models/temporal/lstm.py` — `PackedBiLSTM` 2×256 bidirectional |
+| P7-2 | `pack_padded_sequence` for variable length; unit-test that **no gradient flows through padding** | ✅ packed; asserted **two** ways — zero gradient at padded inputs, and identical output batched vs alone |
+| P7-3 | Add the **per-frame head** (`[T,256] → [T,1]`) — first localization-relevant output | ✅ `src/models/heads/frame.py` + `src/localization/targets.py` |
+| P7-4 | Add frame-level AP as a tracked metric | ✅ **0.9183 ± 0.0180**; ⛔ validity: positional prior explains only 8.1% |
+| P7-5 | 🔬 Run Experiment D; verify D > C | ✅ **D 0.9883 vs C 0.9038 → +0.0844**, beyond seed spread |
+| P7-6 | ⛔ **Gate:** temporal contribution measured independently of attention | ✅ ⛔ **GATE PASSED** — `attention: false` declared, controls match, 3 seeds |
 
 ---
 
-## PHASE 8 — Self-Attention (🔬 Experiment E)
+## PHASE 8 — Self-Attention (🔬 Experiment E) — 🟡 **7/10 built (2026-09-05)**
 
-| ID | Task |
-|---|---|
-| P8-1 | 4-layer pre-norm Transformer encoder, 4 heads, d_model=256, d_ff=512, dropout 0.1, max_T=750 |
-| P8-2 | Learned positional encoding + positional-encoding ablation |
-| P8-3 | **Upgrade fusion to bidirectional cross-attention** (2 layers, A→V and V→A, concat + project) |
-| P8-4 | Implement the sync head (component F): two 256-d projections → per-timestep cosine over ±5-frame window |
-| P8-5 | Implement auxiliary **InfoNCE sync loss** (τ=0.07), positives = aligned pairs from **real** videos, negatives = shifted ≥10 frames |
-| P8-6 | ⛔ **Desync test** — shift audio +400 ms on a real video and assert the sync score drops significantly. If not, the component is not working regardless of the loss curve |
-| P8-7 | Training stability: warmup, pre-norm, gradient clipping at 1.0; attention head-entropy check for collapse |
-| P8-8 | Attention-map visualization over the timeline (`notebooks/03_attention_viz.ipynb`) |
-| P8-9 | 🔬 Run Experiment E; verify E > D beyond seed variance; confirm attention elevates on forged spans |
-| P8-10 | ⛔ **Gate:** attention contribution measured, attention maps produced |
+⚠️ **E changes two components at once** (concat→cross-attention, BiLSTM→Transformer), so
+`AttentionFusionModel` exposes them as independent flags and P8-10 reads all four arms.
+Otherwise `E − D` would be unattributable — the failure P7-6 exists to prevent.
+
+| ID | Task | Status |
+|---|---|---|
+| P8-1 | 4-layer pre-norm Transformer encoder, 4 heads, d_model=256, d_ff=512, dropout 0.1, max_T=750 | ✅ `models/temporal/transformer.py`, pre-norm, hand-rolled to expose attention weights |
+| P8-2 | Learned positional encoding + positional-encoding ablation | ✅ learned PE + ablation, tested by permutation-equivariance |
+| P8-3 | **Upgrade fusion to bidirectional cross-attention** (2 layers, A→V and V→A, concat + project) | ✅ `models/fusion/cross_attention.py` |
+| P8-4 | Implement the sync head (component F): two 256-d projections → per-timestep cosine over ±5-frame window | ✅ `models/heads/sync.py`, max-cosine over ±5 frames |
+| P8-5 | Implement auxiliary **InfoNCE sync loss** (τ=0.07), positives = aligned pairs from **real** videos, negatives = shifted ≥10 frames | ✅ `src/losses/sync.py`, real videos only, within-clip negatives |
+| P8-6 | ⛔ **Desync test** — shift audio +400 ms on a real video and assert the sync score drops significantly. If not, the component is not working regardless of the loss curve | ✅ ⛔ **PASSES** — aligned >0.99, +400 ms desync <0.5, 3-frame nudge >0.9 |
+| P8-7 | Training stability: warmup, pre-norm, gradient clipping at 1.0; attention head-entropy check for collapse | ✅ pre-norm + grad clip 1.0; head entropy `(B, layers, heads)` free every forward |
+| P8-8 | Attention-map visualization over the timeline (`notebooks/03_attention_viz.ipynb`) | ⬜ needs a trained model |
+| P8-9 | 🔬 Run Experiment E; verify E > D beyond seed variance; confirm attention elevates on forged spans | ⬜ **next** — run Experiment E |
+| P8-10 | ⛔ **Gate:** attention contribution measured, attention maps produced | ⬜ blocked on P8-9 |
 
 ---
 
@@ -784,4 +820,10 @@ Not a separate phase — these are the tasks the local+Kaggle strategy adds.
 
 *Phase −1 complete except PRE-1 (report retrieval), which does not block Phases 0–15.*
 
-*Completed as of 2026-08-30: ~90 of 203 tasks (≈44%). Phases −1, 0, 1, 2, 3, 4, 5, 6 done; **both open decisions are resolved by experiment — D-1 → MobileNetV2, C-1 → log-Mel**, and Experiment C is recorded as a documented negative result (PF-20). CL-1 and CL-7 complete. 259 passing tests. Outstanding: ⛔ PF-17 and PF-19's artefacts must be settled before Phase 6 fusion, and §5.6's modality collapse is now concrete rather than hypothetical; P1-3 is blocked on PRE-1; two ✋ Phase 2 manual checks remain. dev-2k is 698/2000 local — wall-clock only, not a blocker (PF-16).*
+*Completed as of 2026-09-05: ~97 of 203 tasks (≈48%). Phases −1, 0, 1, 2, 3, 4, 5, 6, 7 done; Phase 8
+is 7/10 built. **D-1 → MobileNetV2, C-1 → log-Mel**, Experiment C is a documented negative result
+(PF-20) and **Experiment D a decisive positive one** (+0.0844, gate P7-6 passed) whose frame AP
+survived its own confound check (position explains 8.1%). CL-1 and CL-7 complete. 319 passing tests.
+Outstanding: ⛔ PF-17/PF-19/PF-21/PF-22 — the collapse and the audio fingerprint both **survived the
+BiLSTM**, so no Phase 4–7 absolute number may enter Part 11's evidence table; only deltas may. P1-3 is
+blocked on PRE-1; two ✋ Phase 2 manual checks remain. dev-2k is 698/2000 local (PF-16).*

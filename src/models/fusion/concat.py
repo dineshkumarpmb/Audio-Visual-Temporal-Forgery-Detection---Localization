@@ -124,7 +124,7 @@ class ConcatFusionBaseline(nn.Module):
         keep_a = (torch.rand(batch, 1, 1, device=device) >= self.modality_dropout).float()
         return keep_v, keep_a
 
-    def forward(
+    def encode_streams(
         self,
         visual: torch.Tensor,
         audio: torch.Tensor,
@@ -134,7 +134,14 @@ class ConcatFusionBaseline(nn.Module):
         drop_visual: bool = False,
         drop_audio: bool = False,
     ) -> dict[str, torch.Tensor]:
-        """`visual` is `(B, T, Dv)`, `audio` is `(B, T, Da)`, masks are `(B, T)`.
+        """The two streams, encoded to `(B, T, 256)` each — **everything before fusion**.
+
+        This is the seam every later phase builds on, and the reason the experiment ladder
+        stays interpretable. C concatenates these streams, D concatenates then runs a
+        BiLSTM, E cross-attends between them — but all three embed the streams with *these
+        exact* projections, normalisations, modality dropout and face masking. Each
+        experiment therefore differs from the last by one component, which is what makes
+        `D - C` and `E - D` attributable rather than merely observed.
 
         `drop_visual` / `drop_audio` zero a stream at *inference*, which is section 5.6's
         collapse probe: "zero out the audio stream at inference; if performance barely
@@ -166,12 +173,43 @@ class ConcatFusionBaseline(nn.Module):
             keep_a = torch.zeros_like(keep_a)
         v, a = v * keep_v, a * keep_a
 
-        fused = self.fuse(torch.cat([v, a], dim=-1))
+        visual_mask = mask if face is None else (mask & face if mask is not None else face)
+        return {"visual": v, "audio": a, "visual_mask": visual_mask}
+
+    def encode(
+        self,
+        visual: torch.Tensor,
+        audio: torch.Tensor,
+        mask: torch.Tensor | None = None,
+        face: torch.Tensor | None = None,
+        *,
+        drop_visual: bool = False,
+        drop_audio: bool = False,
+    ) -> dict[str, torch.Tensor]:
+        """`encode_streams` plus Baseline 3's early concat: adds `fused` `(B, T, 256)`."""
+        enc = self.encode_streams(
+            visual, audio, mask, face, drop_visual=drop_visual, drop_audio=drop_audio
+        )
+        enc["fused"] = self.fuse(torch.cat([enc["visual"], enc["audio"]], dim=-1))
+        return enc
+
+    def forward(
+        self,
+        visual: torch.Tensor,
+        audio: torch.Tensor,
+        mask: torch.Tensor | None = None,
+        face: torch.Tensor | None = None,
+        *,
+        drop_visual: bool = False,
+        drop_audio: bool = False,
+    ) -> dict[str, torch.Tensor]:
+        """`visual` is `(B, T, Dv)`, `audio` is `(B, T, Da)`, masks are `(B, T)`."""
+        enc = self.encode(visual, audio, mask, face, drop_visual=drop_visual, drop_audio=drop_audio)
+        fused = enc["fused"]
         logit, weights = self.head(fused, mask)
 
-        visual_mask = mask if face is None else (mask & face if mask is not None else face)
-        aux_visual, _ = self.visual_head(v, visual_mask)
-        aux_audio, _ = self.audio_head(a, mask)
+        aux_visual, _ = self.visual_head(enc["visual"], enc["visual_mask"])
+        aux_audio, _ = self.audio_head(enc["audio"], mask)
 
         return {
             "logit": logit,

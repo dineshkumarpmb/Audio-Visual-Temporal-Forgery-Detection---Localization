@@ -28,6 +28,7 @@ import torch
 from torch.utils.data import Dataset
 
 from src.config import AudioPreprocessConfig, VisualFeatureConfig, config_hash
+from src.localization.targets import frame_targets
 
 
 @dataclass(frozen=True)
@@ -186,6 +187,7 @@ class PairedSample:
     label: int
     class_name: str
     split: str
+    frames: np.ndarray | None = None  # (T,) float32 per-frame target, Phase 7 onward
 
 
 class MultimodalFeatureDataset(Dataset):
@@ -205,6 +207,11 @@ class MultimodalFeatureDataset(Dataset):
     * `mask` — the frame exists (padding only). Drives fusion pooling and the audio stream.
     * `face` — the visual features are trustworthy. Drives the visual stream, whose features
       are zeroed where it is False so held-over geometry never reaches the concat.
+
+    **`with_frames` adds the per-frame target** (Phase 7 onward). Off by default so Phase 6
+    batches stay byte-identical, and built *after* the common-grid truncation so the target
+    always has exactly as many entries as the features it labels — see
+    `src.localization.targets`.
     """
 
     def __init__(
@@ -218,6 +225,7 @@ class MultimodalFeatureDataset(Dataset):
         *,
         max_frames: int | None = None,
         align_tolerance: int = 1,
+        with_frames: bool = False,
     ) -> None:
         self.visual_cfg = visual_cfg
         self.audio_cfg = audio_cfg
@@ -225,6 +233,7 @@ class MultimodalFeatureDataset(Dataset):
         self.audio_root = Path(audio_root) / config_hash(audio_cfg)
         self.max_frames = max_frames
         self.align_tolerance = align_tolerance
+        self.with_frames = with_frames
 
         available = [
             v
@@ -244,6 +253,20 @@ class MultimodalFeatureDataset(Dataset):
         self.labels = rows["label"].to_numpy(dtype=np.int64)
         self.class_names = rows["class_name"].tolist()
         self.splits = rows["split"].tolist()
+        # Only read when asked for. `fake_periods` and `fps` are not part of the minimal
+        # manifest Phases 4-6 need, and requiring them unconditionally would break every
+        # caller that builds a manifest with just labels and splits.
+        self.fake_periods: list = []
+        self.fps = np.empty(0)
+        if with_frames:
+            missing_cols = {"fake_periods", "fps"} - set(rows.columns)
+            if missing_cols:
+                raise KeyError(
+                    f"with_frames=True needs {sorted(missing_cols)} in the manifest; "
+                    "per-frame targets cannot be built without the labelled spans"
+                )
+            self.fake_periods = rows["fake_periods"].tolist()
+            self.fps = rows["fps"].to_numpy(dtype=np.float64)
 
     def __len__(self) -> int:
         return len(self.video_ids)
@@ -271,6 +294,15 @@ class MultimodalFeatureDataset(Dataset):
         # Held-over geometry is not evidence. Zero it so it cannot reach the concat.
         visual = visual * face[:, None]
 
+        # ⛔ Built on `t`, the post-truncation length, not on the manifest's `n_frames`.
+        # The two differ whenever the audio and visual grids disagree by a frame, and a
+        # target array one longer than its features misaligns every frame after the gap.
+        frames = (
+            frame_targets(self.fake_periods[idx], t, float(self.fps[idx]))
+            if self.with_frames
+            else None
+        )
+
         return PairedSample(
             vid,
             visual,
@@ -280,6 +312,7 @@ class MultimodalFeatureDataset(Dataset):
             int(self.labels[idx]),
             self.class_names[idx],
             self.splits[idx],
+            frames,
         )
 
     @property
@@ -311,7 +344,7 @@ def collate_paired(batch: list[PairedSample]) -> dict[str, torch.Tensor | list[s
         mask[i, :t] = torch.from_numpy(s.mask)
         face[i, :t] = torch.from_numpy(s.face)
 
-    return {
+    out = {
         "features": visual,  # keeps the Trainer's single-stream contract working
         "audio": audio,
         "mask": mask,
@@ -320,6 +353,16 @@ def collate_paired(batch: list[PairedSample]) -> dict[str, torch.Tensor | list[s
         "video_id": [s.video_id for s in batch],
         "class_name": [s.class_name for s in batch],
     }
+
+    # Per-frame targets ride along only when the dataset was asked for them, so the key's
+    # presence is what switches the Trainer's frame loss on -- the same "the batch decides"
+    # contract that lets `audio` select the two-stream path.
+    if batch[0].frames is not None:
+        frames = torch.zeros(len(batch), max_t, dtype=torch.float32)
+        for i, s in enumerate(batch):
+            frames[i, : len(s.frames)] = torch.from_numpy(s.frames)
+        out["frames"] = frames  # padding stays 0 and is masked out of the loss anyway
+    return out
 
 
 def collate(batch: list[Sample]) -> dict[str, torch.Tensor | list[str]]:

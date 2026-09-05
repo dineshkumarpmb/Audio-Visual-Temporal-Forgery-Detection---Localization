@@ -1,0 +1,145 @@
+{
+  "seed": 1339,
+  "temporal": "bilstm",
+  "attention": false,
+  "lstm_hidden": 256,
+  "lstm_layers": 2,
+  "backbone": "mobilenet_v2",
+  "feature": "logmel",
+  "defences": true,
+  "modality_dropout": 0.2,
+  "aux_weight": 0.3,
+  "frame_weight": 1.0,
+  "frame_pos_weight": 14.566975969545565,
+  "git_sha": "12f72fe0d129",
+  "n_params": 3913351,
+  "epochs_run": 24,
+  "best_epoch": 13,
+  "wall_clock_s": 917.98,
+  "n_clips_train": 592,
+  "dev": {
+    "loss": 0.3907524177006313,
+    "auc": 0.9912536443148688,
+    "ap": 0.9970436016414805,
+    "accuracy": 0.9771428571428571,
+    "eer": 0.022108843537414963,
+    "precision": 1.0,
+    "recall": 0.9682539682539683,
+    "f1": 0.9838709677419354,
+    "n": 175,
+    "positive_rate": 0.72,
+    "frame_ap": 0.9106262300301804,
+    "frame_auc": 0.9885382448109438,
+    "n_frames": 39423,
+    "frame_positive_rate": 0.06062450853562641,
+    "per_class": {
+      "visual_only": {
+        "n_fake": 37,
+        "auc": 0.9702151130722559,
+        "recall": 0.8918918918918919
+      },
+      "audio_only": {
+        "n_fake": 45,
+        "auc": 1.0,
+        "recall": 1.0
+      },
+      "both": {
+        "n_fake": 44,
+        "auc": 1.0,
+        "recall": 1.0
+      },
+      "real": {
+        "n": 49,
+        "specificity": 1.0
+      }
+    }
+  },
+  "dev_drop_visual": {
+    "auc": 0.9878522837706512,
+    "ap": 0.9961303391565598,
+    "accuracy": 0.9657142857142857,
+    "eer": 0.03628117913832199,
+    "precision": 0.9838709677419355,
+    "recall": 0.9682539682539683,
+    "f1": 0.976,
+    "n": 175,
+    "positive_rate": 0.72,
+    "per_class": {
+      "visual_only": {
+        "n_fake": 37,
+        "auc": 0.9586321014892444,
+        "recall": 0.8918918918918919
+      },
+      "audio_only": {
+        "n_fake": 45,
+        "auc": 1.0,
+        "recall": 1.0
+      },
+      "both": {
+        "n_fake": 44,
+        "auc": 1.0,
+        "recall": 1.0
+      },
+      "real": {
+        "n": 49,
+        "specificity": 0.9591836734693877
+      }
+    },
+    "frame_ap": 0.9184318859113894,
+    "frame_auc": 0.9890260885716878,
+    "n_frames": 39423,
+    "frame_positive_rate": 0.06062450853562641
+  },
+  "dev_drop_audio": {
+    "auc": 0.626012309685779,
+    "ap": 0.7980279711072573,
+    "accuracy": 0.72,
+    "eer": 0.4064625850340136,
+    "precision": 0.72,
+    "recall": 1.0,
+    "f1": 0.8372093023255813,
+    "n": 175,
+    "positive_rate": 0.72,
+    "per_class": {
+      "visual_only": {
+        "n_fake": 37,
+        "auc": 0.6304467733039162,
+        "recall": 1.0
+      },
+      "audio_only": {
+        "n_fake": 45,
+        "auc": 0.6276643990929706,
+        "recall": 1.0
+      },
+      "both": {
+        "n_fake": 44,
+        "auc": 0.6205936920222634,
+        "recall": 1.0
+      },
+      "real": {
+        "n": 49,
+        "specificity": 0.0
+      }
+    },
+    "frame_ap": 0.08078783562586851,
+    "frame_auc": 0.6135818534345767,
+    "n_frames": 39423,
+    "frame_positive_rate": 0.06062450853562641
+  },
+  "train_config": {
+    "epochs": 40,
+    "lr": 0.001,
+    "weight_decay": 0.0001,
+    "batch_size": 32,
+    "grad_accum": 1,
+    "pos_weight": 0.3799533799533799,
+    "patience": 10,
+    "amp": false,
+    "grad_clip": 1.0,
+    "seed": 1339,
+    "num_workers": 0,
+    "aux_weight": 0.3,
+    "frame_weight": 1.0,
+    "frame_pos_weight": 14.566975969545565
+  }
+}

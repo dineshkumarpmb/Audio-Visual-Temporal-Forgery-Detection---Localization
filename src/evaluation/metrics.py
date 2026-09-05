@@ -59,16 +59,38 @@ def roc_auc(scores: np.ndarray, labels: np.ndarray) -> float:
 
 
 def average_precision(scores: np.ndarray, labels: np.ndarray) -> float:
-    """Area under the precision-recall curve (step interpolation)."""
+    """Area under the precision-recall curve (step interpolation).
+
+    **Tied scores are resolved as a group, not by input order** — the same discipline
+    `roc_auc` applies via average ranks. Ranking tied items arbitrarily lets a model that
+    emits one constant value score anywhere from 0 to 1 depending only on how the rows
+    happened to be sorted; resolving the group to the precision at its end gives it exactly
+    the positive rate, which is the correct AP for a scorer that has ranked nothing.
+
+    That mattered little at clip level, where sigmoid outputs are never exactly equal —
+    but it made the `majority_class` floor (a constant by construction) report 0.7383
+    instead of its true 0.7200 on the Phase 4-6 dev split. At **frame** level it matters a
+    great deal: a saturated frame head is the specific degenerate mode `frame_pos_weight`
+    defends against, and under order-dependent ties it would score near-perfect AP.
+    """
     scores, labels = _check(scores, labels)
     n_pos = int(labels.sum())
     if n_pos == 0:
         return float("nan")
 
     order = np.argsort(-scores, kind="mergesort")
-    hits = labels[order]
+    ranked, hits = scores[order], labels[order]
     tp = np.cumsum(hits)
     precision = tp / np.arange(1, len(hits) + 1)
+
+    # Every position takes the precision at the end of its tie group, so all items sharing
+    # a score are credited identically regardless of where sorting happened to place them.
+    group_end = np.empty(len(ranked), dtype=bool)
+    group_end[-1] = True
+    group_end[:-1] = ranked[:-1] != ranked[1:]
+    ends = np.flatnonzero(group_end)
+    precision = precision[ends][np.searchsorted(ends, np.arange(len(ranked)))]
+
     return float((precision * hits).sum() / n_pos)
 
 
@@ -113,6 +135,58 @@ def summary(scores: np.ndarray, labels: np.ndarray, threshold: float = 0.5) -> d
         "f1": 2 * precision * recall / (precision + recall) if precision + recall else 0.0,
         "n": int(labels.size),
         "positive_rate": float(labels.mean()),
+    }
+
+
+def frame_metrics(
+    scores: np.ndarray, targets: np.ndarray, mask: np.ndarray | None = None
+) -> dict[str, float]:
+    """P7-4: frame-level AP — the first localization-relevant metric in the project.
+
+    Every valid frame in the split is one sample, pooled across clips: `(B, T)` scores
+    against `(B, T)` targets from `src.localization.targets`, keeping only positions where
+    `mask` is True. Padded positions are dropped rather than scored, because a padded frame
+    is trivially "real" and including them would inflate AP by adding free true negatives
+    in proportion to how ragged the batch happened to be.
+
+    **AP rather than AUC is the headline here, and the imbalance is why.** The median
+    forged span is ~16 frames against clips averaging ~200 (P1-11), so roughly 5-10% of
+    frames are positive — an ROC curve is dominated by the vast negative majority and looks
+    good for a model that has found nothing. AP is computed against the positive class
+    only. AUC is reported alongside for continuity with the clip-level tables, not to be
+    judged on.
+
+    ⚠️ This is *frame* AP, not the *interval* AP@IoU that Phase 10's gate requires (P10-7).
+    They are different quantities: this one never forms a segment, so it cannot punish a
+    prediction that is right about which frames are forged and wrong about where the
+    boundaries fall. It is the cheap tracked metric Phase 7 asks for, not the headline
+    localization number.
+    """
+    scores = np.asarray(scores, dtype=np.float64).ravel()
+    targets = np.asarray(targets, dtype=np.float64).ravel()
+    if scores.shape != targets.shape:
+        raise ValueError(f"shape mismatch: {scores.shape} scores vs {targets.shape} targets")
+    if mask is not None:
+        keep = np.asarray(mask).ravel().astype(bool)
+        if keep.shape != scores.shape:
+            raise ValueError(f"mask shape {keep.shape} != scores {scores.shape}")
+        scores, targets = scores[keep], targets[keep]
+
+    labels = (targets > 0.5).astype(np.int64)
+    if labels.size == 0:
+        return {
+            "frame_ap": float("nan"),
+            "frame_auc": float("nan"),
+            "n_frames": 0,
+            "frame_positive_rate": float("nan"),
+        }
+
+    n_pos = int(labels.sum())
+    return {
+        "frame_ap": average_precision(scores, labels) if n_pos else float("nan"),
+        "frame_auc": roc_auc(scores, labels),
+        "n_frames": int(labels.size),
+        "frame_positive_rate": float(labels.mean()),
     }
 
 

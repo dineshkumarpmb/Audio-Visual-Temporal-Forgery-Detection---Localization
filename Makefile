@@ -245,6 +245,26 @@ phase6:     ## Phase 6 - fusion baseline, its control arm, then Experiment C
 	$(MAKE) experiment-c
 	$(PY) -m pytest tests/ -q
 
+train-temporal: ## Phase 7 - train Baseline 4, fusion + BiLSTM (ARGS=--frame-weight 0)
+	$(PY) scripts/24_train_temporal.py $(ARGS)
+
+frame-confound: ## Phase 7 - P7-4 validity: does frame index alone explain frame AP?
+	$(PY) scripts/26_check_frame_confound.py
+
+experiment-d: ## Phase 7 - Experiment D and the P7-6 gate
+	$(PY) scripts/25_experiment_d.py
+
+phase7:     ## Phase 7 - temporal baseline, then Experiment D
+# ⛔ The gradient check first. A BiLSTM that cannot fit 10 samples is broken in a way no
+# amount of real training will localise -- and packing bugs live exactly here.
+	$(PY) scripts/24_train_temporal.py --overfit-only
+	$(PY) scripts/24_train_temporal.py --seeds 3
+# ⛔ Before the gate reads the frame AP, measure what frame position alone scores. PF-17 and
+# PF-19 are what happens when a headline is quoted without its shortcut floor.
+	$(MAKE) frame-confound
+	$(MAKE) experiment-d
+	$(PY) -m pytest tests/ -q
+
 features:   ## Phases 2-5 — Stage-A extraction (resumable; safe to re-run)
 	$(PY) scripts/04_extract_visual.py
 	$(PY) scripts/05_extract_audio.py
