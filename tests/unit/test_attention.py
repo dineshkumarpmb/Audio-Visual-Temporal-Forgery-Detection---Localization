@@ -117,11 +117,18 @@ def test_attention_entropy_bounds_are_hand_checked() -> None:
     assert attention_entropy(onehot, torch.ones(1, t, dtype=torch.bool)).abs().max() < 1e-4
 
 
-def test_head_entropy_is_reported_every_forward() -> None:
-    """It must be free, or it will not be checked — and an unchecked head collapses quietly."""
+def test_head_entropy_is_opt_in_and_off_by_default() -> None:
+    """⛔ The default path must not ask for attention weights.
+
+    `need_weights=True` both materialises a (B, heads, T, T) tensor and disables PyTorch's
+    fused attention kernel. At this subset's real clip lengths (max T=497) that OOM'd the
+    4 GB card on the first Experiment E run, so the training path must stay off it.
+    """
     enc = TransformerTemporalEncoder(D, n_layers=3, n_heads=4).eval()
     x, mask = _masked([40, 25])
-    ent = enc(x, mask)["head_entropy"]
+    assert "head_entropy" not in enc(x, mask)
+
+    ent = enc(x, mask, compute_entropy=True)["head_entropy"]
     assert ent.shape == (2, 3, 4)  # (B, layers, heads)
     assert ((ent >= 0) & (ent <= 1.05)).all()
 
@@ -138,7 +145,7 @@ def test_fully_masked_row_does_not_nan_the_batch() -> None:
     enc = TransformerTemporalEncoder(D, n_layers=2, n_heads=4).eval()
     x, mask = _masked([30, 30])
     mask[1] = False
-    out = enc(x, mask)
+    out = enc(x, mask, compute_entropy=True)
     assert torch.isfinite(out["sequence"]).all()
     assert torch.isfinite(out["head_entropy"]).all()
 
@@ -304,6 +311,10 @@ def _inputs(t: int = T):
     return torch.randn(B, t, VD), torch.randn(B, t, AD), torch.ones(B, t, dtype=torch.bool)
 
 
+def model_entropy_shape():
+    return _model().eval()(*_inputs(), compute_entropy=True)["head_entropy"].shape
+
+
 def test_experiment_e_output_contract() -> None:
     """Phase 6 and 7 keys survive, so Trainer and the ablation probe work unmodified."""
     out = _model().eval()(*_inputs())
@@ -311,7 +322,8 @@ def test_experiment_e_output_contract() -> None:
     assert out["frame_logits"].shape == (B, T)
     assert out["sync"].shape == (B, T)
     assert out["aux_logits"].shape == (2, B)
-    assert out["head_entropy"].shape == (B, 2, 4)
+    assert "head_entropy" not in out, "the default path must not materialise attention weights"
+    assert model_entropy_shape() == (B, 2, 4)
 
 
 @pytest.mark.parametrize(

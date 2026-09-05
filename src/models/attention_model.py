@@ -126,6 +126,7 @@ class AttentionFusionModel(ConcatFusionBaseline):
         drop_visual: bool = False,
         drop_audio: bool = False,
         return_attention: bool = False,
+        compute_entropy: bool = False,
     ) -> dict[str, torch.Tensor]:
         enc = self.encode_streams(
             visual, audio, mask, face, drop_visual=drop_visual, drop_audio=drop_audio
@@ -143,9 +144,11 @@ class AttentionFusionModel(ConcatFusionBaseline):
             fused = self.fuse(torch.cat([v, a], dim=-1))
 
         if self.temporal_kind == "transformer":
-            temporal = self.temporal(fused, mask, return_attention=return_attention)
+            temporal = self.temporal(
+                fused, mask, return_attention=return_attention, compute_entropy=compute_entropy
+            )
             sequence = temporal["sequence"]
-            head_entropy = temporal["head_entropy"]
+            head_entropy = temporal.get("head_entropy")
             maps = temporal.get("attention_maps")
         elif self.temporal_kind == "lstm":
             sequence = self.temporal(fused, mask)

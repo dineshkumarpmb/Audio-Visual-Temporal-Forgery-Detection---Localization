@@ -7,14 +7,14 @@ Legend: ⛔ = blocking gate item · ⭐ = headline capability · 🔬 = experime
 
 ---
 
-## 📍 CURRENT STATUS — 2026-09-05, Phase 7 complete · Phase 8 in progress
+## 📍 CURRENT STATUS — 2026-09-05, Phase 8 complete · Phase 9 next
 
 | | |
 |---|---|
-| **Done** | Phase −1 · Phase 0 · **P1 (18/20)** · **P2 (13/15)** · **P3 (9/9)** · **P4 (12/12)** · **P5 (8/8)** · **P6 (8/8)** · **P7 (6/6)** · CL-1 ✅ · CL-7 ✅ |
+| **Done** | Phase −1 · Phase 0 · **P1 (18/20)** · **P2 (13/15)** · **P3 (9/9)** · **P4 (12/12)** · **P5 (8/8)** · **P6 (8/8)** · **P7 (6/6)** · **P8 (10/10)** · CL-1 ✅ · CL-7 ✅ |
 | **Resolved** | ⛔ **D-1 → MobileNetV2** (0.7189 vs 0.6319). ⛔ **C-1 → log-Mel** (0.9838 vs 0.7677). Both open decisions settled by experiment |
-| **Next** | **Phase 8 — self-attention** (Experiment E). P8-1…P8-7 built and tested; P8-8/P8-9/P8-10 remain |
-| **Progress** | ~97 of 203 tasks (≈48%) · **9 of 18 phases complete** |
+| **Next** | **Phase 9 — augmentation** (Experiments F0/F1/F2). Splicing first, then classical, then the feature-space GAN |
+| **Progress** | ~100 of 203 tasks (≈49%) · **10 of 18 phases complete** |
 | **Tests** | **319 passing** — 303 unit + 16 integration against the real 136,304-entry dataset |
 | **⚠️ Caveat** | ⛔ **PF-17 / PF-19 / PF-20** — the artefacts are inherited by every arm since. Phase 7's AUC 0.9883 is an **upper bound**; the trustworthy quantity is the `D − C` delta. No bare number from Phases 4–7 may enter Part 11's evidence table |
 | **✋ Awaiting you** | P2-8 (contact sheets) · ⛔ P2-10 (watch 20 overlays) — artefacts in `reports/figures/` |
@@ -27,7 +27,7 @@ Legend: ⛔ = blocking gate item · ⭐ = headline capability · 🔬 = experime
 `losses/sync.py`, `localization/targets.py`, `training/{trainer,reporting}.py`,
 `evaluation/metrics.py` and `data/dataset.py`, driven by `scripts/02`–`26`. `api/`,
 `models/gan/` and `inference/` are still stubs — Phases 9–16 untouched apart from Phase 8's
-components, which are built but not yet run.
+components, which are now built **and run**.
 
 ### 🔬 Phase 7 result — Experiment D (2026-09-05)
 
@@ -55,6 +55,43 @@ over an already-collapsed representation cannot un-collapse it, which is now mea
 than argued. `visual_only` fakes score AUC 0.9702 with the visual pathway contributing nothing;
 their audio is unmodified, so this is **PF-19's fingerprint, stronger than at Phase 6**.
 Cross-attention (P8-3) is the last untried defence — see PF-21.
+
+### 🔬 Phase 8 result — Experiment E (2026-09-05)
+
+**E > D (+0.0045), but attention did not earn it.** `reports/experiment_e.md`, gate P8-10 passed.
+
+| arm | dev AUC | sd | frame AP | lift | −visual |
+|---|---|---|---|---|---|
+| D (Phase 7, no sync) | 0.9883 | 0.0022 | 0.9183 | — | +0.0020 |
+| D + sync loss | 0.9922 | 0.0018 | 0.9022 | 56.46× | +0.0028 |
+| + cross-attention | 0.9920 | 0.0048 | 0.8847 | 53.17× | +0.0010 |
+| + self-attention | 0.9917 | 0.0038 | 0.8613 | 25.84× | +0.0056 |
+| **E full (§5.1 model)** | **0.9928** | 0.0011 | 0.8998 | 0.06× | +0.0010 |
+
+⛔ **The decomposition is the point.** Measured against `D + sync` so the sync loss is held
+constant: sync loss **+0.0039**, cross-attention **−0.0002**, self-attention **−0.0005**, both
+together +0.0005. Seed spread is 0.0022, so every attention term is **below seed variance and
+not significant** (§7.3 criterion 1). `E − D` is real; it is P8-5's InfoNCE sync loss, not
+P8-1's Transformer or P8-3's cross-attention. Section 5.3 predicted global comparison would
+beat sequential memory — at this scale it did not.
+
+⛔ **P8-9's "attention elevates on forged spans" is seed-dependent.** Lift per seed is
+0.06, 0.06, **59.17** — runs identical but for the seed, within 0.003 dev AUC, split between
+attention that sits almost entirely on the forged span and attention that almost entirely
+avoids it. Whether attention finds the forgery is **decoupled from classification
+performance**, so no single attention figure represents the architecture. Median quoted; the
+mean describes none of the runs. Frame AP also *fell* at every attention arm (0.9183 → 0.8613–0.8998).
+
+⛔ **PF-21 is answered, negatively.** No arm broke the §5.6 collapse — every configuration
+still loses ≈nothing when the visual stream is zeroed (+0.0010 to +0.0056, all under the 0.01
+threshold). The project has now tried modality dropout, auxiliary heads, recurrence,
+cross-attention and self-attention. **This is a dataset finding, not an architecture one**: on
+LAV-DF at this scale the audio pathway is so much easier that no architectural encouragement
+makes the visual pathway worth using. Belongs in limitations; PF-19's processing fingerprint
+is the leading explanation.
+
+The sync head passes its desync unit test (P8-6) but **does not separate real from fake at
+clip level** (−0.0016) — it helps as a training signal, not as a detector.
 
 ### 🟢 What unblocked, and how
 
@@ -93,7 +130,8 @@ at `docs/original_report.pdf`.
    automated can sign off (P2-8, P2-10).
 8. `make phase6` — fusion + its ⛔ **control arm** → Experiment C → P6-8.
 9. `make phase7` — Baseline 4 + BiLSTM → ⛔ `make frame-confound` → Experiment D → P7-6 gate.
-10. **Phase 8** — `make phase8` once P8-9 exists (Experiment E).
+10. **Phase 8** — `scripts/27_train_attention.py` (4 arms x 3 seeds) → `scripts/29_attention_maps.py`
+    → `scripts/28_experiment_e.py` for Experiment E and the ⛔ P8-10 gate.
 
 ### Risk status
 
@@ -133,7 +171,7 @@ requires re-checking at every scale-up — these scale-ups are what exposed both
 |---|---|---|
 | ⛔ PF-17 — clip-length shortcut | Part 11, Phase 6 | Settle a length-matched dev view before fusion |
 | ⛔ PF-19 — audio reads a global processing fingerprint | Part 11, Phase 6 | log-Mel scores 0.9728 on `visual_only`, whose audio is unmodified; 8/8 pairs diverge from t=0. A re-encode control would quantify it |
-| ⛔ **PF-21** — §5.6 collapse survived the BiLSTM | Phase 8 | Zeroing video costs +0.0021 at C and **+0.0020 ± 0.0021** at D — recurrence over a collapsed representation cannot un-collapse it. Frame AP without video 0.8986 vs 0.9012, so **localization is audio-driven too**. Cross-attention (P8-3) is the last untried defence: its V→A *queries* come from video, so a dead visual stream cannot route attention |
+| ⛔ **PF-21** — §5.6 collapse survived the BiLSTM, **and Phase 8** | Part 11 limitations | **ANSWERED 2026-09-05, negatively.** Cross-attention was the last untried defence and it failed too: zeroing video costs +0.0028 (sync), **+0.0010 (cross)**, +0.0056 (self), +0.0010 (E full) — all under the 0.01 threshold. Modality dropout, auxiliary heads, recurrence, cross-attention and self-attention have now all been tried. **A dataset finding, not an architecture one** — on LAV-DF at this scale the audio pathway is too easy for the visual one to be worth using. Goes in limitations; PF-19 is the leading explanation |
 | ⛔ **PF-22** — PF-19's fingerprint is stronger at D | Phase 8, Part 11 | `visual_only` fakes score AUC **0.9702** with the visual pathway contributing nothing, and their audio is unmodified by definition. Phase 7's 0.9883 is an upper bound; the `D − C` delta is the trustworthy part |
 | **PF-23** — `average_precision` broke ties by row order | reports on disk | Fixed 2026-09-05 to resolve tie groups like `roc_auc` always has. Trained-model AP is unaffected (sigmoid outputs are never exactly tied), but the **`majority_class` Baseline-0 floor is a constant by construction**: Phases 4-6 recorded `ap 0.7383`, the correct value is **0.7200** (= the positive rate). Stale in three report JSONs; no headline moves. Mattered because a saturated frame head would have scored near-perfect frame AP |
 | PF-18 — BatchNorm sees padding | Phase 6+ | `--norm group` ablation exists, not yet measured |
@@ -598,7 +636,7 @@ verbatim so `D − C` isolates the recurrence. 3.91 M params, 3 seeds, same 786 
 
 ---
 
-## PHASE 8 — Self-Attention (🔬 Experiment E) — 🟡 **7/10 built (2026-09-05)**
+## PHASE 8 — Self-Attention (🔬 Experiment E) — 🟢 **10/10 complete (2026-09-05)**
 
 ⚠️ **E changes two components at once** (concat→cross-attention, BiLSTM→Transformer), so
 `AttentionFusionModel` exposes them as independent flags and P8-10 reads all four arms.
@@ -613,9 +651,9 @@ Otherwise `E − D` would be unattributable — the failure P7-6 exists to preve
 | P8-5 | Implement auxiliary **InfoNCE sync loss** (τ=0.07), positives = aligned pairs from **real** videos, negatives = shifted ≥10 frames | ✅ `src/losses/sync.py`, real videos only, within-clip negatives |
 | P8-6 | ⛔ **Desync test** — shift audio +400 ms on a real video and assert the sync score drops significantly. If not, the component is not working regardless of the loss curve | ✅ ⛔ **PASSES** — aligned >0.99, +400 ms desync <0.5, 3-frame nudge >0.9 |
 | P8-7 | Training stability: warmup, pre-norm, gradient clipping at 1.0; attention head-entropy check for collapse | ✅ pre-norm + grad clip 1.0; head entropy `(B, layers, heads)` free every forward |
-| P8-8 | Attention-map visualization over the timeline (`notebooks/03_attention_viz.ipynb`) | ⬜ needs a trained model |
-| P8-9 | 🔬 Run Experiment E; verify E > D beyond seed variance; confirm attention elevates on forged spans | ⬜ **next** — run Experiment E |
-| P8-10 | ⛔ **Gate:** attention contribution measured, attention maps produced | ⬜ blocked on P8-9 |
+| P8-8 | Attention-map visualization over the timeline (`notebooks/03_attention_viz.ipynb`) | ✅ `scripts/29_attention_maps.py` → 14 figures in `reports/figures/attention/`. Written as a script, not a notebook: the pre-commit hook strips notebook outputs, so the figures would vanish in review |
+| P8-9 | 🔬 Run Experiment E; verify E > D beyond seed variance; confirm attention elevates on forged spans | ✅ **E 0.9928 vs D 0.9883 → +0.0045**, beyond the 0.0022 seed spread. ⛔ But the gain is the **sync loss** (+0.0039); attention is −0.0002/−0.0005, below seed variance. Lift is **seed-dependent** (0.06, 0.06, 59.17) — not confirmed |
+| P8-10 | ⛔ **Gate:** attention contribution measured, attention maps produced | ✅ ⛔ **GATE PASSED** — 4 arms × 3 seeds, controls match D, maps present |
 
 ---
 
@@ -820,10 +858,13 @@ Not a separate phase — these are the tasks the local+Kaggle strategy adds.
 
 *Phase −1 complete except PRE-1 (report retrieval), which does not block Phases 0–15.*
 
-*Completed as of 2026-09-05: ~97 of 203 tasks (≈48%). Phases −1, 0, 1, 2, 3, 4, 5, 6, 7 done; Phase 8
-is 7/10 built. **D-1 → MobileNetV2, C-1 → log-Mel**, Experiment C is a documented negative result
-(PF-20) and **Experiment D a decisive positive one** (+0.0844, gate P7-6 passed) whose frame AP
-survived its own confound check (position explains 8.1%). CL-1 and CL-7 complete. 319 passing tests.
-Outstanding: ⛔ PF-17/PF-19/PF-21/PF-22 — the collapse and the audio fingerprint both **survived the
-BiLSTM**, so no Phase 4–7 absolute number may enter Part 11's evidence table; only deltas may. P1-3 is
-blocked on PRE-1; two ✋ Phase 2 manual checks remain. dev-2k is 698/2000 local (PF-16).*
+*Completed as of 2026-09-05: ~100 of 203 tasks (≈49%). Phases −1, 0, 1, 2, 3, 4, 5, 6, 7, 8 done.
+**D-1 → MobileNetV2, C-1 → log-Mel**, Experiment C is a documented negative result (PF-20),
+**Experiment D a decisive positive one** (+0.0844, gate P7-6 passed) whose frame AP survived its own
+confound check (position explains 8.1%), and **Experiment E a mixed one** (+0.0045, gate P8-10
+passed) where the decomposition assigns the gain to the **sync loss** and shows both attention
+components below seed variance. CL-1 and CL-7 complete. 319 passing tests.
+Outstanding: ⛔ PF-17/PF-19/PF-22 — the audio fingerprint **survived the BiLSTM and the Transformer**,
+so no Phase 4–8 absolute number may enter Part 11's evidence table; only deltas may. ⛔ PF-21 is now
+answered negatively and is a **limitations-section finding**: nothing tried breaks the §5.6 collapse.
+P1-3 is blocked on PRE-1; two ✋ Phase 2 manual checks remain. dev-2k is 698/2000 local (PF-16).*

@@ -1,0 +1,165 @@
+{
+  "seed": 1339,
+  "arm": "d_sync",
+  "cross_attention": false,
+  "temporal": "lstm",
+  "attention": false,
+  "positional": true,
+  "backbone": "mobilenet_v2",
+  "feature": "logmel",
+  "defences": true,
+  "sync_weight": 0.3,
+  "frame_weight": 1.0,
+  "aux_weight": 0.3,
+  "modality_dropout": 0.2,
+  "git_sha": "7a8023e23b51",
+  "n_params": 4044935,
+  "epochs_run": 29,
+  "best_epoch": 18,
+  "wall_clock_s": 876.45,
+  "n_clips_train": 592,
+  "dev": {
+    "loss": 0.9469267681666783,
+    "auc": 0.9946550048590865,
+    "ap": 0.9980479091520238,
+    "accuracy": 0.9657142857142857,
+    "eer": 0.04024943310657596,
+    "precision": 0.9918032786885246,
+    "recall": 0.9603174603174603,
+    "f1": 0.9758064516129032,
+    "n": 175,
+    "positive_rate": 0.72,
+    "frame_ap": 0.8930615975056289,
+    "frame_auc": 0.9800546600583647,
+    "n_frames": 39423,
+    "frame_positive_rate": 0.06062450853562641,
+    "per_class": {
+      "visual_only": {
+        "n_fake": 37,
+        "auc": 0.9851075565361279,
+        "recall": 0.8918918918918919
+      },
+      "audio_only": {
+        "n_fake": 45,
+        "auc": 0.9972789115646259,
+        "recall": 0.9777777777777777
+      },
+      "both": {
+        "n_fake": 44,
+        "auc": 1.0,
+        "recall": 1.0
+      },
+      "real": {
+        "n": 49,
+        "specificity": 0.9795918367346939
+      }
+    },
+    "sync_real_mean": 0.003060410264879465,
+    "sync_fake_mean": 0.006240685470402241,
+    "sync_separation": -0.0031802752055227757,
+    "attention_lift": 56.4625129699707,
+    "attention_lift_median": 52.91515350341797,
+    "attention_lift_n_clips": 126
+  },
+  "dev_drop_visual": {
+    "auc": 0.9915775834143181,
+    "ap": 0.9970185411201009,
+    "accuracy": 0.9542857142857143,
+    "eer": 0.04024943310657596,
+    "precision": 0.9758064516129032,
+    "recall": 0.9603174603174603,
+    "f1": 0.9680000000000001,
+    "n": 175,
+    "positive_rate": 0.72,
+    "per_class": {
+      "visual_only": {
+        "n_fake": 37,
+        "auc": 0.9762824048538334,
+        "recall": 0.8918918918918919
+      },
+      "audio_only": {
+        "n_fake": 45,
+        "auc": 0.9959183673469387,
+        "recall": 0.9777777777777777
+      },
+      "both": {
+        "n_fake": 44,
+        "auc": 1.0,
+        "recall": 1.0
+      },
+      "real": {
+        "n": 49,
+        "specificity": 0.9387755102040817
+      }
+    },
+    "frame_ap": 0.8865435814146301,
+    "frame_auc": 0.9795813798097298,
+    "n_frames": 39423,
+    "frame_positive_rate": 0.06062450853562641,
+    "sync_real_mean": 0.050141848623752594,
+    "sync_fake_mean": 0.04867272824048996,
+    "sync_separation": 0.0014691203832626343,
+    "attention_lift": 58.60649871826172,
+    "attention_lift_median": 51.34300994873047,
+    "attention_lift_n_clips": 126
+  },
+  "dev_drop_audio": {
+    "auc": 0.3482345319080013,
+    "ap": 0.636552854380804,
+    "accuracy": 0.72,
+    "eer": 0.5935374149659864,
+    "precision": 0.72,
+    "recall": 1.0,
+    "f1": 0.8372093023255813,
+    "n": 175,
+    "positive_rate": 0.72,
+    "per_class": {
+      "visual_only": {
+        "n_fake": 37,
+        "auc": 0.3248758963044677,
+        "recall": 1.0
+      },
+      "audio_only": {
+        "n_fake": 45,
+        "auc": 0.3247165532879819,
+        "recall": 1.0
+      },
+      "both": {
+        "n_fake": 44,
+        "auc": 0.3919294990723562,
+        "recall": 1.0
+      },
+      "real": {
+        "n": 49,
+        "specificity": 0.0
+      }
+    },
+    "frame_ap": 0.04514963344694981,
+    "frame_auc": 0.3790024547822156,
+    "n_frames": 39423,
+    "frame_positive_rate": 0.06062450853562641,
+    "sync_real_mean": -0.671099066734314,
+    "sync_fake_mean": -0.6623009443283081,
+    "sync_separation": -0.00879812240600586,
+    "attention_lift": 0.9985750317573547,
+    "attention_lift_median": 0.9986980557441711,
+    "attention_lift_n_clips": 126
+  },
+  "train_config": {
+    "epochs": 40,
+    "lr": 0.001,
+    "weight_decay": 0.0001,
+    "batch_size": 16,
+    "grad_accum": 1,
+    "pos_weight": 0.3799533799533799,
+    "patience": 10,
+    "amp": false,
+    "grad_clip": 1.0,
+    "seed": 1339,
+    "num_workers": 0,
+    "aux_weight": 0.3,
+    "frame_weight": 1.0,
+    "frame_pos_weight": 14.566975969545565,
+    "sync_weight": 0.3
+  }
+}

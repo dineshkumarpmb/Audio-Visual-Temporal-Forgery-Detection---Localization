@@ -1,0 +1,71 @@
+{
+  "arms": {
+    "d_sync": {
+      "auc_mean": 0.9922254616132168,
+      "auc_std": 0.001779209270411845,
+      "frame_ap_mean": 0.9021904893235702,
+      "attention_lift_median": 56.4625129699707,
+      "attention_lift_stable": true,
+      "drop_visual_delta": 0.002753482345319247,
+      "uses_video": false
+    },
+    "cross": {
+      "auc_mean": 0.992009502213584,
+      "auc_std": 0.004799937538255647,
+      "frame_ap_mean": 0.8846788023713493,
+      "attention_lift_median": 53.170166015625,
+      "attention_lift_stable": true,
+      "drop_visual_delta": 0.0010258071482563969,
+      "uses_video": false
+    },
+    "self": {
+      "auc_mean": 0.9917395529640428,
+      "auc_std": 0.0037800606984589747,
+      "frame_ap_mean": 0.8613376054967933,
+      "attention_lift_median": 25.835140228271484,
+      "attention_lift_stable": false,
+      "drop_visual_delta": 0.005614944390454624,
+      "uses_video": false
+    },
+    "full": {
+      "auc_mean": 0.9927653601122989,
+      "auc_std": 0.0011401960955589234,
+      "frame_ap_mean": 0.8997945522427826,
+      "attention_lift_median": 0.06302591413259506,
+      "attention_lift_stable": false,
+      "drop_visual_delta": 0.0010258071482560638,
+      "uses_video": false
+    }
+  },
+  "d_auc_mean": 0.9882842025699169,
+  "d_auc_std": 0.002182419061808435,
+  "d_frame_ap_mean": 0.9183145011368222,
+  "delta_vs_d": 0.004481157542381986,
+  "seed_spread": 0.002182419061808435,
+  "beats_d": true,
+  "contributions": {
+    "sync loss (P8-5)": 0.003941259043299894,
+    "cross-attention (P8-3)": -0.00021595939963281463,
+    "self-attention (P8-1)": -0.0004859086491739717,
+    "both together (E)": 0.0005398984990820921
+  },
+  "decomposed": true,
+  "controlled": true,
+  "attention_lift_median": 0.06302591413259506,
+  "attention_lift_per_seed": [
+    0.06302591413259506,
+    0.055486295372247696,
+    59.170143127441406
+  ],
+  "attention_lift_range": [
+    0.055486295372247696,
+    59.170143127441406
+  ],
+  "attention_lift_stable": false,
+  "sync_separation_mean": -0.0015839701518416405,
+  "head_entropy_mean": 0.37705257534980774,
+  "attention_maps_present": true,
+  "collapse_fixed_by": [],
+  "n_seeds": 3,
+  "gate_passed": true
+}

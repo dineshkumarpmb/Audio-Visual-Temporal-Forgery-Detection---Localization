@@ -27,6 +27,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 from src.evaluation.metrics import frame_metrics, per_class_breakdown, summary
+from src.losses.sync import InfoNCESyncLoss
 
 
 @dataclass
@@ -52,6 +53,9 @@ class TrainConfig:
     # Frames are far more imbalanced than clips: ~5-10% of frames are forged against 73%
     # of clips. Without this the frame head predicts "real" everywhere and looks fine.
     frame_pos_weight: float | None = None
+    # P8-5: weight on the auxiliary InfoNCE sync loss. Section 5.4 starts it at 0.3.
+    # 0 keeps Phases 4-7 unchanged, so every earlier arm's objective is untouched.
+    sync_weight: float = 0.0
 
 
 @dataclass
@@ -86,6 +90,8 @@ class Trainer:
             else None
         )
         self.criterion = nn.BCEWithLogitsLoss(pos_weight=pw)
+        # Built only when used, so Phases 4-7 construct exactly what they did before.
+        self.sync_criterion = InfoNCESyncLoss() if cfg.sync_weight else None
         self.optimizer = torch.optim.AdamW(
             [p for p in model.parameters() if p.requires_grad],
             lr=cfg.lr,
@@ -162,6 +168,15 @@ class Trainer:
         if frame_logits is not None and frames is not None and self.cfg.frame_weight:
             loss = loss + self.cfg.frame_weight * self._frame_loss(
                 frame_logits, frames.to(self.device, non_blocking=True), mask
+            )
+
+        # P8-5: the auxiliary sync loss. ⛔ It reads `labels` because it is computed on
+        # **real clips only** -- training a fake's forged span toward "aligned" would teach
+        # the head to erase the very desynchrony the classifier is looking for.
+        v_embed = out.get("sync_visual_embed")
+        if self.sync_criterion is not None and v_embed is not None:
+            loss = loss + self.cfg.sync_weight * self.sync_criterion(
+                v_embed, out["sync_audio_embed"], labels, mask
             )
         return loss, out
 

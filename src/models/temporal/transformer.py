@@ -24,10 +24,19 @@ The stock module discards them, and Phase 8 needs them twice — P8-7's head-ent
 check and P8-8's attention-map figure, which is the qualitative evidence the gate requires.
 Everything else here is the standard block.
 
-**Entropy is always computed; full maps are opt-in.** A `(B, layers, heads, T, T)` tensor at
-batch 32 and T=250 is ~128 MB, so returning it every forward would dominate the memory
-budget the cached-feature design exists to protect. Per-head entropy is `(B, layers, heads)`
-— negligible, and it is what the collapse check actually reads.
+⛔ **Attention weights are opt-in, and on a 4 GB card that is not an optimisation.**
+Asking `nn.MultiheadAttention` for weights (`need_weights=True`) does two things: it
+materialises a `(B, heads, T, T)` tensor, and it disables PyTorch's fused
+scaled-dot-product kernel, which never forms that matrix at all. At batch 32 and this
+subset's real T (median 187, **max 497**) that is ~126 MB per layer forward, kept for
+backward, across 4 layers — and it OOM'd the GTX 1650 on the first Experiment E run.
+
+So training uses the fused path, and the analysis quantities are computed at eval time:
+
+* `compute_entropy=True` — P8-7's `(B, layers, heads)` collapse check. Cheap, but it needs
+  the weights, so it runs during evaluation rather than every training step. Head collapse
+  is a property of the trained model, so measuring it at eval loses nothing.
+* `return_attention=True` — P8-8's full maps, for figures only, one clip at a time.
 """
 
 from __future__ import annotations
@@ -125,15 +134,19 @@ class PreNormEncoderLayer(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(
-        self, x: torch.Tensor, key_padding_mask: torch.Tensor | None = None
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+        self,
+        x: torch.Tensor,
+        key_padding_mask: torch.Tensor | None = None,
+        *,
+        need_weights: bool = False,
+    ) -> tuple[torch.Tensor, torch.Tensor | None]:
         h = self.norm1(x)
         attended, weights = self.attn(
             h,
             h,
             h,
             key_padding_mask=key_padding_mask,
-            need_weights=True,
+            need_weights=need_weights,
             average_attn_weights=False,
         )
         x = x + self.dropout(attended)
@@ -180,8 +193,13 @@ class TransformerTemporalEncoder(nn.Module):
         mask: torch.Tensor | None = None,
         *,
         return_attention: bool = False,
+        compute_entropy: bool = False,
     ) -> dict[str, torch.Tensor]:
-        """`x` is `(B, T, d_model)`, `mask` is `(B, T)` with True = real frame."""
+        """`x` is `(B, T, d_model)`, `mask` is `(B, T)` with True = real frame.
+
+        Leave both flags off in the training loop: that is the fused-kernel path, and the
+        only one that fits a 4 GB card at this subset's clip lengths.
+        """
         if x.ndim != 3:
             raise ValueError(f"expected (B, T, D), got {tuple(x.shape)}")
         if x.shape[-1] != self.d_model:
@@ -197,13 +215,16 @@ class TransformerTemporalEncoder(nn.Module):
             guard = ~mask.any(dim=1, keepdim=True)
             key_padding = ~(mask | guard)  # True = ignore this key
 
+        need_weights = return_attention or compute_entropy
         h = self.pos(x)
         entropies, maps = [], []
         for layer in self.layers:
-            h, weights = layer(h, key_padding)
-            entropies.append(attention_entropy(weights, mask))
-            if return_attention:
-                maps.append(weights)
+            h, weights = layer(h, key_padding, need_weights=need_weights)
+            if weights is not None:
+                if compute_entropy:
+                    entropies.append(attention_entropy(weights, mask))
+                if return_attention:
+                    maps.append(weights)
 
         h = self.norm(h)
         if mask is not None:
@@ -212,11 +233,10 @@ class TransformerTemporalEncoder(nn.Module):
         if h.shape[1] != t_in:
             raise AssertionError(f"temporal resolution changed: {t_in} in, {h.shape[1]} out")
 
-        out = {
-            "sequence": h,
-            # (B, layers, heads) -- P8-7 reads this every run; it costs nothing to carry.
-            "head_entropy": torch.stack(entropies, dim=1),
-        }
+        out = {"sequence": h}
+        if entropies:
+            # (B, layers, heads) -- P8-7's collapse check, computed at eval time.
+            out["head_entropy"] = torch.stack(entropies, dim=1)
         if return_attention:
             out["attention_maps"] = torch.stack(maps, dim=1)  # (B, layers, heads, T, T)
         return out
