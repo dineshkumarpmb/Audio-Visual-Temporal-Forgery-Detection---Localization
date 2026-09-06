@@ -22,6 +22,7 @@ from src.training.gan import (
     ModeCollapseError,
     diversity,
     generate_samples,
+    mode_seeking_penalty,
     train_gan,
 )
 
@@ -194,3 +195,56 @@ def test_train_gan_runs_and_logs_diversity() -> None:
     )
     assert isinstance(gen, SequenceGenerator) and isinstance(disc, SequenceDiscriminator)
     assert history and {"step", "loss_d", "loss_g", "pairwise", "collapsed"} <= set(history[0])
+
+
+# ------------------------------------------------- mode-seeking regulariser (P9-3, P9-4)
+
+
+def test_mode_seeking_penalty_punishes_a_noise_blind_generator() -> None:
+    """The term exists because spectral norm alone left pairwise_ratio at 0.10 (floor 0.50).
+
+    A generator that ignores its noise is exactly the partial collapse P9-4 refuses, so the
+    penalty has to be far larger for identical outputs than for outputs that track the noise.
+    """
+    noise, noise2 = torch.randn(B, 64), torch.randn(B, 64)
+    same = torch.randn(B, T, D)
+    blind = mode_seeking_penalty(same, same.clone(), noise, noise2)
+    responsive = mode_seeking_penalty(same, torch.randn(B, T, D), noise, noise2)
+    assert blind > 100 * responsive
+    assert torch.isfinite(blind)
+
+
+def test_mode_seeking_penalty_is_finite_for_identical_noise() -> None:
+    """Two coincident noise draws must not produce a NaN that poisons the generator."""
+    noise = torch.randn(B, 64)
+    out = mode_seeking_penalty(torch.randn(B, T, D), torch.randn(B, T, D), noise, noise.clone())
+    assert torch.isfinite(out)
+
+
+def test_train_gan_logs_the_mode_seeking_term_only_when_it_is_on() -> None:
+    seqs = [torch.randn(60, D) for _ in range(12)]
+    labels = torch.randint(0, 2, (12,))
+    _, _, off = train_gan(
+        seqs,
+        labels,
+        d_model=D,
+        steps=4,
+        batch_size=4,
+        n_frames=16,
+        log_every=2,
+        ms_weight=0.0,
+        verbose=False,
+    )
+    _, _, on = train_gan(
+        seqs,
+        labels,
+        d_model=D,
+        steps=4,
+        batch_size=4,
+        n_frames=16,
+        log_every=2,
+        ms_weight=0.5,
+        verbose=False,
+    )
+    assert off[0]["loss_ms"] == 0.0
+    assert on[0]["loss_ms"] > 0.0

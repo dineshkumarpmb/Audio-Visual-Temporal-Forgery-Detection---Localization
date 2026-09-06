@@ -15,7 +15,11 @@ TORCH_PINS  := torch==2.7.1+cu118 torchvision==0.22.1+cu118 torchaudio==2.7.1+cu
 .PHONY: help venv torch install install-dev check check-bench check-kaggle lint fmt \
         typecheck test test-cov fetch-meta manifest subset verify-subsets verify-mirror \
         stats phase1 models faces verify-preproc verify-labels sheets overlays phase2 \
-        audio audio-mfcc phase3 visual overfit train-visual decide-d1 confound phase4 \n        train-audio decide-c1 provenance phase5 \n        train-fusion experiment-c phase6 \
+        audio audio-mfcc phase3 visual overfit train-visual decide-d1 confound phase4 \
+        train-audio decide-c1 provenance phase5 \
+        train-fusion experiment-c phase6 \
+        train-temporal frame-confound experiment-d phase7 \
+        train-augmented experiment-f phase9 \
         features train evaluate ablations benchmark api frontend demo clean-bench
 
 help:  ## Show this help
@@ -263,6 +267,20 @@ phase7:     ## Phase 7 - temporal baseline, then Experiment D
 # PF-19 are what happens when a headline is quoted without its shortcut floor.
 	$(MAKE) frame-confound
 	$(MAKE) experiment-d
+	$(PY) -m pytest tests/ -q
+
+train-augmented: ## Phase 9 - train one augmentation arm (ARGS=--arms F1 --seeds 3)
+	$(PY) scripts/30_train_augmented.py $(ARGS)
+
+experiment-f: ## Phase 9 - Experiment F and the P9-7 gate
+	$(PY) scripts/31_experiment_f.py
+
+phase9:     ## Phase 9 - the three augmentation arms, then Experiment F
+# The arm order is a dependency, not a preference. F2's generator is trained on the fused
+# embeddings F1's *checkpoint* produces, so the script refuses to run F2 for a seed whose F1
+# checkpoint is missing. Both are resumable: a killed sweep re-reads result.json per seed.
+	$(PY) scripts/30_train_augmented.py --arms F0 F1 F2 --seeds 3
+	$(MAKE) experiment-f
 	$(PY) -m pytest tests/ -q
 
 features:   ## Phases 2-5 — Stage-A extraction (resumable; safe to re-run)

@@ -54,6 +54,7 @@ from src.models.backbones.audio import NATIVE_DIM  # noqa: E402
 from src.seed import seed_everything  # noqa: E402
 from src.training.augment import AugmentedPairs, ClassicalConfig, SpliceConfig  # noqa: E402
 from src.training.gan import (  # noqa: E402
+    MS_WEIGHT,
     ModeCollapseError,
     collect_fused,
     generate_samples,
@@ -160,6 +161,7 @@ def fit_gan_for(arm: str, seed: int, args, model_factory, train_loader, out_dir:
         steps=args.gan_steps,
         batch_size=args.gan_batch_size,
         n_frames=args.gan_frames,
+        ms_weight=args.gan_ms_weight,
         device=device,
         seed=seed,
     )
@@ -210,6 +212,12 @@ def main() -> int:
     ap.add_argument("--classical-prob", type=float, default=0.5)
     # P9-3
     ap.add_argument("--gan-steps", type=int, default=1500)
+    ap.add_argument(
+        "--gan-ms-weight",
+        type=float,
+        default=MS_WEIGHT,
+        help="mode-seeking weight; 0 disables it and P9-4 then refuses the samples",
+    )
     ap.add_argument("--gan-batch-size", type=int, default=32)
     ap.add_argument("--gan-frames", type=int, default=64)
     ap.add_argument("--gan-weight", type=float, default=0.3)
@@ -380,6 +388,7 @@ def main() -> int:
                 "splice_ratio": args.splice_ratio if splice else 0.0,
                 "classical_prob": args.classical_prob if classical else 0.0,
                 "gan_weight": args.gan_weight if use_gan else 0.0,
+                "gan_ms_weight": args.gan_ms_weight if use_gan else 0.0,
                 "gan_diversity": diversity_row,
                 "backbone": args.backbone,
                 "feature": args.feature,

@@ -242,6 +242,14 @@ class Trainer:
         """Train with early stopping on **dev** AUC. Test is never touched here."""
         for epoch in range(self.start_epoch, self.cfg.epochs):
             t0 = time.time()
+            # P9-2: a dataset that re-randomises per epoch has to be told which epoch it is.
+            # `AugmentedPairs` folds this into its per-item seed so classical augmentation
+            # varies across epochs while the spliced half stays fixed; without the call the
+            # model would see one frozen perturbation of every clip for the whole run.
+            # Generic by design -- datasets without the hook are untouched.
+            set_epoch = getattr(train_loader.dataset, "set_epoch", None)
+            if callable(set_epoch):
+                set_epoch(epoch)
             train_loss = self.train_epoch(train_loader)
             val_loss, metrics, *_ = self.evaluate(val_loader)
             result = EpochResult(epoch, train_loss, val_loss, metrics, time.time() - t0)

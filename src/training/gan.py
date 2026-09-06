@@ -47,6 +47,11 @@ MIN_PAIRWISE_RATIO = 0.5
 MIN_STD_RATIO = 0.10
 MIN_NN_RATIO = 0.5
 
+# ⛔ Mode-seeking weight. Not a hyperparameter that was tuned for F2's accuracy -- it is the
+# smallest setting measured to clear P9-4's pairwise criterion, which spectral norm alone did
+# not. See `train_gan` for the measurements behind the value.
+MS_WEIGHT = 0.5
+
 
 class ModeCollapseError(RuntimeError):
     """Raised when generated samples fail P9-4 and must not be used."""
@@ -167,6 +172,22 @@ def _crop(seqs: list[torch.Tensor], idx: np.ndarray, n_frames: int, rng) -> torc
     return torch.stack(out)
 
 
+def mode_seeking_penalty(
+    fake: torch.Tensor, fake2: torch.Tensor, noise: torch.Tensor, noise2: torch.Tensor
+) -> torch.Tensor:
+    """MSGAN's mode-seeking term: large when two noise vectors decode to the same sequence.
+
+    The reciprocal of the mean output gap per unit of noise gap. A generator that ignores its
+    noise drives the denominator to zero and the penalty to its ceiling; one whose outputs move
+    with the noise pays almost nothing. Both clamps are there so the term stays finite when two
+    noise draws happen to coincide -- a real possibility at batch size 32 -- rather than
+    producing a NaN that would silently poison the generator's weights.
+    """
+    output_gap = (fake - fake2).abs().mean(dim=tuple(range(1, fake.ndim)))
+    noise_gap = (noise - noise2).abs().mean(dim=tuple(range(1, noise.ndim))).clamp_min(1e-8)
+    return 1.0 / (output_gap / noise_gap).mean().clamp_min(1e-8)
+
+
 def train_gan(
     seqs: list[torch.Tensor],
     labels: torch.Tensor,
@@ -176,6 +197,7 @@ def train_gan(
     batch_size: int = 32,
     n_frames: int = 64,
     lr: float = 2e-4,
+    ms_weight: float = MS_WEIGHT,
     device: str = "cpu",
     log_every: int = 250,
     seed: int = 0,
@@ -187,6 +209,26 @@ def train_gan(
     discriminator's momentum fight the moving target. Fixed-length crops keep every batch
     rectangular -- the generator is asked for `n_frames` and the real batch is cropped to
     match, so neither side can distinguish real from fake by length alone.
+
+    ⛔ **`ms_weight` is here because spectral norm alone was measured to be insufficient.**
+    Section I names spectral norm as the defence against mode collapse and the discriminator
+    carries it on every layer, but on this project's own fused embeddings the generator still
+    failed P9-4 on the pairwise criterion -- `pairwise_ratio` **0.10 at 1500 steps and 0.20 at
+    4000**, against a 0.50 floor. Training longer moved it in the right direction far too
+    slowly to matter: the samples were individually plausible (`std_ratio` 0.30-0.65, `nn_ratio`
+    3.4-4.8, so neither thin nor memorised) but too similar *to each other*. That is partial
+    collapse, and it is exactly the failure the gate exists to catch.
+
+    The term is MSGAN's mode-seeking regulariser: penalise `1 / (|G(z1) - G(z2)| / |z1 - z2|)`,
+    which is large whenever two different noise vectors decode to the same sequence. It costs
+    one extra generator forward per step and touches nothing else -- the discriminator, the
+    conditioning and the non-saturating objective are all unchanged.
+
+    Measured on 592 fused sequences, same seed, 1500 steps: `ms_weight=0` -> 0.10 (refused),
+    `0.5` -> **1.36**, `1.0` -> 2.75. The default is 0.5 because the goal is to *match* the
+    variety of the real data, not to maximise it; at 1.0 the samples are nearly three times
+    more spread out than the clips they imitate, which passes the gate by leaving the
+    distribution rather than by modelling it.
     """
     gen = SequenceGenerator(d_model=d_model).to(device)
     disc = SequenceDiscriminator(d_model=d_model).to(device)
@@ -216,6 +258,14 @@ def train_gan(
         # log(1 - D(G(z))), which has usable gradients while the discriminator is winning.
         d_fake2 = disc(fake, fake_labels)
         loss_g = bce(d_fake2, torch.ones_like(d_fake2))
+        ms_term = 0.0
+        if ms_weight:
+            # Same labels as `fake`, so the penalty measures sensitivity to the *noise* and
+            # cannot be paid off by separating the two classes further.
+            noise2 = torch.randn(batch_size, gen.noise_dim, device=device)
+            fake2 = gen(noise2, fake_labels, n_frames)
+            ms_term = ms_weight * mode_seeking_penalty(fake, fake2, noise, noise2)
+            loss_g = loss_g + ms_term
         opt_g.zero_grad(set_to_none=True)
         loss_g.backward()
         opt_g.step()
@@ -229,6 +279,7 @@ def train_gan(
                 "step": step + 1,
                 "loss_d": float(loss_d),
                 "loss_g": float(loss_g),
+                "loss_ms": float(ms_term),
                 **div.as_dict(),
             }
             history.append(row)
