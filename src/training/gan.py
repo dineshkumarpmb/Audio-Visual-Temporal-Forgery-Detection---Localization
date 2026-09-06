@@ -48,9 +48,9 @@ MIN_STD_RATIO = 0.10
 MIN_NN_RATIO = 0.5
 
 # ⛔ Mode-seeking weight. Not a hyperparameter that was tuned for F2's accuracy -- it is the
-# smallest setting measured to clear P9-4's pairwise criterion, which spectral norm alone did
-# not. See `train_gan` for the measurements behind the value.
-MS_WEIGHT = 0.5
+# setting measured to clear P9-4's pairwise criterion on every seed, which spectral norm alone
+# did not. See `train_gan` for the measurements behind the value.
+MS_WEIGHT = 1.0
 
 
 class ModeCollapseError(RuntimeError):
@@ -210,28 +210,45 @@ def train_gan(
     rectangular -- the generator is asked for `n_frames` and the real batch is cropped to
     match, so neither side can distinguish real from fake by length alone.
 
-    ⛔ **`ms_weight` is here because spectral norm alone was measured to be insufficient.**
-    Section I names spectral norm as the defence against mode collapse and the discriminator
-    carries it on every layer, but on this project's own fused embeddings the generator still
-    failed P9-4 on the pairwise criterion -- `pairwise_ratio` **0.10 at 1500 steps and 0.20 at
-    4000**, against a 0.50 floor. Training longer moved it in the right direction far too
-    slowly to matter: the samples were individually plausible (`std_ratio` 0.30-0.65, `nn_ratio`
-    3.4-4.8, so neither thin nor memorised) but too similar *to each other*. That is partial
-    collapse, and it is exactly the failure the gate exists to catch.
+    ⛔ **Two things here exist because the generator did not clear its own P9-4 gate**, and
+    both were found by running it rather than by reading it. Section I names spectral norm as
+    the defence against mode collapse; the discriminator carries it on every layer, and it was
+    not enough. On 592 fused embeddings from a trained F1 checkpoint the first version scored
+    `pairwise_ratio` **0.01** against a 0.50 floor -- generated clips were near-identical to
+    each other -- and neither longer training (4000 steps), a stronger mode-seeking weight,
+    nor a two-timescale learning rate moved it past 0.15.
 
-    The term is MSGAN's mode-seeking regulariser: penalise `1 / (|G(z1) - G(z2)| / |z1 - z2|)`,
-    which is large whenever two different noise vectors decode to the same sequence. It costs
-    one extra generator forward per step and touches nothing else -- the discriminator, the
-    conditioning and the non-saturating objective are all unchanged.
+    **1. The target space is standardised.** Those embeddings have a per-dimension mean whose
+    norm is **307.7** against a mean standard deviation of **8.07**: they are a large fixed
+    offset plus a small variation, and the variation is the entire signal. A generator trained
+    on the raw vectors spends its capacity reproducing the offset, and the leftover differences
+    between samples are rounding error by comparison. `train_gan` therefore whitens the real
+    sequences per dimension, trains in that space, and records the statistics on the generator
+    so `sample` can invert them -- the caller still receives vectors in the model's own fused
+    space. This is the single biggest factor: it took `pairwise_ratio` from 0.29 to 0.50+.
 
-    Measured on 592 fused sequences, same seed, 1500 steps: `ms_weight=0` -> 0.10 (refused),
-    `0.5` -> **1.36**, `1.0` -> 2.75. The default is 0.5 because the goal is to *match* the
-    variety of the real data, not to maximise it; at 1.0 the samples are nearly three times
-    more spread out than the clips they imitate, which passes the gate by leaving the
-    distribution rather than by modelling it.
+    **2. `ms_weight` adds MSGAN's mode-seeking regulariser**, penalising
+    `1 / (|G(z1) - G(z2)| / |z1 - z2|)`, which is large whenever two different noise vectors
+    decode to the same sequence. It costs one extra generator forward per step and changes
+    nothing else -- discriminator, conditioning and the non-saturating objective are untouched.
+
+    Measured together on the real embeddings, 1500 steps, three seeds: whitening alone (no
+    mode-seeking) gives 0.07 and is still refused; `ms_weight=0.5` gives 0.50 / 0.90 / 0.64,
+    which passes but sits on the threshold; **`ms_weight=1.0` gives 0.80 / 0.61 / 0.66** and is
+    the default because it clears the gate on every seed rather than on two of three. Sample
+    novelty stays healthy throughout (`nn_ratio` 3.6-4.6, floor 0.5), so the diversity is not
+    bought by drifting away from the data.
     """
+    # Whiten in float64-free, per-dimension form over every real frame, then hand the
+    # statistics to the generator so its samples land back in the caller's space.
+    frames = torch.cat([s.detach().cpu() for s in seqs], dim=0)
+    feat_mean = frames.mean(dim=0)
+    feat_std = frames.std(dim=0).clamp_min(1e-6)
+    seqs = [(s - feat_mean.to(s.device)) / feat_std.to(s.device) for s in seqs]
+
     gen = SequenceGenerator(d_model=d_model).to(device)
     disc = SequenceDiscriminator(d_model=d_model).to(device)
+    gen.set_feature_stats(feat_mean, feat_std)
     opt_g = torch.optim.Adam(gen.parameters(), lr=lr, betas=(0.5, 0.999))
     opt_d = torch.optim.Adam(disc.parameters(), lr=lr, betas=(0.5, 0.999))
     bce = nn.BCEWithLogitsLoss()
@@ -272,7 +289,9 @@ def train_gan(
 
         if (step + 1) % log_every == 0 or step == 0:
             gen.eval()
-            sample, _ = gen.sample(64, n_frames, device=device)
+            # Whitened space on both sides: `real` is a whitened crop, so the sample must not
+            # be un-whitened or the two would be measured in different coordinates.
+            sample, _ = gen.sample(64, n_frames, device=device, denormalize=False)
             div = diversity(sample, real)
             gen.train()
             row = {

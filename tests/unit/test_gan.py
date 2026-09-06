@@ -248,3 +248,48 @@ def test_train_gan_logs_the_mode_seeking_term_only_when_it_is_on() -> None:
     )
     assert off[0]["loss_ms"] == 0.0
     assert on[0]["loss_ms"] > 0.0
+
+
+# ------------------------------------------- standardised target space (P9-3, P9-4)
+
+
+def test_train_gan_records_the_real_feature_statistics() -> None:
+    """The generator must be able to put its samples back in the caller's space.
+
+    Without this, `sample` returns whitened vectors and `forward_fused` is fed something
+    306 units away from anything the model has ever seen.
+    """
+    seqs = [torch.randn(60, D) * 3.0 + 7.0 for _ in range(12)]
+    labels = torch.randint(0, 2, (12,))
+    gen, _, _ = train_gan(
+        seqs, labels, d_model=D, steps=2, batch_size=4, n_frames=16, log_every=99, verbose=False
+    )
+    frames = torch.cat(seqs, dim=0)
+    assert torch.allclose(gen.feat_mean, frames.mean(dim=0), atol=1e-4)
+    assert torch.allclose(gen.feat_std, frames.std(dim=0).clamp_min(1e-6), atol=1e-4)
+
+
+def test_sample_denormalizes_by_default() -> None:
+    """⛔ The offset is the whole reason: |mu| was 307.7 against a mean sd of 8.07."""
+    gen = SequenceGenerator(d_model=D)
+    gen.set_feature_stats(torch.full((D,), 5.0), torch.full((D,), 2.0))
+    torch.manual_seed(0)
+    whitened, _ = gen.sample(4, T, labels=torch.zeros(4, dtype=torch.long), denormalize=False)
+    torch.manual_seed(0)
+    natural, _ = gen.sample(4, T, labels=torch.zeros(4, dtype=torch.long))
+    assert torch.allclose(natural, whitened * 2.0 + 5.0, atol=1e-5)
+
+
+def test_the_seed_reaches_every_step() -> None:
+    """⛔ Noise routed only through h0 decays: clip means collapsed to pairwise_ratio 0.01.
+
+    P9-4 scores *clip means*, so a generator whose per-frame outputs differ while their mean
+    does not is refused. The property that fixes it is that the clip mean itself moves with
+    the noise, and it has to hold at the 64-frame length the GAN is trained at.
+    """
+    gen = SequenceGenerator(d_model=D)
+    labels = torch.zeros(6, dtype=torch.long)
+    means = gen(torch.randn(6, gen.noise_dim), labels, 64).mean(dim=1)
+    unit = means / means.norm(dim=-1, keepdim=True).clamp_min(1e-8)
+    off_diagonal = ~torch.eye(6, dtype=torch.bool)
+    assert float((1.0 - unit @ unit.T)[off_diagonal].mean()) > 1e-3

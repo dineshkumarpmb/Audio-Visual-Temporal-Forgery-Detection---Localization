@@ -264,6 +264,10 @@ def main() -> int:
     for key, values in diffs.items():
         print(f"\n    {RED}uncontrolled: {key}: {values}{RESET}")
 
+    shas = {name: rep.get("git_sha") for name, rep in arms.items()}
+    if len(set(shas.values())) > 1:
+        print(f"\n  {YELLOW}arms were trained at different commits: {shas}{RESET}")
+
     seeds_ok = all(len(rep["runs"]) >= args.min_seeds for rep in arms.values())
     three_arms = True  # enforced above -- a missing arm exits non-zero before this point
     gan_measured = bool(health["measured"] and not health["any_collapsed"])
@@ -309,7 +313,9 @@ def main() -> int:
         "controlled": controlled,
         "uncontrolled": diffs,
         "seeds_ok": seeds_ok,
-        "git_sha": arms["F0"].get("git_sha"),
+        # Per arm, not one field for the run. The arms are trained by separate invocations and
+        # a fix landing between them is normal; what matters is that a reader can see it.
+        "git_sha": {name: rep.get("git_sha") for name, rep in arms.items()},
         "gate_passed": gate,
     }
     out_md = Path(args.out)
@@ -382,6 +388,18 @@ def _write(path: Path, f: dict) -> None:
         ]
 
     lines += [
+        "",
+        (
+            "**Commits:** "
+            + ", ".join(f"{k} `{v}`" for k, v in f["git_sha"].items())
+            + (
+                ". The arms were trained at different commits — the difference is the P9-4 fix "
+                "in `src/training/gan.py` and `src/models/gan/generator.py`, which is F2-only "
+                "code: F0 and F1 never construct a generator."
+                if len(set(f["git_sha"].values())) > 1
+                else "."
+            )
+        ),
         "",
         "## ⛔ P9-6 — the two questions, in order",
         "",

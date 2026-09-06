@@ -1,0 +1,168 @@
+{
+  "seed": 1337,
+  "arm": "F1",
+  "splice": true,
+  "classical": true,
+  "gan": false,
+  "splice_ratio": 0.5,
+  "classical_prob": 0.5,
+  "gan_weight": 0.0,
+  "gan_ms_weight": 0.0,
+  "gan_diversity": null,
+  "backbone": "mobilenet_v2",
+  "feature": "logmel",
+  "defences": true,
+  "sync_weight": 0.3,
+  "git_sha": "fbec6c6bd2d5",
+  "n_params": 5826695,
+  "epochs_run": 22,
+  "best_epoch": 11,
+  "wall_clock_s": 1131.81,
+  "n_clips_train": 888,
+  "dev": {
+    "auc": 0.9885001619695497,
+    "ap": 0.9959321495153899,
+    "accuracy": 0.92,
+    "eer": 0.04024943310657596,
+    "precision": 0.9117647058823529,
+    "recall": 0.9841269841269841,
+    "f1": 0.9465648854961831,
+    "n": 175,
+    "positive_rate": 0.72,
+    "per_class": {
+      "visual_only": {
+        "n_fake": 37,
+        "auc": 0.9669056811913955,
+        "recall": 0.9459459459459459
+      },
+      "audio_only": {
+        "n_fake": 45,
+        "auc": 0.999546485260771,
+        "recall": 1.0
+      },
+      "both": {
+        "n_fake": 44,
+        "auc": 0.9953617810760668,
+        "recall": 1.0
+      },
+      "real": {
+        "n": 49,
+        "specificity": 0.7551020408163265
+      }
+    },
+    "frame_ap": 0.8690776834768984,
+    "frame_auc": 0.9793006791296737,
+    "n_frames": 39423,
+    "frame_positive_rate": 0.06062450853562641,
+    "sync_real_mean": 0.039391838014125824,
+    "sync_fake_mean": 0.04315818101167679,
+    "sync_separation": -0.0037663429975509644,
+    "attention_lift": 0.05841102451086044,
+    "attention_lift_median": 0.0003415229148231447,
+    "attention_lift_n_clips": 126,
+    "head_entropy_mean": 0.5993438959121704
+  },
+  "dev_drop_visual": {
+    "auc": 0.9886621315192744,
+    "ap": 0.9960274176882105,
+    "accuracy": 0.9142857142857143,
+    "eer": 0.04024943310657596,
+    "precision": 0.9051094890510949,
+    "recall": 0.9841269841269841,
+    "f1": 0.9429657794676807,
+    "n": 175,
+    "positive_rate": 0.72,
+    "per_class": {
+      "visual_only": {
+        "n_fake": 37,
+        "auc": 0.9652509652509652,
+        "recall": 0.9459459459459459
+      },
+      "audio_only": {
+        "n_fake": 45,
+        "auc": 0.999092970521542,
+        "recall": 1.0
+      },
+      "both": {
+        "n_fake": 44,
+        "auc": 0.9976808905380334,
+        "recall": 1.0
+      },
+      "real": {
+        "n": 49,
+        "specificity": 0.7346938775510204
+      }
+    },
+    "frame_ap": 0.8563772671474692,
+    "frame_auc": 0.9784826650707438,
+    "n_frames": 39423,
+    "frame_positive_rate": 0.06062450853562641,
+    "sync_real_mean": 0.18549366295337677,
+    "sync_fake_mean": 0.18612079322338104,
+    "sync_separation": -0.0006271302700042725,
+    "attention_lift": 0.06245250254869461,
+    "attention_lift_median": 0.00033344526309520006,
+    "attention_lift_n_clips": 126,
+    "head_entropy_mean": 0.6104699969291687
+  },
+  "dev_drop_audio": {
+    "auc": 0.4896339488176223,
+    "ap": 0.7158464917137919,
+    "accuracy": 0.28,
+    "eer": 0.5351473922902494,
+    "precision": 0.0,
+    "recall": 0.0,
+    "f1": 0.0,
+    "n": 175,
+    "positive_rate": 0.72,
+    "per_class": {
+      "visual_only": {
+        "n_fake": 37,
+        "auc": 0.4738003309431881,
+        "recall": 0.0
+      },
+      "audio_only": {
+        "n_fake": 45,
+        "auc": 0.4707482993197279,
+        "recall": 0.0
+      },
+      "both": {
+        "n_fake": 44,
+        "auc": 0.5222634508348795,
+        "recall": 0.0
+      },
+      "real": {
+        "n": 49,
+        "specificity": 1.0
+      }
+    },
+    "frame_ap": 0.056739639943724995,
+    "frame_auc": 0.4732145716016937,
+    "n_frames": 39423,
+    "frame_positive_rate": 0.06062450853562641,
+    "sync_real_mean": -0.6872566342353821,
+    "sync_fake_mean": -0.6830002665519714,
+    "sync_separation": -0.0042563676834106445,
+    "attention_lift": 0.9996345043182373,
+    "attention_lift_median": 0.9996010065078735,
+    "attention_lift_n_clips": 126,
+    "head_entropy_mean": 0.9993074536323547
+  },
+  "train_config": {
+    "epochs": 40,
+    "lr": 0.001,
+    "weight_decay": 0.0001,
+    "batch_size": 16,
+    "grad_accum": 1,
+    "pos_weight": 0.22482758620689655,
+    "patience": 10,
+    "amp": false,
+    "grad_clip": 1.0,
+    "seed": 1337,
+    "num_workers": 0,
+    "aux_weight": 0.3,
+    "frame_weight": 1.0,
+    "frame_pos_weight": 9.995471608174938,
+    "sync_weight": 0.3
+  }
+}
