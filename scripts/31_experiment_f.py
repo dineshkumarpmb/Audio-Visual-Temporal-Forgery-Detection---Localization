@@ -351,9 +351,9 @@ def _write(path: Path, f: dict) -> None:
     if gan["significant"] and gan["delta"] > 0:
         headline = "the GAN added something beyond classical augmentation"
     elif gan["significant"]:
-        headline = "**the GAN made things worse**"
+        headline = "the GAN made things worse"
     else:
-        headline = "**the GAN added nothing beyond classical augmentation**"
+        headline = "the GAN added nothing beyond classical augmentation"
 
     lines = [
         "# Experiment F — does augmentation help, and did the GAN add anything?",
@@ -416,7 +416,16 @@ def _write(path: Path, f: dict) -> None:
         "",
         f"**Augmentation (F1 − F0):** {_describe(aug)}. Per seed: "
         + ", ".join(f"{v:+.4f}" for v in aug["per_seed"].values())
-        + ".",
+        + "."
+        + (
+            " **Augmentation made the model worse on dev.** The F1 − F0 comparison is the"
+            " baseline for the GAN question, so F2 is being asked whether it recovers ground"
+            " rather than whether it adds to a gain."
+            if aug["significant"] and aug["delta"] < 0
+            else " Augmentation helped, and F2 − F1 asks whether the GAN adds to that."
+            if aug["significant"]
+            else ""
+        ),
         "",
         f"**⛔ The GAN (F2 − F1):** {_describe(gan)}. Per seed: "
         + ", ".join(f"{v:+.4f}" for v in gan["per_seed"].values())
@@ -485,8 +494,9 @@ def _write(path: Path, f: dict) -> None:
         "",
         "## ⛔ PF-21 — do audio-untouched spliced fakes force the visual pathway?",
         "",
-        "Splicing sets the modality of each generated fake, so two thirds of them have **untouched",
-        "audio** and cannot be detected from the audio stream at all — the first training signal in",
+        "Splicing sets the modality of each generated fake uniformly over visual / audio / both, so",
+        "one third of them — the `visual` splices — have **untouched audio** and cannot be detected",
+        "from the audio stream at all — the first training signal in",
         "this project able to force the visual pathway to matter. Nothing in LAV-DF's own training",
         "mix provides it. The measurement is the same one Phases 6–8 used: AUC lost when the visual",
         f"stream is zeroed, against a {f['collapse_tolerance']} threshold.",
@@ -514,10 +524,14 @@ def _write(path: Path, f: dict) -> None:
             " project can produce: the model was given forgeries it *cannot* detect from audio, and"
             " still did not learn to use video. Modality dropout, auxiliary heads, recurrence,"
             " cross-attention, self-attention and now targeted augmentation have all failed against"
-            " it. It belongs in the limitations section, and PF-19's global audio processing"
-            " fingerprint remains the leading explanation — the audio pathway can score the spliced"
-            " fakes too, because the fingerprint is a property of the file rather than of the"
-            " forged span."
+            " it. It belongs in the limitations section. Two caveats bound how far this reaches:"
+            " the audio-untouched `visual` splices are a minority of training fakes (a third of"
+            " the spliced examples, beside every LAV-DF fake), and this measurement is"
+            " taken on LAV-DF's own dev split, where the audio pathway — and PF-19's processing"
+            " fingerprint — already suffices. Splices are cut from two *real* clips, so their"
+            " audio carries no fingerprint; any visual skill the model learned for them is"
+            " invisible here, and a dev view of held-out `visual` splices would be needed to"
+            " measure it."
         ),
         "",
         "## Gate P9-7",

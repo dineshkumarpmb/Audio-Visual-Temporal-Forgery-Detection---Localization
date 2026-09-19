@@ -7,15 +7,15 @@ Legend: ⛔ = blocking gate item · ⭐ = headline capability · 🔬 = experime
 
 ---
 
-## 📍 CURRENT STATUS — 2026-09-05, Phase 8 complete · Phase 9 next
+## 📍 CURRENT STATUS — 2026-09-19, Phase 9 complete · Phase 10 next
 
 | | |
 |---|---|
-| **Done** | Phase −1 · Phase 0 · **P1 (18/20)** · **P2 (13/15)** · **P3 (9/9)** · **P4 (12/12)** · **P5 (8/8)** · **P6 (8/8)** · **P7 (6/6)** · **P8 (10/10)** · CL-1 ✅ · CL-7 ✅ |
+| **Done** | Phase −1 · Phase 0 · **P1 (18/20)** · **P2 (13/15)** · **P3 (9/9)** · **P4 (12/12)** · **P5 (8/8)** · **P6 (8/8)** · **P7 (6/6)** · **P8 (10/10)** · **P9 (7/7)** · CL-1 ✅ · CL-7 ✅ |
 | **Resolved** | ⛔ **D-1 → MobileNetV2** (0.7189 vs 0.6319). ⛔ **C-1 → log-Mel** (0.9838 vs 0.7677). Both open decisions settled by experiment |
-| **Next** | **Phase 9 — augmentation** (Experiments F0/F1/F2). Splicing first, then classical, then the feature-space GAN |
-| **Progress** | ~100 of 203 tasks (≈49%) · **10 of 18 phases complete** |
-| **Tests** | **319 passing** — 303 unit + 16 integration against the real 136,304-entry dataset |
+| **Next** | **Phase 10 — temporal localization ⭐** (Experiment G). Start with ⛔ P10-7: 1-D interval AP/AR, unit-tested against hand-computed cases, before any localization number is trusted |
+| **Progress** | ~107 of 203 tasks (≈53%) · **11 of 18 phases complete** |
+| **Tests** | **351 passing** — 335 unit + 16 integration against the real 136,304-entry dataset |
 | **⚠️ Caveat** | ⛔ **PF-17 / PF-19 / PF-20** — the artefacts are inherited by every arm since. Phase 7's AUC 0.9883 is an **upper bound**; the trustworthy quantity is the `D − C` delta. No bare number from Phases 4–7 may enter Part 11's evidence table |
 | **✋ Awaiting you** | P2-8 (contact sheets) · ⛔ P2-10 (watch 20 overlays) — artefacts in `reports/figures/` |
 | **Kaggle** | `dinesh1234567` · phone verified · **30 GPU h/week** · P100 16 GB or T4×2 · 12 h/session · 20 GB `/kaggle/working` |
@@ -25,9 +25,43 @@ Legend: ⛔ = blocking gate item · ⭐ = headline capability · 🔬 = experime
 `src/` now holds `models/backbones/{visual,audio}.py`, `models/fusion/{concat,cross_attention}.py`,
 `models/temporal/{lstm,transformer}.py`, `models/heads/{classification,frame,sync}.py`,
 `losses/sync.py`, `localization/targets.py`, `training/{trainer,reporting}.py`,
-`evaluation/metrics.py` and `data/dataset.py`, driven by `scripts/02`–`26`. `api/`,
-`models/gan/` and `inference/` are still stubs — Phases 9–16 untouched apart from Phase 8's
-components, which are now built **and run**.
+`evaluation/metrics.py` and `data/dataset.py`, driven by `scripts/02`–`26`. Phase 9 added
+`training/{augment,gan}.py`, `models/gan/{generator,discriminator}.py` and `scripts/30`–`31`.
+`api/` and `inference/` are still stubs — Phases 10–16 are untouched.
+
+### 🔬 Phase 9 result — Experiment F (2026-09-19)
+
+**The GAN added nothing beyond classical augmentation — and augmentation itself hurt.**
+`reports/experiment_f.md`, gate P9-7 passed.
+
+| arm | dev AUC | sd | frame AP | −visual | train clips |
+|---|---|---|---|---|---|
+| E full (Phase 8) | 0.9928 | 0.0011 | 0.8998 | +0.0010 | 592 |
+| F0 no augmentation | 0.9919 | 0.0030 | 0.8946 | −0.0003 | 592 |
+| F1 splice + classical | 0.9874 | 0.0021 | 0.8412 | +0.0009 | 888 |
+| F2 F1 + GAN samples | 0.9883 | 0.0005 | 0.8508 | +0.0071 | 888 |
+
+⛔ **P9-6, F2 − F1 = +0.0009** AUC (per seed −0.0008 / +0.0044 / −0.0008), inside the 0.0021
+seed spread and the seeds disagree on the sign — **not significant**. Frame AP +0.0096, also
+inside spread. The pre-committed headline applies: *the GAN added nothing beyond classical
+augmentation*. P9-4 admitted all three seeds (pairwise ratio 1.01, std ratio 0.77, nn ratio 8.84).
+
+⛔ **F1 − F0 = −0.0045 AUC and −0.0534 frame AP, significant on both** (beyond spread,
+negative on all 3 seeds). Splicing + classical augmentation made the model *worse* on LAV-DF
+dev, and hurt localization most — the opposite of the plan's "likely the biggest single win"
+for P9-1. F0 reproduces Phase 8's E full (|Δ| 0.0009), so this is the augmentation, not the
+harness. **Carry into Phase 10: train Experiment G without P9 augmentation unless a
+localization-specific re-test says otherwise.**
+
+⛔ **PF-21 still stands.** No arm uses video (threshold 0.01). F2's +0.0071 mean hides one seed
+at +0.0204 and two near zero — seed-dependent, not a break. Caveat: only the `visual` splices
+(a third of the spliced examples) have untouched audio, and the reliance metric runs on LAV-DF
+dev where audio suffices, so it cannot see any visual skill learned for splices. A held-out
+`visual`-splice dev view would measure it — logged as **PF-24**.
+
+F2 seed 2 was interrupted on 2026-09-06 at epoch 16 and re-run from scratch on 2026-09-19 (a
+resume would have lost epochs 0–15 of history). F0/F1 were trained at `fbec6c6`, F2 at `1e167fd`
+— the difference is F2-only GAN code, recorded per arm in the report.
 
 ### 🔬 Phase 7 result — Experiment D (2026-09-05)
 
@@ -132,6 +166,8 @@ at `docs/original_report.pdf`.
 9. `make phase7` — Baseline 4 + BiLSTM → ⛔ `make frame-confound` → Experiment D → P7-6 gate.
 10. **Phase 8** — `scripts/27_train_attention.py` (4 arms x 3 seeds) → `scripts/29_attention_maps.py`
     → `scripts/28_experiment_e.py` for Experiment E and the ⛔ P8-10 gate.
+11. `make phase9` — F0 → F1 → F2 (F2 needs F1's checkpoint per seed; resumable per seed)
+    → `scripts/31_experiment_f.py` for Experiment F and the ⛔ P9-7 gate.
 
 ### Risk status
 
@@ -174,6 +210,8 @@ requires re-checking at every scale-up — these scale-ups are what exposed both
 | ⛔ **PF-21** — §5.6 collapse survived the BiLSTM, **and Phase 8** | Part 11 limitations | **ANSWERED 2026-09-05, negatively.** Cross-attention was the last untried defence and it failed too: zeroing video costs +0.0028 (sync), **+0.0010 (cross)**, +0.0056 (self), +0.0010 (E full) — all under the 0.01 threshold. Modality dropout, auxiliary heads, recurrence, cross-attention and self-attention have now all been tried. **A dataset finding, not an architecture one** — on LAV-DF at this scale the audio pathway is too easy for the visual one to be worth using. Goes in limitations; PF-19 is the leading explanation |
 | ⛔ **PF-22** — PF-19's fingerprint is stronger at D | Phase 8, Part 11 | `visual_only` fakes score AUC **0.9702** with the visual pathway contributing nothing, and their audio is unmodified by definition. Phase 7's 0.9883 is an upper bound; the `D − C` delta is the trustworthy part |
 | **PF-23** — `average_precision` broke ties by row order | reports on disk | Fixed 2026-09-05 to resolve tie groups like `roc_auc` always has. Trained-model AP is unaffected (sigmoid outputs are never exactly tied), but the **`majority_class` Baseline-0 floor is a constant by construction**: Phases 4-6 recorded `ap 0.7383`, the correct value is **0.7200** (= the positive rate). Stale in three report JSONs; no headline moves. Mattered because a saturated frame head would have scored near-perfect frame AP |
+| **PF-24** — reliance on video is measured only on LAV-DF dev | Phase 10–11 | Phase 9's audio-untouched `visual` splices are the one training signal that could force video use, but `dev_drop_visual` is scored on LAV-DF fakes where audio suffices. A held-out spliced dev view (by modality) would show whether F1/F2 learned any visual skill at all |
+| **PF-25** — P9 augmentation hurts on dev | Phase 10 | F1 − F0 = −0.0045 AUC / **−0.0534 frame AP**, significant on 3/3 seeds. Default Experiment G to no augmentation |
 | PF-18 — BatchNorm sees padding | Phase 6+ | `--norm group` ablation exists, not yet measured |
 | 🔴 PRE-1 — original report missing | **P1-3, Part 9, Phase 16** | Not on this machine; drop at `docs/original_report.pdf`. The only thing keeping the P1-20 gate at 3/4 |
 | dev-2k is 698/2000 local | tighter Phase 4 numbers | Wall-clock only, ~500 files/hour. Does not change any Phase 4 conclusion |
@@ -198,8 +236,8 @@ requires re-checking at every scale-up — these scale-ups are what exposed both
 | 5 Audio baseline | 8 | ✅ **8/8** — gate passed; C-1 ✅ log-Mel; ⛔ PF-19 caveat |
 | 6 Fusion | 8 | ✅ **8/8** — gate passed on a **negative** result: C < B, collapsed onto audio (PF-20) |
 | 7 Temporal | 6 | ✅ **6/6** — gate P7-6 passed; D − C = **+0.0844**; frame AP **0.9183** |
-| 8 Self-attention | 10 | 🟡 **7/10** — P8-1…P8-7 built + tested (⛔ P8-6 desync passes); P8-8/9/10 pending |
-| 9 Augmentation | 7 | ⬜ Not started |
+| 8 Self-attention | 10 | ✅ **10/10** — gate P8-10 passed; E − D = +0.0045, all of it the sync loss |
+| 9 Augmentation | 7 | ✅ **7/7** — gate P9-7 passed; F2 − F1 = +0.0009 (**not significant**); F1 − F0 = −0.0045 (augmentation hurt) |
 | 10 Localization ⭐ | 14 | ⬜ Not started |
 | 11 Ablations | 11 | ⬜ Not started |
 | 12 Optimization | 6 | ⬜ Not started |
@@ -657,17 +695,17 @@ Otherwise `E − D` would be unattributable — the failure P7-6 exists to preve
 
 ---
 
-## PHASE 9 — Augmentation (🔬 Experiments F0 / F1 / F2)
+## PHASE 9 — Augmentation (🔬 Experiments F0 / F1 / F2) — ✅ **COMPLETE 7/7, gate passed (2026-09-19)**
 
-| ID | Task |
-|---|---|
-| P9-1 | Implement **manipulation splicing** first — splice a real span from video X into video Y with exactly-known boundaries (likely the biggest single win) |
-| P9-2 | Implement classical augmentation: spec-augment, temporal jitter, crop/colour jitter |
-| P9-3 | Implement the conditional feature-space GAN: `G: (noise, label) → [T,256]` + sequence discriminator, spectral norm |
-| P9-4 | Monitor GAN output diversity; inspect for mode collapse **before** using any samples |
-| P9-5 | 🔬 Run **all three arms**: F0 (none) / F1 (classical) / F2 (classical + GAN), 3 seeds each |
-| P9-6 | ⛔ Report **F2 vs F1** honestly — the only valid GAN claim. F2 ≈ F1 → "the GAN added nothing beyond classical augmentation" is a legitimate published result |
-| P9-7 | ⛔ **Gate:** three arms run, conclusion recorded honestly |
+| ID | Task | Status |
+|---|---|---|
+| P9-1 | Implement **manipulation splicing** first — splice a real span from video X into video Y with exactly-known boundaries (likely the biggest single win) | ✅ `training/augment.py`, real donor + real recipient, quarter-frame inset fixes a 1338/15000 boundary round-trip bug. Measured: **not** a win — see P9-6 |
+| P9-2 | Implement classical augmentation: spec-augment, temporal jitter, crop/colour jitter | ✅ in feature space (time masking, jitter, `feature_noise`, `frame_dropout`); pixel crop/colour jitter deliberately replaced — the cache holds embeddings. Per-epoch re-randomisation wired via `set_epoch` |
+| P9-3 | Implement the conditional feature-space GAN: `G: (noise, label) → [T,256]` + sequence discriminator, spectral norm | ✅ `models/gan/`, spectral norm, per-dim whitening, seed fed to every GRU step, MSGAN mode-seeking (weight 1.0) |
+| P9-4 | Monitor GAN output diversity; inspect for mode collapse **before** using any samples | ✅ ⛔ ratios vs real batch, raises `ModeCollapseError`. All 3 seeds admitted: pairwise 1.15 / 1.16 / 0.72 (floor 0.50) |
+| P9-5 | 🔬 Run **all three arms**: F0 (none) / F1 (classical) / F2 (classical + GAN), 3 seeds each | ✅ 9 runs, `experiments/phase9_F{0,1,2}/seed{0,1,2}`, `reports/phase9_F*.json` |
+| P9-6 | ⛔ Report **F2 vs F1** honestly — the only valid GAN claim. F2 ≈ F1 → "the GAN added nothing beyond classical augmentation" is a legitimate published result | ✅ ⛔ **F2 − F1 = +0.0009, not significant** (seeds −0.0008/+0.0044/−0.0008). Headline: *the GAN added nothing beyond classical augmentation*. F1 − F0 = −0.0045 — augmentation hurt |
+| P9-7 | ⛔ **Gate:** three arms run, conclusion recorded honestly | ✅ ⛔ **GATE PASSED** — `reports/experiment_f.md`, 3 arms × 3 seeds, controls match, F0 reproduces E full |
 
 ---
 

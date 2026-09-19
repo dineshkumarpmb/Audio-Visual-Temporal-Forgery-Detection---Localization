@@ -57,7 +57,8 @@ class SpliceConfig(StrictModel):
 
     `modality_weights` picks between a fake whose video is swapped, whose audio is swapped,
     or both -- mirroring LAV-DF's own four classes. The default is uniform, which makes
-    two thirds of generated fakes undetectable from audio alone. That is deliberate: it is
+    one third of generated fakes (the `visual` splices) undetectable from audio alone -- the
+    other two thirds swap audio and remain audible. That is deliberate: it is
     the first lever in this project that can *force* the visual pathway to matter, and
     whether it moves the PF-21 collapse is a measurable question rather than a hope.
     """
