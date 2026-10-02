@@ -1,0 +1,174 @@
+{
+  "seed": 1337,
+  "arm": "full_l1",
+  "frame_loss": "focal",
+  "lambda_cls": 1.0,
+  "lambda_loc": 1.0,
+  "lambda_sync": 0.3,
+  "lambda_bnd": 0.5,
+  "boundary_head": true,
+  "select_metric": "frame_ap",
+  "backbone": "mobilenet_v2",
+  "feature": "logmel",
+  "augmentation": false,
+  "git_sha": "ba2502fccc26-dirty",
+  "n_params": 5843785,
+  "epochs_run": 5,
+  "best_epoch": 32,
+  "wall_clock_s": 181.76,
+  "n_clips_train": 592,
+  "n_clips_dev": 175,
+  "dev": {
+    "auc": 0.9944930353093618,
+    "ap": 0.998009259110819,
+    "accuracy": 0.9428571428571428,
+    "eer": 0.03628117913832199,
+    "precision": 0.9461538461538461,
+    "recall": 0.9761904761904762,
+    "f1": 0.9609375,
+    "n": 175,
+    "positive_rate": 0.72,
+    "per_class": {
+      "visual_only": {
+        "n_fake": 37,
+        "auc": 0.9812465526751241,
+        "recall": 0.918918918918919
+      },
+      "audio_only": {
+        "n_fake": 45,
+        "auc": 1.0,
+        "recall": 1.0
+      },
+      "both": {
+        "n_fake": 44,
+        "auc": 1.0,
+        "recall": 1.0
+      },
+      "real": {
+        "n": 49,
+        "specificity": 0.8571428571428571
+      }
+    },
+    "frame_ap": 0.9196700288519736,
+    "frame_auc": 0.9839468684846678,
+    "n_frames": 39423,
+    "frame_positive_rate": 0.060548410826167465,
+    "sync_real_mean": 0.11395111680030823,
+    "sync_fake_mean": 0.11267630755901337,
+    "sync_separation": 0.0012748092412948608,
+    "attention_lift": 0.06631265580654144,
+    "attention_lift_median": 0.01828368380665779,
+    "attention_lift_n_clips": 126,
+    "head_entropy_mean": 0.2181393802165985
+  },
+  "dev_drop_visual": {
+    "auc": 0.9923874311629414,
+    "ap": 0.9973227806071691,
+    "accuracy": 0.9485714285714286,
+    "eer": 0.03628117913832199,
+    "precision": 0.9534883720930233,
+    "recall": 0.9761904761904762,
+    "f1": 0.9647058823529412,
+    "n": 175,
+    "positive_rate": 0.72,
+    "per_class": {
+      "visual_only": {
+        "n_fake": 37,
+        "auc": 0.9740761169332598,
+        "recall": 0.918918918918919
+      },
+      "audio_only": {
+        "n_fake": 45,
+        "auc": 1.0,
+        "recall": 1.0
+      },
+      "both": {
+        "n_fake": 44,
+        "auc": 1.0,
+        "recall": 1.0
+      },
+      "real": {
+        "n": 49,
+        "specificity": 0.8775510204081632
+      }
+    },
+    "frame_ap": 0.91728489888937,
+    "frame_auc": 0.9811231063443383,
+    "n_frames": 39423,
+    "frame_positive_rate": 0.060548410826167465,
+    "sync_real_mean": 0.22110730409622192,
+    "sync_fake_mean": 0.22106105089187622,
+    "sync_separation": 4.6253204345703125e-05,
+    "attention_lift": 0.06461454182863235,
+    "attention_lift_median": 0.015190988779067993,
+    "attention_lift_n_clips": 126,
+    "head_entropy_mean": 0.22146445512771606
+  },
+  "dev_drop_audio": {
+    "auc": 0.6575963718820862,
+    "ap": 0.8326707751277502,
+    "accuracy": 0.6857142857142857,
+    "eer": 0.3883219954648526,
+    "precision": 0.7591240875912408,
+    "recall": 0.8253968253968254,
+    "f1": 0.7908745247148289,
+    "n": 175,
+    "positive_rate": 0.72,
+    "per_class": {
+      "visual_only": {
+        "n_fake": 37,
+        "auc": 0.6905681191395477,
+        "recall": 0.8918918918918919
+      },
+      "audio_only": {
+        "n_fake": 45,
+        "auc": 0.672108843537415,
+        "recall": 0.8222222222222222
+      },
+      "both": {
+        "n_fake": 44,
+        "auc": 0.6150278293135436,
+        "recall": 0.7727272727272727
+      },
+      "real": {
+        "n": 49,
+        "specificity": 0.32653061224489793
+      }
+    },
+    "frame_ap": 0.09815290905019522,
+    "frame_auc": 0.6318066960336557,
+    "n_frames": 39423,
+    "frame_positive_rate": 0.060548410826167465,
+    "sync_real_mean": -0.5076051950454712,
+    "sync_fake_mean": -0.49307671189308167,
+    "sync_separation": -0.014528483152389526,
+    "attention_lift": 0.9862914681434631,
+    "attention_lift_median": 0.9872052669525146,
+    "attention_lift_n_clips": 126,
+    "head_entropy_mean": 0.8421740531921387
+  },
+  "train_config": {
+    "epochs": 40,
+    "lr": 0.001,
+    "weight_decay": 0.0001,
+    "batch_size": 16,
+    "grad_accum": 1,
+    "pos_weight": 0.3799533799533799,
+    "patience": 10,
+    "amp": false,
+    "grad_clip": 1.0,
+    "seed": 1337,
+    "num_workers": 0,
+    "aux_weight": 0.3,
+    "frame_weight": 1.0,
+    "frame_pos_weight": null,
+    "sync_weight": 0.3,
+    "cls_weight": 1.0,
+    "frame_loss": "focal",
+    "focal_alpha": 0.25,
+    "focal_gamma": 2.0,
+    "boundary_weight": 0.5,
+    "boundary_sigma": 2.0,
+    "select_metric": "frame_ap"
+  }
+}

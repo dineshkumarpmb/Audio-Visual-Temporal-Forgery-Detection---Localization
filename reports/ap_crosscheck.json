@@ -1,0 +1,60 @@
+{
+  "reference": "avdeepfake1m 0.0.4 (_evaluation extension)",
+  "seed": 0,
+  "ap_thresholds": [
+    0.1,
+    0.3,
+    0.5,
+    0.75,
+    0.95
+  ],
+  "ar_n": [
+    1,
+    2,
+    5,
+    100
+  ],
+  "ar_iou_thresholds": [
+    0.5,
+    0.55,
+    0.6,
+    0.65,
+    0.7,
+    0.75,
+    0.8,
+    0.85,
+    0.9,
+    0.95
+  ],
+  "unrounded": {
+    "decimals": null,
+    "cases_checked": 465,
+    "cases_skipped_no_gt": 35,
+    "worst_abs_diff_ap_agreeing": 8.956465136211733e-08,
+    "worst_abs_diff_ar_agreeing": 1.3828277589666982e-07,
+    "disagreements_explained_by_float32_threshold_ties": 0,
+    "unexplained_failures": [],
+    "n_unexplained": 0,
+    "standard_minus_reference_ap": {
+      "mean": 0.09773733034435476,
+      "min": -0.14285714881760736,
+      "max": 1.0
+    }
+  },
+  "grid_3_decimals": {
+    "decimals": 3,
+    "cases_checked": 465,
+    "cases_skipped_no_gt": 35,
+    "worst_abs_diff_ap_agreeing": 8.956465136211733e-08,
+    "worst_abs_diff_ar_agreeing": 1.3828277589666982e-07,
+    "disagreements_explained_by_float32_threshold_ties": 11,
+    "unexplained_failures": [],
+    "n_unexplained": 0,
+    "standard_minus_reference_ap": {
+      "mean": 0.09768868724242671,
+      "min": -0.14285714881760736,
+      "max": 1.0
+    }
+  },
+  "passed": true
+}

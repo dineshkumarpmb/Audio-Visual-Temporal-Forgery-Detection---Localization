@@ -27,6 +27,14 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 from src.evaluation.metrics import frame_metrics, per_class_breakdown, summary
+from src.losses.localization import (
+    BOUNDARY_SIGMA,
+    FOCAL_ALPHA,
+    FOCAL_GAMMA,
+    boundary_loss,
+    boundary_targets,
+    focal_loss_with_logits,
+)
 from src.losses.sync import InfoNCESyncLoss
 
 
@@ -56,6 +64,19 @@ class TrainConfig:
     # P8-5: weight on the auxiliary InfoNCE sync loss. Section 5.4 starts it at 0.3.
     # 0 keeps Phases 4-7 unchanged, so every earlier arm's objective is untouched.
     sync_weight: float = 0.0
+    # --- Phase 10 (section 5.4's full objective). Every default reproduces Phases 4-9. ----
+    # λ_cls on the video-level BCE. 1.0 multiplies by one, so earlier losses are unchanged.
+    cls_weight: float = 1.0
+    # P10-3: "bce" keeps Phase 7's weighted BCE; "focal" swaps in focal loss (α, γ below).
+    frame_loss: str = "bce"
+    focal_alpha: float = FOCAL_ALPHA
+    focal_gamma: float = FOCAL_GAMMA
+    # P10-4: λ_bnd on the boundary head. 0 = off, and the head is then never read.
+    boundary_weight: float = 0.0
+    boundary_sigma: float = BOUNDARY_SIGMA
+    # Which dev metric picks best.pt and drives early stopping. Phases 4-9 used clip AUC;
+    # Phase 10's headline is localization, so its arms select on dev frame AP instead.
+    select_metric: str = "auc"
 
 
 @dataclass
@@ -92,6 +113,12 @@ class Trainer:
         self.criterion = nn.BCEWithLogitsLoss(pos_weight=pw)
         # Built only when used, so Phases 4-7 construct exactly what they did before.
         self.sync_criterion = InfoNCESyncLoss() if cfg.sync_weight else None
+        if cfg.frame_loss not in ("bce", "focal"):
+            raise ValueError(f"frame_loss must be 'bce' or 'focal', got {cfg.frame_loss!r}")
+        if cfg.select_metric not in ("auc", "frame_ap"):
+            raise ValueError(
+                f"select_metric must be 'auc' or 'frame_ap', got {cfg.select_metric!r}"
+            )
         self.optimizer = torch.optim.AdamW(
             [p for p in model.parameters() if p.requires_grad],
             lr=cfg.lr,
@@ -153,7 +180,7 @@ class Trainer:
             out = self.model(batch["features"].to(self.device, non_blocking=True), mask)
 
         logits = out["logit"]
-        loss = self.criterion(logits, labels)
+        loss = self.cfg.cls_weight * self.criterion(logits, labels)
 
         # P6-5: auxiliary per-modality heads. Their gradients are the reason the visual
         # pathway keeps learning even once the fused head can score well on audio alone.
@@ -166,9 +193,27 @@ class Trainer:
         # carrying targets, so a Phase 7 model evaluated on a Phase 6 loader still runs.
         frame_logits, frames = out.get("frame_logits"), batch.get("frames")
         if frame_logits is not None and frames is not None and self.cfg.frame_weight:
-            loss = loss + self.cfg.frame_weight * self._frame_loss(
-                frame_logits, frames.to(self.device, non_blocking=True), mask
+            ft = frames.to(self.device, non_blocking=True)
+            if self.cfg.frame_loss == "focal":
+                frame_term = focal_loss_with_logits(
+                    frame_logits,
+                    ft,
+                    mask,
+                    alpha=self.cfg.focal_alpha,
+                    gamma=self.cfg.focal_gamma,
+                )
+            else:
+                frame_term = self._frame_loss(frame_logits, ft, mask)
+            loss = loss + self.cfg.frame_weight * frame_term
+
+        # P10-4: the boundary head, against Gaussian start/end heatmaps built from the same
+        # frame targets -- so a boundary can never disagree with the span it bounds.
+        bnd_logits = out.get("boundary_logits")
+        if bnd_logits is not None and frames is not None and self.cfg.boundary_weight:
+            heat = boundary_targets(
+                frames.to(self.device, non_blocking=True), mask, self.cfg.boundary_sigma
             )
+            loss = loss + self.cfg.boundary_weight * boundary_loss(bnd_logits, heat, mask)
 
         # P8-5: the auxiliary sync loss. ⛔ It reads `labels` because it is computed on
         # **real clips only** -- training a fake's forged span toward "aligned" would teach
@@ -256,24 +301,31 @@ class Trainer:
             self.history.append(result)
 
             auc = metrics["auc"]
-            improved = not np.isnan(auc) and auc > self.best_auc
+            # `best_auc` keeps its name for checkpoint compatibility; it holds whichever
+            # metric `select_metric` names.
+            chosen = float(metrics.get(self.cfg.select_metric, np.nan))
+            improved = not np.isnan(chosen) and chosen > self.best_auc
             if improved:
-                self.best_auc, self.best_epoch = auc, epoch
+                self.best_auc, self.best_epoch = chosen, epoch
                 self.save("best.pt", epoch)
             self.save("last.pt", epoch)  # X-4: every epoch, not just the best
 
             if verbose:
                 star = " *" if improved else ""
+                frame = f"frameAP {metrics['frame_ap']:.4f}  " if "frame_ap" in metrics else ""
                 print(
                     f"    epoch {epoch:>3}  train {train_loss:.4f}  val {val_loss:.4f}  "
-                    f"AUC {auc:.4f}  acc {metrics['accuracy']:.3f}  "
+                    f"AUC {auc:.4f}  {frame}acc {metrics['accuracy']:.3f}  "
                     f"{result.seconds:.1f}s{star}",
                     flush=True,
                 )
 
             if epoch - self.best_epoch >= self.cfg.patience:
                 if verbose:
-                    print(f"    early stop: no dev AUC gain in {self.cfg.patience} epochs")
+                    print(
+                        f"    early stop: no dev {self.cfg.select_metric} gain in "
+                        f"{self.cfg.patience} epochs"
+                    )
                 break
 
         return self.history

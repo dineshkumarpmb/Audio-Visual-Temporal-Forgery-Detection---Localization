@@ -1,0 +1,14 @@
+{
+  "manifest": "data/manifests/manifest_v1.parquet",
+  "n_entries": 136304,
+  "n_fake": 99873,
+  "n_spans": 114253,
+  "n_spans_merged_at_frame_resolution": 448,
+  "worst_error_frames": 0.9000000000000341,
+  "p10_1_failures": 0,
+  "n_real": 36431,
+  "p10_2_failures": 0,
+  "failures": [],
+  "passed": true,
+  "labels_are_seconds": true
+}

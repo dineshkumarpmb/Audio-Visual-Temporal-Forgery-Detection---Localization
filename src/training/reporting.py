@@ -27,7 +27,20 @@ def git_sha() -> str:
         out = subprocess.run(
             ["git", "rev-parse", "HEAD"], capture_output=True, text=True, timeout=10, check=False
         )
-        return out.stdout.strip()[:12] or "unknown"
+        sha = out.stdout.strip()[:12]
+        if not sha:
+            return "unknown"
+        # A run trained from uncommitted code must say so: the bare SHA would point at a
+        # commit that does not contain the code that produced the number. Only src/ and
+        # scripts/ count -- results written under experiments/ and reports/ are not code.
+        status = subprocess.run(
+            ["git", "status", "--porcelain", "--", "src", "scripts"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+        return f"{sha}-dirty" if status.stdout.strip() else sha
     except (subprocess.SubprocessError, OSError):
         return "unknown"
 

@@ -7,17 +7,17 @@ Legend: ⛔ = blocking gate item · ⭐ = headline capability · 🔬 = experime
 
 ---
 
-## 📍 CURRENT STATUS — 2026-09-19, Phase 9 complete · Phase 10 next
+## 📍 CURRENT STATUS — 2026-10-02, Phase 10 complete · Phase 11 next
 
 | | |
 |---|---|
-| **Done** | Phase −1 · Phase 0 · **P1 (18/20)** · **P2 (13/15)** · **P3 (9/9)** · **P4 (12/12)** · **P5 (8/8)** · **P6 (8/8)** · **P7 (6/6)** · **P8 (10/10)** · **P9 (7/7)** · CL-1 ✅ · CL-7 ✅ |
+| **Done** | Phase −1 · Phase 0 · **P1 (18/20)** · **P2 (13/15)** · **P3 (9/9)** · **P4 (12/12)** · **P5 (8/8)** · **P6 (8/8)** · **P7 (6/6)** · **P8 (10/10)** · **P9 (7/7)** · **P10 (13/14)** · CL-1 ✅ · CL-7 ✅ |
 | **Resolved** | ⛔ **D-1 → MobileNetV2** (0.7189 vs 0.6319). ⛔ **C-1 → log-Mel** (0.9838 vs 0.7677). Both open decisions settled by experiment |
-| **Next** | **Phase 10 — temporal localization ⭐** (Experiment G). Start with ⛔ P10-7: 1-D interval AP/AR, unit-tested against hand-computed cases, before any localization number is trusted |
-| **Progress** | ~107 of 203 tasks (≈53%) · **11 of 18 phases complete** |
-| **Tests** | **351 passing** — 335 unit + 16 integration against the real 136,304-entry dataset |
-| **⚠️ Caveat** | ⛔ **PF-17 / PF-19 / PF-20** — the artefacts are inherited by every arm since. Phase 7's AUC 0.9883 is an **upper bound**; the trustworthy quantity is the `D − C` delta. No bare number from Phases 4–7 may enter Part 11's evidence table |
-| **✋ Awaiting you** | P2-8 (contact sheets) · ⛔ P2-10 (watch 20 overlays) — artefacts in `reports/figures/` |
+| **Next** | **Phase 11 — ablations.** Post-processing is frozen (`configs/postprocess_frozen.json`); ⛔ P11-8 scores the test split exactly once, at the end |
+| **Progress** | ~120 of 203 tasks (≈59%) · **12 of 18 phases complete** |
+| **Tests** | **401 passing** (unit + integration against the real 136,304-entry dataset) |
+| **⚠️ Caveat** | ⛔ **PF-17 / PF-19 / PF-20** — the artefacts are inherited by every arm since. Phase 7's AUC 0.9883 is an **upper bound**; the trustworthy quantity is the `D − C` delta. No bare number from Phases 4–10 may enter Part 11's evidence table |
+| **✋ Awaiting you** | P2-8 (contact sheets) · ⛔ P2-10 (watch 20 overlays) — artefacts in `reports/figures/` · P10-13 (20 timelines, `reports/figures/localization/timelines_dev20.png`) |
 | **Kaggle** | `dinesh1234567` · phone verified · **30 GPU h/week** · P100 16 GB or T4×2 · 12 h/session · 20 GB `/kaggle/working` |
 | **Branch** | `master` |
 
@@ -27,7 +27,38 @@ Legend: ⛔ = blocking gate item · ⭐ = headline capability · 🔬 = experime
 `losses/sync.py`, `localization/targets.py`, `training/{trainer,reporting}.py`,
 `evaluation/metrics.py` and `data/dataset.py`, driven by `scripts/02`–`26`. Phase 9 added
 `training/{augment,gan}.py`, `models/gan/{generator,discriminator}.py` and `scripts/30`–`31`.
-`api/` and `inference/` are still stubs — Phases 10–16 are untouched.
+`api/` and `inference/` are still stubs — Phases 11–16 are untouched. Phase 10 added
+`evaluation/localization.py`, `localization/{postprocess,chunking}.py`, `losses/localization.py`,
+`models/heads/boundary.py` and `scripts/32`–`35`.
+
+### 🔬 Phase 10 result — Experiment G (2026-10-02)
+
+**Localization works on dev, and no objective change beats plain BCE at AP@0.5.**
+`reports/experiment_g.md`, gate P10-14 passed. Dev numbers — λ, model selection and
+post-processing were all chosen on dev; Phase 11's single test run is the held-out figure.
+
+| arm | AP@0.5 | AP@0.75 | AP@0.95 | AR@10 | boundary err | FP on real |
+|---|---|---|---|---|---|---|
+| BCE control (F0 objective) | 0.8461 ± 0.0109 | 0.6425 | 0.0730 | 0.6542 | 69 ms | 0.020 |
+| focal | 0.8441 ± 0.0114 | **0.6793** | **0.1870** | **0.6977** | **61 ms** | 0.048 |
+| **full** (focal + boundary, headline) | **0.8522** ± 0.0187 | 0.6340 | 0.0383 | 0.6202 | 78 ms | **0.000** |
+
+⛔ **Every AP@0.5 difference is inside seed spread — not significant.** The headline arm is
+`full` only because the pre-committed rule picks the highest mean AP@0.5. The one significant
+result is **focal − BCE: +0.0369 AP@0.75 and −7.3 ms boundary error** (all 3 seeds) — focal
+loss sharpens boundaries. The boundary head (§5.4) did **not** help: −0.0454 AP@0.75, +17 ms,
+both not significant, and AP@0.95 collapses to 0.038. λ tuning (P10-5) moved nothing beyond
+spread, so the plan's defaults stand.
+
+Post-processing tuning was the largest single lever: **+0.24 AP@0.5** for `full` over §6.4's
+defaults (0.6112 → 0.8522), with a flat top — mostly from dropping τ to 0.2.
+
+⛔ **PF-21 holds for localization too.** Zeroing video costs +0.0009 (BCE), −0.0000 (full) and
++0.0119 (focal) AP@0.5 — only focal crosses 0.01, barely, so localization is audio-driven.
+
+**PF-26** — Phase 10 training is RAM-bound on this machine: the first `make phase10` run was
+killed by host memory pressure mid-`full_l1` (≈1.5 GB free with Chrome open). Resume from
+`last.pt` worked exactly (epoch 35). Close Chrome before long runs (X-5).
 
 ### 🔬 Phase 9 result — Experiment F (2026-09-19)
 
@@ -211,6 +242,7 @@ requires re-checking at every scale-up — these scale-ups are what exposed both
 | ⛔ **PF-22** — PF-19's fingerprint is stronger at D | Phase 8, Part 11 | `visual_only` fakes score AUC **0.9702** with the visual pathway contributing nothing, and their audio is unmodified by definition. Phase 7's 0.9883 is an upper bound; the `D − C` delta is the trustworthy part |
 | **PF-23** — `average_precision` broke ties by row order | reports on disk | Fixed 2026-09-05 to resolve tie groups like `roc_auc` always has. Trained-model AP is unaffected (sigmoid outputs are never exactly tied), but the **`majority_class` Baseline-0 floor is a constant by construction**: Phases 4-6 recorded `ap 0.7383`, the correct value is **0.7200** (= the positive rate). Stale in three report JSONs; no headline moves. Mattered because a saturated frame head would have scored near-perfect frame AP |
 | **PF-24** — reliance on video is measured only on LAV-DF dev | Phase 10–11 | Phase 9's audio-untouched `visual` splices are the one training signal that could force video use, but `dev_drop_visual` is scored on LAV-DF fakes where audio suffices. A held-out spliced dev view (by modality) would show whether F1/F2 learned any visual skill at all |
+| **PF-26** — host RAM kills long runs | Phase 11+ | `make phase10` was reaped mid-run at ≈1.5 GB free; resume from `last.pt` exact. Close Chrome before Phase 11's ablation matrix |
 | **PF-25** — P9 augmentation hurts on dev | Phase 10 | F1 − F0 = −0.0045 AUC / **−0.0534 frame AP**, significant on 3/3 seeds. Default Experiment G to no augmentation |
 | PF-18 — BatchNorm sees padding | Phase 6+ | `--norm group` ablation exists, not yet measured |
 | 🔴 PRE-1 — original report missing | **P1-3, Part 9, Phase 16** | Not on this machine; drop at `docs/original_report.pdf`. The only thing keeping the P1-20 gate at 3/4 |
@@ -238,7 +270,7 @@ requires re-checking at every scale-up — these scale-ups are what exposed both
 | 7 Temporal | 6 | ✅ **6/6** — gate P7-6 passed; D − C = **+0.0844**; frame AP **0.9183** |
 | 8 Self-attention | 10 | ✅ **10/10** — gate P8-10 passed; E − D = +0.0045, all of it the sync loss |
 | 9 Augmentation | 7 | ✅ **7/7** — gate P9-7 passed; F2 − F1 = +0.0009 (**not significant**); F1 − F0 = −0.0045 (augmentation hurt) |
-| 10 Localization ⭐ | 14 | ⬜ Not started |
+| 10 Localization ⭐ | 14 | ✅ **13/14** — gate P10-14 passed; AP@0.5 **0.8522** (dev); arms tie at AP@0.5, focal significantly sharper at AP@0.75; P10-13 awaits ✋ |
 | 11 Ablations | 11 | ⬜ Not started |
 | 12 Optimization | 6 | ⬜ Not started |
 | 13 API | 12 | ⬜ Not started |
@@ -709,24 +741,24 @@ Otherwise `E − D` would be unattributable — the failure P7-6 exists to preve
 
 ---
 
-## PHASE 10 — Temporal Localization ⭐ (🔬 Experiment G)
+## PHASE 10 — Temporal Localization ⭐ (🔬 Experiment G) — ✅ **13/14, gate passed (2026-10-02)**
 
-| ID | Task |
-|---|---|
-| P10-1 | ⛔ GT alignment: `fake_periods` → per-frame `[T]` target, with the **inverse-transform assertion** (target → intervals matches original within 1 frame) |
-| P10-2 | Assert `target.sum() == 0` for every real video, exactly |
-| P10-3 | Per-frame head + **focal loss** (α=0.25, γ=2.0) |
-| P10-4 | Optional boundary head `[T,2]` (start-ness / end-ness) vs Gaussian-smoothed targets + BoundaryLoss |
-| P10-5 | Combined loss `λ_cls·BCE + λ_loc·Focal + λ_sync·InfoNCE + λ_bnd·Boundary` starting at (1.0, 2.0, 0.3, 0.5); tune λ on dev |
-| P10-6 | Post-processing chain (§6.4): median smooth(5) → threshold τ → binary closing(3) → extract runs → min-duration 0.4 s → merge gaps < 0.3 s → per-segment confidence → seconds |
-| P10-7 | ⛔ Implement AP/AR for 1-D intervals and **unit-test against hand-computed toy cases** (perfect → 1.0; IoU 0.4 @ thr 0.5 → 0.0; one correct + one spurious → exact hand value). Cross-check against an established implementation |
-| P10-8 | Synthetic known-span test → recovered IoU > 0.9 |
-| P10-9 | Property tests: segments sorted, non-overlapping, within `[0, duration]` |
-| P10-10 | Grid-search τ / median kernel / min-duration / merge-gap on **dev** maximizing AP@0.5, then **freeze** |
-| P10-11 | Implement long-video chunking: 750-frame chunks, 125-frame overlap, average scores in overlap, post-process **once** on the stitched sequence |
-| P10-12 | Measure mean boundary error (ms) and **false-positive segment rate on real videos** |
-| P10-13 | ✋ Visually compare predicted timelines against ground truth for 20 videos |
-| P10-14 | ⛔ **Gate:** AP@{0.5,0.75,0.95} + AR@{100,50,20,10} computed with a *verified* AP implementation, post-processing frozen before test |
+| ID | Task | Status |
+|---|---|---|
+| P10-1 | ⛔ GT alignment: `fake_periods` → per-frame `[T]` target, with the **inverse-transform assertion** (target → intervals matches original within 1 frame) | ✅ ⛔ `scripts/32_check_gt_alignment.py` over the full manifest: **99,873/99,873** fakes within one frame, worst 0.900 frames (`reports/gt_alignment.json`) |
+| P10-2 | Assert `target.sum() == 0` for every real video, exactly | ✅ **36,431/36,431** real targets exactly zero |
+| P10-3 | Per-frame head + **focal loss** (α=0.25, γ=2.0) | ✅ `losses/localization.py`; arm `focal`, 3 seeds |
+| P10-4 | Optional boundary head `[T,2]` (start-ness / end-ness) vs Gaussian-smoothed targets + BoundaryLoss | ✅ `models/heads/boundary.py`; arm `full`, 3 seeds |
+| P10-5 | Combined loss `λ_cls·BCE + λ_loc·Focal + λ_sync·InfoNCE + λ_bnd·Boundary` starting at (1.0, 2.0, 0.3, 0.5); tune λ on dev | ✅ `full_l1` / `full_l4` / `full_b1`, seed 0: AP@0.5 0.8712 / 0.8522 / 0.8378 vs 0.8634 at the default — all inside `full`'s 3-seed spread (0.0187), so **defaults kept** |
+| P10-6 | Post-processing chain (§6.4): median smooth(5) → threshold τ → binary closing(3) → extract runs → min-duration 0.4 s → merge gaps < 0.3 s → per-segment confidence → seconds | ✅ `localization/postprocess.py` |
+| P10-7 | ⛔ Implement AP/AR for 1-D intervals and **unit-test against hand-computed toy cases** (perfect → 1.0; IoU 0.4 @ thr 0.5 → 0.0; one correct + one spurious → exact hand value). Cross-check against an established implementation | ✅ ⛔ `evaluation/localization.py` + `tests/unit/test_localization_metrics.py`; cross-checked against the LAV-DF authors' evaluator (`avdeepfake1m` 0.0.4): 465 cases, **0 unexplained** (`reports/ap_crosscheck.json`) |
+| P10-8 | Synthetic known-span test → recovered IoU > 0.9 | ✅ `tests/unit/test_postprocess.py` |
+| P10-9 | Property tests: segments sorted, non-overlapping, within `[0, duration]` | ✅ `tests/unit/test_postprocess.py`; `assert_segment_contract` also runs on every dev prediction |
+| P10-10 | Grid-search τ / median kernel / min-duration / merge-gap on **dev** maximizing AP@0.5, then **freeze** | ✅ ⛔ 7,776 configs; frozen to `configs/postprocess_frozen.json` (arm `full`: τ 0.2, kernel 5, min dur 0.2 s, gap 0.0 s). Flat top. Tuning bought +0.24 AP@0.5 over §6.4's defaults |
+| P10-11 | Implement long-video chunking: 750-frame chunks, 125-frame overlap, average scores in overlap, post-process **once** on the stitched sequence | ✅ `localization/chunking.py` |
+| P10-12 | Measure mean boundary error (ms) and **false-positive segment rate on real videos** | ✅ headline arm: **78 ± 16 ms**, FP rate on real **0.000**. Focal: 61 ± 2 ms, 0.048 |
+| P10-13 | ✋ Visually compare predicted timelines against ground truth for 20 videos | ✋ **Awaiting you** — `reports/figures/localization/timelines_dev20.png` |
+| P10-14 | ⛔ **Gate:** AP@{0.5,0.75,0.95} + AR@{100,50,20,10} computed with a *verified* AP implementation, post-processing frozen before test | ✅ ⛔ **GATE PASSED** — `reports/experiment_g.md`, 6/6 checks, test split never scored |
 
 ---
 

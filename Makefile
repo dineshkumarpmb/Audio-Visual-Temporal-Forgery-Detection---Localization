@@ -20,6 +20,7 @@ TORCH_PINS  := torch==2.7.1+cu118 torchvision==0.22.1+cu118 torchaudio==2.7.1+cu
         train-fusion experiment-c phase6 \
         train-temporal frame-confound experiment-d phase7 \
         train-augmented experiment-f phase9 \
+        gt-alignment crosscheck-ap train-localization experiment-g phase10 \
         features train evaluate ablations benchmark api frontend demo clean-bench
 
 help:  ## Show this help
@@ -281,6 +282,30 @@ phase9:     ## Phase 9 - the three augmentation arms, then Experiment F
 # checkpoint is missing. Both are resumable: a killed sweep re-reads result.json per seed.
 	$(PY) scripts/30_train_augmented.py --arms F0 F1 F2 --seeds 3
 	$(MAKE) experiment-f
+	$(PY) -m pytest tests/ -q
+
+gt-alignment: ## Phase 10 - P10-1/P10-2 ground-truth round trip over the whole manifest
+	$(PY) scripts/32_check_gt_alignment.py
+
+crosscheck-ap: ## Phase 10 - P10-7 AP/AR vs the LAV-DF authors' evaluator (REF=<dir>)
+# The reference is not a dependency (it pins numpy<2). Fetch it into a scratch dir:
+#   pip download avdeepfake1m==0.0.4 --no-deps -d <tmp>
+#   python -m zipfile -e <tmp>/avdeepfake1m-0.0.4-*.whl <REF>
+	$(PY) scripts/33_crosscheck_ap.py --reference "$(REF)"
+
+train-localization: ## Phase 10 - train localization arms (ARGS=--arms full --seeds 3)
+	$(PY) scripts/34_train_localization.py $(ARGS)
+
+experiment-g: ## Phase 10 - tune + freeze post-processing on dev, Experiment G, gate P10-14
+	$(PY) scripts/35_experiment_g.py
+
+phase10:    ## Phase 10 - round trip, the three arms, lambda tuning, then Experiment G
+# Evaluation reads only the saved dev predictions, so experiment-g can be re-run (a metric
+# fixed, a figure redrawn) without retraining. crosscheck-ap needs REF and runs separately.
+	$(MAKE) gt-alignment
+	$(PY) scripts/34_train_localization.py --arms bce full focal --seeds 3
+	$(PY) scripts/34_train_localization.py --arms full_l1 full_l4 full_b1 --seeds 1 --skip-overfit
+	$(MAKE) experiment-g
 	$(PY) -m pytest tests/ -q
 
 features:   ## Phases 2-5 — Stage-A extraction (resumable; safe to re-run)

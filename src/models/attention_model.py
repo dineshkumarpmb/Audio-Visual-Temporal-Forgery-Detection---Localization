@@ -44,6 +44,7 @@ import torch
 
 from src.models.fusion.concat import ConcatFusionBaseline
 from src.models.fusion.cross_attention import BidirectionalCrossAttention
+from src.models.heads.boundary import BoundaryHead
 from src.models.heads.frame import FrameHead
 from src.models.heads.sync import SYNC_WINDOW, SyncHead
 from src.models.temporal.lstm import PackedBiLSTM
@@ -77,6 +78,9 @@ class AttentionFusionModel(ConcatFusionBaseline):
         sync_window: int = SYNC_WINDOW,
         lstm_hidden: int = 256,
         lstm_layers: int = 2,
+        # P10-4: optional (start, end) head. Built only when asked for, so every earlier
+        # arm constructs -- and every earlier checkpoint loads into -- the same module tree.
+        boundary: bool = False,
     ) -> None:
         super().__init__(
             visual_dim=visual_dim,
@@ -115,6 +119,7 @@ class AttentionFusionModel(ConcatFusionBaseline):
 
         self.sync_head = SyncHead(d_model, d_model, sync_window)
         self.frame_head = FrameHead(d_model, hidden, dropout)
+        self.boundary_head = BoundaryHead(d_model, hidden, dropout) if boundary else None
 
     def forward(
         self,
@@ -178,6 +183,8 @@ class AttentionFusionModel(ConcatFusionBaseline):
             "aux_visual": aux_visual,
             "aux_audio": aux_audio,
         }
+        if self.boundary_head is not None:
+            out["boundary_logits"] = self.boundary_head(sequence, mask)
         if head_entropy is not None:
             out["head_entropy"] = head_entropy
         if return_attention:
@@ -209,12 +216,15 @@ class AttentionFusionModel(ConcatFusionBaseline):
         else:
             sequence = fused
         logit, weights = self.head(sequence, mask)
-        return {
+        out = {
             "logit": logit,
             "frame_logits": self.frame_head(sequence, mask),
             "attention": weights,
             "sequence": sequence,
         }
+        if self.boundary_head is not None:
+            out["boundary_logits"] = self.boundary_head(sequence, mask)
+        return out
 
     @torch.no_grad()
     def sync_score(
