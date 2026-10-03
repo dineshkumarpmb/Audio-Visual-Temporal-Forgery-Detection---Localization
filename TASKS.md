@@ -7,16 +7,16 @@ Legend: ⛔ = blocking gate item · ⭐ = headline capability · 🔬 = experime
 
 ---
 
-## 📍 CURRENT STATUS — 2026-10-02, Phase 10 complete · Phase 11 next
+## 📍 CURRENT STATUS — 2026-10-03, Phase 11 complete · Phase 12 next
 
 | | |
 |---|---|
-| **Done** | Phase −1 · Phase 0 · **P1 (18/20)** · **P2 (13/15)** · **P3 (9/9)** · **P4 (12/12)** · **P5 (8/8)** · **P6 (8/8)** · **P7 (6/6)** · **P8 (10/10)** · **P9 (7/7)** · **P10 (13/14)** · CL-1 ✅ · CL-7 ✅ |
+| **Done** | Phase −1 · Phase 0 · **P1 (18/20)** · **P2 (13/15)** · **P3 (9/9)** · **P4 (12/12)** · **P5 (8/8)** · **P6 (8/8)** · **P7 (6/6)** · **P8 (10/10)** · **P9 (7/7)** · **P10 (13/14)** · **P11 (11/11)** · CL-1 ✅ · CL-7 ✅ |
 | **Resolved** | ⛔ **D-1 → MobileNetV2** (0.7189 vs 0.6319). ⛔ **C-1 → log-Mel** (0.9838 vs 0.7677). Both open decisions settled by experiment |
-| **Next** | **Phase 11 — ablations.** Post-processing is frozen (`configs/postprocess_frozen.json`); ⛔ P11-8 scores the test split exactly once, at the end |
-| **Progress** | ~120 of 203 tasks (≈59%) · **12 of 18 phases complete** |
-| **Tests** | **401 passing** (unit + integration against the real 136,304-entry dataset) |
-| **⚠️ Caveat** | ⛔ **PF-17 / PF-19 / PF-20** — the artefacts are inherited by every arm since. Phase 7's AUC 0.9883 is an **upper bound**; the trustworthy quantity is the `D − C` delta. No bare number from Phases 4–10 may enter Part 11's evidence table |
+| **Next** | **Phase 12 — optimization** (ONNX, fp16, Table 8.2.3). ⛔ The test split is spent (`reports/test_once.lock`); P12-5 re-verifies accuracy on **dev**, never test |
+| **Progress** | ~131 of 203 tasks (≈65%) · **13 of 18 phases complete** |
+| **Tests** | **409 passing** (unit + integration against the real 136,304-entry dataset) |
+| **⚠️ Caveat** | ⛔ **PF-17 / PF-19 / PF-20** — the artefacts are inherited by every arm since. Absolute numbers (test included) are **upper bounds**; the trustworthy quantities are the paired deltas in `reports/evidence_table.md`. ⛔ **PF-27**: Phase 4–11 runs reproduce to ~1 seed-sd, not 1e-4 — new training uses `--strict-determinism` |
 | **✋ Awaiting you** | P2-8 (contact sheets) · ⛔ P2-10 (watch 20 overlays) — artefacts in `reports/figures/` · P10-13 (20 timelines, `reports/figures/localization/timelines_dev20.png`) |
 | **Kaggle** | `dinesh1234567` · phone verified · **30 GPU h/week** · P100 16 GB or T4×2 · 12 h/session · 20 GB `/kaggle/working` |
 | **Branch** | `master` |
@@ -30,6 +30,48 @@ Legend: ⛔ = blocking gate item · ⭐ = headline capability · 🔬 = experime
 `api/` and `inference/` are still stubs — Phases 11–16 are untouched. Phase 10 added
 `evaluation/localization.py`, `localization/{postprocess,chunking}.py`, `losses/localization.py`,
 `models/heads/boundary.py` and `scripts/32`–`35`.
+
+### 🔬 Phase 11 result — evidence table + the single test run (2026-10-03)
+
+**Gate P11-11 passed.** `reports/evidence_table.md` (Tables 8.2.1, 8.2.2, 8.2.4, 8.2.5 and
+section 7.3 on 13 claims) and `reports/test_once.md`.
+
+⛔ **P11-8 — test, scored exactly once** (392 clips, 291 fake / 101 real, 3 seeds, frozen
+post-processing; a second run is refused by `scripts/38_test_once.py`):
+
+| G (headline) | dev | **test** |
+|---|---|---|
+| clip ROC-AUC | 0.9889 | **0.9842 ± 0.0013** |
+| frame AP | 0.9257 | **0.8903 ± 0.0037** |
+| AP@0.5 | 0.8522 | **0.8005 ± 0.0167** |
+| AP@0.75 | 0.6340 | **0.5392 ± 0.0299** |
+| boundary error | 78 ms | **97 ± 14 ms** |
+| FP rate on real | 0.000 | **0.026** |
+
+Visual-only fakes are the weak class on test (AP@0.5 0.71 vs ~0.85). Zeroing video costs
+AUC 0.0016 and *raises* AP@0.5 by 0.0096 — **PF-21 holds on held-out data.**
+
+**Section 7.3 verdicts (dev, paired by seed).** Helps: **J** MobileNetV2 (+0.087 AUC),
+**K** log-Mel (+0.216), **D > C** BiLSTM (+0.084). Hurts: **C vs B** fusion (−0.080 AUC),
+**E vs D** on frame AP (−0.018). Not significant: G-1 cross-attention, H-1 Transformer,
+F1, F2, focal, boundary head, **H** sync loss (+0.0023 AP@0.5, spread 0.0287) and **I**
+modality dropout (+0.0175, spread 0.0187).
+
+**PF-28** — the two new ablations' secondary metrics are real findings: the sync loss
+**costs 0.096 AP@0.75** (all 3 seeds, beyond spread) and 22 ms of boundary error; without
+modality dropout the model is the only arm whose localization uses video (0.060 AP@0.5
+lost without it) — but unhelpfully: visual-only AP@0.5 falls 0.68 → 0.57 and 10% of real
+clips get a false segment.
+
+**PF-27 / P11-10** — re-training G seed 0 from its logged config drifted (AUC Δ 0.006,
+best epoch 12 → 23): cuDNN determinism alone is not enough. With
+`torch.use_deterministic_algorithms(True)` (`--strict-determinism`) two re-runs are
+**bit-identical**. P11-10 passes in strict mode; earlier runs reproduce to ~1 seed-sd.
+
+Test-split features: only 19 test clips existed locally, so the dev-2k test split was
+fetched alone (`05_fetch_metadata.py --splits test`, 383 clips, 0 failed) and extracted —
+train (592) and dev (175) are exactly Experiment G's. Experiment I seed 2 was killed by
+host RAM pressure at epoch 23 (PF-26 again) and resumed from `last.pt`.
 
 ### 🔬 Phase 10 result — Experiment G (2026-10-02)
 
@@ -242,7 +284,10 @@ requires re-checking at every scale-up — these scale-ups are what exposed both
 | ⛔ **PF-22** — PF-19's fingerprint is stronger at D | Phase 8, Part 11 | `visual_only` fakes score AUC **0.9702** with the visual pathway contributing nothing, and their audio is unmodified by definition. Phase 7's 0.9883 is an upper bound; the `D − C` delta is the trustworthy part |
 | **PF-23** — `average_precision` broke ties by row order | reports on disk | Fixed 2026-09-05 to resolve tie groups like `roc_auc` always has. Trained-model AP is unaffected (sigmoid outputs are never exactly tied), but the **`majority_class` Baseline-0 floor is a constant by construction**: Phases 4-6 recorded `ap 0.7383`, the correct value is **0.7200** (= the positive rate). Stale in three report JSONs; no headline moves. Mattered because a saturated frame head would have scored near-perfect frame AP |
 | **PF-24** — reliance on video is measured only on LAV-DF dev | Phase 10–11 | Phase 9's audio-untouched `visual` splices are the one training signal that could force video use, but `dev_drop_visual` is scored on LAV-DF fakes where audio suffices. A held-out spliced dev view (by modality) would show whether F1/F2 learned any visual skill at all |
-| **PF-26** — host RAM kills long runs | Phase 11+ | `make phase10` was reaped mid-run at ≈1.5 GB free; resume from `last.pt` exact. Close Chrome before Phase 11's ablation matrix |
+| **PF-26** — host RAM kills long runs | Phase 12+ | `make phase10` was reaped mid-run at ≈1.5 GB free, and Phase 11's Experiment I seed 2 again (2026-10-03); resume from `last.pt` exact both times. Close Chrome before long runs |
+| ⛔ **PF-27** — default training is not bit-reproducible | all new training | Re-run of G seed 0 drifted ~1 seed-sd. `--strict-determinism` (`torch.use_deterministic_algorithms`) makes re-runs bit-identical; use it from now on |
+| **PF-28** — sync loss costs boundary precision; modality dropout hides unhelpful video use | Part 11 limitations, Phase 16 | G − H = −0.096 AP@0.75 (significant). I relies on video for localization (0.060 AP@0.5) but does worse on visual-only fakes |
+| ⛔ **Test split is spent** | Phases 12–16 | `reports/test_once.lock`. Accuracy re-checks after optimization (P12-5) run on dev |
 | **PF-25** — P9 augmentation hurts on dev | Phase 10 | F1 − F0 = −0.0045 AUC / **−0.0534 frame AP**, significant on 3/3 seeds. Default Experiment G to no augmentation |
 | PF-18 — BatchNorm sees padding | Phase 6+ | `--norm group` ablation exists, not yet measured |
 | 🔴 PRE-1 — original report missing | **P1-3, Part 9, Phase 16** | Not on this machine; drop at `docs/original_report.pdf`. The only thing keeping the P1-20 gate at 3/4 |
@@ -271,7 +316,7 @@ requires re-checking at every scale-up — these scale-ups are what exposed both
 | 8 Self-attention | 10 | ✅ **10/10** — gate P8-10 passed; E − D = +0.0045, all of it the sync loss |
 | 9 Augmentation | 7 | ✅ **7/7** — gate P9-7 passed; F2 − F1 = +0.0009 (**not significant**); F1 − F0 = −0.0045 (augmentation hurt) |
 | 10 Localization ⭐ | 14 | ✅ **13/14** — gate P10-14 passed; AP@0.5 **0.8522** (dev); arms tie at AP@0.5, focal significantly sharper at AP@0.75; P10-13 awaits ✋ |
-| 11 Ablations | 11 | ⬜ Not started |
+| 11 Ablations | 11 | ✅ **11/11** — gate P11-11 passed; **test AUC 0.9842, AP@0.5 0.8005**; H and I not significant at AP@0.5; P11-10 bit-identical in strict mode (PF-27) |
 | 12 Optimization | 6 | ⬜ Not started |
 | 13 API | 12 | ⬜ Not started |
 | 14 Frontend | 12 | ⬜ Not started (also gated by P14-0) |
@@ -762,21 +807,21 @@ Otherwise `E − D` would be unattributable — the failure P7-6 exists to preve
 
 ---
 
-## PHASE 11 — Ablation Experiments
+## PHASE 11 — Ablation Experiments — ✅ **COMPLETE 11/11, gate passed (2026-10-03)**
 
-| ID | Task |
-|---|---|
-| P11-1 | Build `src/evaluation/*` as **pure functions** — predictions.parquet + manifest → metrics.json, decoupled from training |
-| P11-2 | `scripts/08_run_ablations.py` — run the full matrix A–K × 3 seeds (0,1,2) |
-| P11-3 | 🔬 Experiment H — ablate the sync loss (λ_sync=0); verify G > H |
-| P11-4 | 🔬 Experiment I — ablate modality dropout; use the 4-class breakdown to detect collapse |
-| P11-5 | Compute mean ± std for every headline claim |
-| P11-6 | Apply the **four §7.3 criteria** (magnitude > seed std, consistency on all 3 seeds, right metric, cost stated) to every claimed improvement |
-| P11-7 | Fill Table 8.2.1 (classification), 8.2.2 (localization), 8.2.4 (4-class breakdown), 8.2.5 (decision resolutions) |
-| P11-8 | ⛔ **Run the test split exactly once**, at the very end, after all hyperparameters and thresholds are frozen |
-| P11-9 | ⛔ Include **negative results**; mark any sub-seed-variance difference as "not significant" |
-| P11-10 | Reproducibility check: re-run one experiment from its logged config, confirm metrics match to ~1e-4 |
-| P11-11 | ⛔ **Gate:** complete evidence table exists, every number traceable to a logged run |
+| ID | Task | Status |
+|---|---|---|
+| P11-1 | Build `src/evaluation/*` as **pure functions** — predictions + manifest → metrics, decoupled from training | ✅ `src/evaluation/runs.py`; Experiment G re-run through it reproduces its committed numbers exactly. `src/inference/predict.py` + `scripts/36` saved dev predictions for E and F0–F2 (rebuilt models match saved predictions to ~1e-6) |
+| P11-2 | Run the full matrix A–K × 3 seeds (0,1,2) | ✅ A–G and J/K reused from Phases 4–10 (3 seeds each); H and I trained here. `make phase11` runs the protocol in order. The script is `37_evidence_table.py` (`08_` was already taken) |
+| P11-3 | 🔬 Experiment H — ablate the sync loss (λ_sync=0); verify G > H | ✅ `experiments/phase11_H_nosync`. G − H = **+0.0023 AP@0.5, not significant** (spread 0.0287). But −0.096 AP@0.75, significant: the sync loss costs boundary precision (PF-28) |
+| P11-4 | 🔬 Experiment I — ablate modality dropout; use the 4-class breakdown to detect collapse | ✅ `experiments/phase11_I_nomd`. G − I = **+0.0175 AP@0.5, not significant**. I uses video for localization (0.060 AP@0.5 lost without it) yet visual-only AP@0.5 falls 0.68 → 0.57 (PF-28) |
+| P11-5 | Compute mean ± std for every headline claim | ✅ Every arm, every metric, in `reports/evidence_table.json` |
+| P11-6 | Apply the **four §7.3 criteria** to every claimed improvement | ✅ 13 claims, paired by seed; deciding metric per criterion 3; params + train time per criterion 4 |
+| P11-7 | Fill Table 8.2.1, 8.2.2, 8.2.4, 8.2.5 | ✅ `reports/evidence_table.md` (8.2.3 is Phase 12's) |
+| P11-8 | ⛔ **Run the test split exactly once**, at the very end | ✅ ⛔ `scripts/38_test_once.py` — 392 clips, lock written before predicting, re-run refused. **AUC 0.9842, AP@0.5 0.8005, AP@0.75 0.5392** (`reports/test_once.md`) |
+| P11-9 | ⛔ Include **negative results**; mark sub-seed-variance differences "not significant" | ✅ 2 claims hurt, 8 not significant — all listed |
+| P11-10 | Reproducibility: re-run one experiment from its logged config, match to ~1e-4 | ✅ in strict mode — **bit-identical** (`reports/reproducibility_strict.json`). ❌ default mode drifts ~1 seed-sd (`reports/reproducibility.json`) → **PF-27** |
+| P11-11 | ⛔ **Gate:** complete evidence table, every number traceable to a logged run | ✅ ⛔ **GATE PASSED** — 6/6 checks; every arm traced to its run dirs + git SHAs |
 
 ---
 

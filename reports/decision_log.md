@@ -839,6 +839,55 @@ and it now has a documented baseline to beat.
 
 ---
 
+### PF-27 · Default-mode training is not bit-reproducible; strict mode is (P11-10)
+
+**Finding, recorded 2026-10-03**, from `scripts/39_check_reproducibility.py`.
+
+Re-training Experiment G's seed 0 from its exact logged config (`train_config` identical)
+did **not** reproduce it: dev AUC 0.9843 → 0.9783, frame AP 0.9253 → 0.9278, best epoch
+12 → 23. The runs part at the first epoch (train loss 4.98351 vs 4.98380).
+`seed_everything` pinned every RNG and made cuDNN deterministic, but never called
+`torch.use_deterministic_algorithms(True)`, so other CUDA kernels (attention / scatter
+backward, cuBLAS) summed in a run-dependent order and the difference compounded.
+
+**Fix:** `seed_everything(strict=True)` / `scripts/34 --strict-determinism` adds
+`torch.use_deterministic_algorithms(True)` and `CUBLAS_WORKSPACE_CONFIG=:4096:8`. Every op
+in the section 5.1 model has a deterministic kernel (no error raised), at roughly 5-30%
+more time per epoch. **Two strict runs are bit-identical**: every dev metric |Δ| = 0,
+max per-frame score |Δ| = 0, same best epoch (`reports/reproducibility_strict.json`).
+
+**Consequences accepted:** strict mode is opt-in, so every Phase 4-11 run keeps the code
+path it was trained under; those runs are reproducible to about one seed std
+(`reports/reproducibility.json`), not to 1e-4. The 3-seed, paired-by-seed protocol
+already absorbs noise of that size -- no section 7.3 verdict rests on a smaller
+difference. New training should pass `--strict-determinism`.
+
+---
+
+### PF-28 · Phase 11's ablations: neither the sync loss nor modality dropout earns its place at AP@0.5
+
+**Finding, recorded 2026-10-03**, from `reports/evidence_table.md` (dev, 3 seeds, paired).
+
+**H, the sync loss (G vs G with λ_sync = 0):** AP@0.5 +0.0023, spread 0.0287 -- **not
+significant**. But on boundary quality it **hurts significantly**: AP@0.75 is 0.0962
+lower *with* the sync loss (all 3 seeds, spread 0.0384), AP@0.95 0.038 vs 0.299, boundary
+error 78 vs 56 ms. Phase 8 credited E's +0.0045 clip-AUC gain to the sync loss; for
+localization it is a cost, not a gain.
+
+**I, modality dropout (G vs G with p = 0):** AP@0.5 +0.0175, spread 0.0187 -- **not
+significant** (seeds +0.039, -0.018, +0.031). Without it the model is the only arm in the
+project whose localization crosses PF-21's 0.01 threshold: zeroing video costs
+**0.060 AP@0.5** (0.022-0.105 per seed) against -0.000 for G. But the video it uses does not
+help: visual-only fakes localize *worse* (AP@0.5 0.574 vs 0.682) and 10.2% of real clips
+get a false segment (G: 0.0%). Modality dropout does not hold the model off video so much
+as stop it leaning on video in an unhelpful way. PF-21's conclusion stands.
+
+**Test (P11-8, the single run, 392 clips):** G scores AUC 0.9842, AP@0.5 0.8005, AP@0.75
+0.5392 -- 0.05 / 0.09 below dev, the optimism expected from tuning on dev. Zeroing video
+costs AUC 0.0016 and *raises* AP@0.5 by 0.0096: PF-21 holds on held-out data.
+
+---
+
 ## Appendix B — architectural decisions
 
 | ID | Decision | Options | Resolved by | Date | Outcome |
@@ -852,11 +901,11 @@ and it now has a documented baseline to beat.
 | **D-1** | Visual backbone | ResNet-18 / MobileNetV2 | Experiment J, Phase 4 | 2026-08-30 | ✅ **MobileNetV2** — dev AUC 0.7189 vs 0.6319, a 0.087 gap far outside seed noise, so §5.2's speed tie-break never applies. Reverses the 2026-08-29 call made at 58 clips |
 | **C-1** | Audio features | MFCC / log-Mel | Experiment K, Phase 5 | 2026-08-30 | ✅ **log-Mel** — dev AUC 0.9838 vs 0.7677, a 0.2161 gap with disjoint seed intervals. ⛔ Read with PF-19: part of the margin is a dataset artefact |
 | **B-1** | Face detector | MediaPipe / MTCNN / RetinaFace | Phase 2 | ⬜ | ⬜ Recommended: MediaPipe (CPU-only, keeps VRAM free, gives landmarks + mouth ROI in one pass) |
-| **F-1** | Sync approach | Learned InfoNCE / pretrained SyncNet | Phase 8 | ⬜ | ⬜ Recommended: learned |
-| **G-1** | Fusion | Concat / gated / cross-attention | Experiments C vs E | ⬜ | ⬜ |
-| **H-1** | Temporal | BiLSTM / Transformer | Experiments D vs E | ⬜ | ⬜ |
+| **F-1** | Sync approach | Learned InfoNCE / pretrained SyncNet | Phase 8, Exp H | 2026-10-03 | ✅ **Learned InfoNCE** built; Exp H shows it does not help AP@0.5 (not significant) and costs 0.096 AP@0.75 (PF-28) |
+| **G-1** | Fusion | Concat / gated / cross-attention | Phase 8 decomposition (concat+Transformer vs cross+Transformer), Phase 11 | 2026-10-03 | ✅ **Cross-attention kept, but a tie**: frame AP +0.0387, spread 0.0561 — not significant |
+| **H-1** | Temporal | BiLSTM / Transformer | Phase 8 decomposition (cross+BiLSTM vs cross+Transformer), Phase 11 | 2026-10-03 | ✅ **Transformer kept, but a tie**: frame AP +0.0153, spread 0.0196 — not significant |
 | **I-1** | GAN tier detail | Feature-space / face-region / full synthesis | Phase 9 | 2026-08-12 | ✅ Feature-space (see PF-2) |
-| **L-1** | Localization | Dense per-frame / sliding window | Phase 10 | ⬜ | ⬜ Recommended: dense |
+| **L-1** | Localization | Dense per-frame / sliding window | Phase 10 | 2026-10-02 | ✅ **Dense per-frame** + section 6.4 post-processing, frozen on dev |
 
 ---
 

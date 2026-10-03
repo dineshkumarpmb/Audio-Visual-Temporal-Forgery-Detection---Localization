@@ -1,0 +1,8 @@
+{
+  "scored_at": "2026-10-03T21:49:22",
+  "git_sha": "679be7bd9e26",
+  "arm": "full",
+  "frozen": "configs\\postprocess_frozen.json",
+  "frozen_sha256": "294697c93fc78d97a372e51c391fea84b18fe9c9dfbdd1e214a5e7fad589ee54",
+  "n_test_clips": 392
+}
