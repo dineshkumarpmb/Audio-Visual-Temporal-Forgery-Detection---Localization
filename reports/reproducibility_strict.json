@@ -1,0 +1,46 @@
+{
+  "original": "experiments/_repro_strict_a/phase10_full/seed0",
+  "rerun": "experiments/_repro_strict_b/phase10_full/seed0",
+  "original_git_sha": "55c81a839235-dirty",
+  "rerun_git_sha": "55c81a839235-dirty",
+  "checked_at_git_sha": "55c81a839235-dirty",
+  "best_epoch": [
+    18,
+    18
+  ],
+  "metrics": {
+    "auc": {
+      "original": 0.9925494007126661,
+      "rerun": 0.9925494007126661,
+      "abs_diff": 0.0
+    },
+    "ap": {
+      "original": 0.9974725976269491,
+      "rerun": 0.9974725976269491,
+      "abs_diff": 0.0
+    },
+    "f1": {
+      "original": 0.976,
+      "rerun": 0.976,
+      "abs_diff": 0.0
+    },
+    "frame_ap": {
+      "original": 0.9249633945991186,
+      "rerun": 0.9249633945991186,
+      "abs_diff": 0.0
+    },
+    "frame_auc": {
+      "original": 0.9790843456561903,
+      "rerun": 0.9790843456561903,
+      "abs_diff": 0.0
+    }
+  },
+  "max_frame_score_diff": 0.0,
+  "tolerance": 0.0001,
+  "checks": {
+    "identical logged train_config": true,
+    "same best epoch": true,
+    "every dev metric within 0.0001": true
+  },
+  "passed": true
+}

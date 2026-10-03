@@ -18,21 +18,34 @@ import random
 DEFAULT_SEED = 1337
 
 
-def seed_everything(seed: int = DEFAULT_SEED, *, deterministic: bool = True) -> dict[str, object]:
+def seed_everything(
+    seed: int = DEFAULT_SEED, *, deterministic: bool = True, strict: bool = False
+) -> dict[str, object]:
     """Pin every RNG we use. Returns what was actually pinned, for run logs.
 
     `deterministic=True` forces cuDNN into deterministic algorithms. That costs
     throughput, which is the correct trade for a project whose headline claim is
     reproducibility — Part 7's comparisons are meaningless if two runs of the same
     config disagree.
+
+    ⚠️ cuDNN alone is **not enough** (PF-27, measured in P11-10): other CUDA kernels --
+    attention and scatter backward passes, cuBLAS split-K -- still sum in a run-dependent
+    order, and a re-trained run drifted by about one seed-sd. `strict=True` additionally
+    calls `torch.use_deterministic_algorithms(True)` and pins `CUBLAS_WORKSPACE_CONFIG`,
+    which makes a non-deterministic op raise instead of silently drifting. Opt-in, so
+    every run made before PF-27 keeps the code path it was trained under.
     """
     os.environ["PYTHONHASHSEED"] = str(seed)
+    if strict:
+        # Must be set before cuBLAS initialises; harmless if it already has the value.
+        os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
     random.seed(seed)
 
     state: dict[str, object] = {
         "seed": seed,
         "pythonhashseed_effective": os.environ.get("PYTHONHASHSEED") == str(seed),
         "deterministic": deterministic,
+        "strict": strict,
     }
 
     try:
@@ -54,6 +67,8 @@ def seed_everything(seed: int = DEFAULT_SEED, *, deterministic: bool = True) -> 
         if deterministic:
             torch.backends.cudnn.deterministic = True
             torch.backends.cudnn.benchmark = False
+        if strict:
+            torch.use_deterministic_algorithms(True)
         state["torch"] = torch.__version__
         state["cuda_available"] = torch.cuda.is_available()
     except ImportError:

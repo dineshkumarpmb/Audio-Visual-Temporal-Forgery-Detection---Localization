@@ -21,6 +21,7 @@ TORCH_PINS  := torch==2.7.1+cu118 torchvision==0.22.1+cu118 torchaudio==2.7.1+cu
         train-temporal frame-confound experiment-d phase7 \
         train-augmented experiment-f phase9 \
         gt-alignment crosscheck-ap train-localization experiment-g phase10 \
+        test-features train-ablations evidence test-once reproduce phase11 \
         features train evaluate ablations benchmark api frontend demo clean-bench
 
 help:  ## Show this help
@@ -318,8 +319,44 @@ train:      ## Stage-B training. Override: make train CONFIG=configs/experiment/
 evaluate:
 	$(PY) scripts/07_evaluate.py --config $(or $(CONFIG),configs/default.yaml)
 
-ablations:  ## Phase 11 — the full A-K matrix across 3 seeds
-	$(PY) scripts/08_run_ablations.py
+test-features: ## Phase 11 - fetch + extract the dev-2k TEST split only (train/dev untouched)
+# Training loaders use every clip that has features, so fetching more train/dev clips would
+# silently change the ablations' training set relative to Experiment G's. Test only.
+	$(PY) scripts/05_fetch_metadata.py --subset dev-2k --splits test --max-hours 2
+	$(PY) scripts/13_extract_visual.py --subset dev-2k --backbone mobilenet_v2 --from-video
+	$(PY) scripts/12_extract_audio.py --subset dev-2k --feature logmel
+
+train-ablations: ## Phase 11 - Experiments H (-sync) and I (-modality dropout), 3 seeds
+	$(PY) scripts/34_train_localization.py --arms H_nosync I_nomd --seeds 3 --skip-overfit
+
+evidence:   ## Phase 11 - the A-K evidence table, section 7.3 on every claim, gate P11-11
+	$(PY) scripts/37_evidence_table.py
+
+test-once:  ## ⛔ P11-8 - score the test split exactly once (refuses to run twice)
+	$(PY) scripts/38_test_once.py --final
+
+reproduce:  ## P11-10 - re-train G seed 0 (default + twice strict), compare to ~1e-4
+# PF-27: the default mode (cuDNN deterministic only) is shown to drift by ~1 seed-sd; the
+# strict mode (torch.use_deterministic_algorithms) is shown to reproduce.
+	$(PY) scripts/34_train_localization.py --arms full --seeds 1 --out-root experiments/_repro --skip-overfit
+	-$(PY) scripts/39_check_reproducibility.py --rerun experiments/_repro/phase10_full/seed0
+	$(PY) scripts/34_train_localization.py --arms full --seeds 1 --out-root experiments/_repro_strict_a --skip-overfit --strict-determinism
+	$(PY) scripts/34_train_localization.py --arms full --seeds 1 --out-root experiments/_repro_strict_b --skip-overfit --strict-determinism
+	$(PY) scripts/39_check_reproducibility.py --original experiments/_repro_strict_a/phase10_full/seed0 --rerun experiments/_repro_strict_b/phase10_full/seed0 --out reports/reproducibility_strict.json
+
+ablations:  ## Phase 11 - ablations, dev evidence, reproducibility, then the single test run
+# Order is the protocol: every dev decision is made before test-once, which refuses to run
+# until H and I exist. E/F predictions are inference-only re-runs of saved checkpoints.
+	$(PY) scripts/36_dump_dev_predictions.py --arms phase8_full phase9_F0 phase9_F1 phase9_F2
+	$(MAKE) train-ablations
+	$(MAKE) reproduce
+	-$(MAKE) evidence
+	$(MAKE) test-features
+	$(MAKE) test-once
+	$(MAKE) evidence
+	$(PY) -m pytest tests/ -q
+
+phase11: ablations
 
 benchmark:  ## Phase 12 — latency / VRAM / model size, fills Table 8.2.3
 	$(PY) scripts/09_benchmark.py

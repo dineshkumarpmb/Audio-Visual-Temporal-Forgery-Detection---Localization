@@ -1,0 +1,184 @@
+{
+  "seed": 1339,
+  "arm": "I_nomd",
+  "frame_loss": "focal",
+  "lambda_cls": 1.0,
+  "lambda_loc": 2.0,
+  "lambda_sync": 0.3,
+  "modality_dropout": 0.0,
+  "ablation_of": "full",
+  "lambda_bnd": 0.5,
+  "boundary_head": true,
+  "select_metric": "frame_ap",
+  "backbone": "mobilenet_v2",
+  "feature": "logmel",
+  "augmentation": false,
+  "git_sha": "55c81a839235-dirty",
+  "n_params": 5843785,
+  "epochs_run": 25,
+  "best_epoch": 14,
+  "wall_clock_s": 818.56,
+  "n_clips_train": 592,
+  "n_clips_dev": 175,
+  "dev": {
+    "auc": 0.9833171363783608,
+    "ap": 0.9948676405791933,
+    "accuracy": 0.9542857142857143,
+    "eer": 0.03628117913832199,
+    "precision": 0.9916666666666667,
+    "recall": 0.9444444444444444,
+    "f1": 0.967479674796748,
+    "n": 175,
+    "positive_rate": 0.72,
+    "per_class": {
+      "visual_only": {
+        "n_fake": 37,
+        "auc": 0.9431880860452289,
+        "recall": 0.8108108108108109
+      },
+      "audio_only": {
+        "n_fake": 45,
+        "auc": 1.0,
+        "recall": 1.0
+      },
+      "both": {
+        "n_fake": 44,
+        "auc": 1.0,
+        "recall": 1.0
+      },
+      "real": {
+        "n": 49,
+        "specificity": 0.9795918367346939
+      }
+    },
+    "frame_ap": 0.9240051351531972,
+    "frame_auc": 0.9804393153087885,
+    "n_frames": 39423,
+    "frame_positive_rate": 0.060548410826167465,
+    "sync_real_mean": 0.029399046674370766,
+    "sync_fake_mean": 0.039794810116291046,
+    "sync_separation": -0.01039576344192028,
+    "attention_lift": 0.09447041898965836,
+    "attention_lift_median": 0.0057210372760891914,
+    "attention_lift_n_clips": 126,
+    "head_entropy_mean": 0.37681275606155396
+  },
+  "dev_drop_visual": {
+    "auc": 0.981373501781665,
+    "ap": 0.994317057389515,
+    "accuracy": 0.96,
+    "eer": 0.04024943310657596,
+    "precision": 0.983739837398374,
+    "recall": 0.9603174603174603,
+    "f1": 0.9718875502008032,
+    "n": 175,
+    "positive_rate": 0.72,
+    "per_class": {
+      "visual_only": {
+        "n_fake": 37,
+        "auc": 0.936569222283508,
+        "recall": 0.8648648648648649
+      },
+      "audio_only": {
+        "n_fake": 45,
+        "auc": 1.0,
+        "recall": 1.0
+      },
+      "both": {
+        "n_fake": 44,
+        "auc": 1.0,
+        "recall": 1.0
+      },
+      "real": {
+        "n": 49,
+        "specificity": 0.9591836734693877
+      }
+    },
+    "frame_ap": 0.9218549790504273,
+    "frame_auc": 0.9762100150701999,
+    "n_frames": 39423,
+    "frame_positive_rate": 0.060548410826167465,
+    "sync_real_mean": 0.15913628041744232,
+    "sync_fake_mean": 0.15178833901882172,
+    "sync_separation": 0.0073479413986206055,
+    "attention_lift": 0.07109177857637405,
+    "attention_lift_median": 0.00989471934735775,
+    "attention_lift_n_clips": 126,
+    "head_entropy_mean": 0.3414462208747864
+  },
+  "dev_drop_audio": {
+    "auc": 0.4714933592484613,
+    "ap": 0.7079865442596993,
+    "accuracy": 0.28,
+    "eer": 0.5090702947845804,
+    "precision": 0.0,
+    "recall": 0.0,
+    "f1": 0.0,
+    "n": 175,
+    "positive_rate": 0.72,
+    "per_class": {
+      "visual_only": {
+        "n_fake": 37,
+        "auc": 0.42857142857142855,
+        "recall": 0.0
+      },
+      "audio_only": {
+        "n_fake": 45,
+        "auc": 0.5047619047619047,
+        "recall": 0.0
+      },
+      "both": {
+        "n_fake": 44,
+        "auc": 0.4735621521335807,
+        "recall": 0.0
+      },
+      "real": {
+        "n": 49,
+        "specificity": 1.0
+      }
+    },
+    "frame_ap": 0.06933400358819605,
+    "frame_auc": 0.5583424067335971,
+    "n_frames": 39423,
+    "frame_positive_rate": 0.060548410826167465,
+    "sync_real_mean": -0.641511082649231,
+    "sync_fake_mean": -0.6322879195213318,
+    "sync_separation": -0.00922316312789917,
+    "attention_lift": 0.9971736669540405,
+    "attention_lift_median": 0.9974346160888672,
+    "attention_lift_n_clips": 126,
+    "head_entropy_mean": 0.9873222708702087
+  },
+  "train_config": {
+    "epochs": 40,
+    "lr": 0.001,
+    "weight_decay": 0.0001,
+    "batch_size": 16,
+    "grad_accum": 1,
+    "pos_weight": 0.3799533799533799,
+    "patience": 10,
+    "amp": false,
+    "grad_clip": 1.0,
+    "seed": 1339,
+    "num_workers": 0,
+    "aux_weight": 0.3,
+    "frame_weight": 2.0,
+    "frame_pos_weight": null,
+    "sync_weight": 0.3,
+    "cls_weight": 1.0,
+    "frame_loss": "focal",
+    "focal_alpha": 0.25,
+    "focal_gamma": 2.0,
+    "boundary_weight": 0.5,
+    "boundary_sigma": 2.0,
+    "select_metric": "frame_ap"
+  },
+  "resumed": {
+    "reason": "host RAM pressure stopped the first run during epoch 23 (PF-26); resumed from last.pt",
+    "resumed_at_epoch": 23,
+    "epochs_before_resume": 23,
+    "wall_clock_s_before_resume": 740.7,
+    "wall_clock_s_after_resume": 77.86,
+    "source": "logs/phase11_train_I.log (epoch times) + this run"
+  }
+}

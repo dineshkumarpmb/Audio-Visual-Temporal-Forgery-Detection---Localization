@@ -31,7 +31,6 @@ honest held-out number is Phase 11's single test run.
 from __future__ import annotations
 
 import argparse
-import itertools
 import json
 import subprocess
 import sys
@@ -47,22 +46,25 @@ from src.data.manifest import read_manifest  # noqa: E402
 from src.evaluation.localization import (  # noqa: E402
     AP_IOU_THRESHOLDS,
     AR_N_PROPOSALS,
-    average_precision_at_iou,
     interval_iou,
-    localization_report,
 )
-from src.localization.postprocess import (  # noqa: E402
-    PostProcessConfig,
-    assert_segment_contract,
-    scores_to_segments,
-    smooth,
+from src.evaluation.runs import (  # noqa: E402
+    FPS,
+    GRID,
+    REFINE,
+    compare,
+    ground_truth,
+    load_predictions,
+    localization_metrics,
+    segments,
+    summarise,
 )
-from src.localization.targets import normalise_periods  # noqa: E402
+from src.evaluation.runs import grid_search as _grid_search  # noqa: E402
+from src.localization.postprocess import PostProcessConfig  # noqa: E402
 from src.training.reporting import git_sha  # noqa: E402
 from src.utils.console import init_console  # noqa: E402
 
 GREEN, RED, YELLOW, DIM, RESET = "\033[32m", "\033[31m", "\033[33m", "\033[2m", "\033[0m"
-FPS = 25.0
 MAIN_ARMS = ("bce", "focal", "full")
 TUNING_ARMS = ("full_l1", "full_l4", "full_b1")
 LABELS = {
@@ -74,36 +76,9 @@ LABELS = {
     "full_b1": "full, λ_bnd = 1",
 }
 
-GRID = {
-    "threshold": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
-    "median_kernel": [1, 3, 5, 9],
-    "min_duration_s": [0.0, 0.1, 0.2, 0.3, 0.4, 0.6, 1.0],
-    "merge_gap_s": [0.0, 0.1, 0.2, 0.3, 0.5, 1.0],
-    "merge_first": [False, True],
-}
-REFINE = [0, 2, 4]
-
 
 # ---------------------------------------------------------------- loading
-
-
-def load_predictions(path: Path) -> dict:
-    d = np.load(path, allow_pickle=False)
-    offsets = np.concatenate(([0], np.cumsum(d["lengths"])))
-    ids = [str(v) for v in d["video_ids"]]
-    frames = {v: d["frame_scores"][offsets[i] : offsets[i + 1]] for i, v in enumerate(ids)}
-    bnd = d["boundary_scores"] if "boundary_scores" in d.files else np.zeros((0, 2))
-    bounds = (
-        {v: bnd[offsets[i] : offsets[i + 1]] for i, v in enumerate(ids)}
-        if len(bnd) == len(d["frame_scores"])
-        else None
-    )
-    return {
-        "frames": frames,
-        "bounds": bounds,
-        "lengths": dict(zip(ids, d["lengths"].tolist(), strict=True)),
-        "labels": dict(zip(ids, d["labels"].tolist(), strict=True)),
-    }
+# P11-1: the pure evaluation functions live in `src/evaluation/runs.py`, shared with Phase 11.
 
 
 def load_arm(root: Path, arm: str) -> list[dict]:
@@ -123,141 +98,19 @@ def load_arm(root: Path, arm: str) -> list[dict]:
     return runs
 
 
-def ground_truth(manifest, lengths: dict[str, int]) -> dict[str, list[tuple[float, float]]]:
-    """Label seconds, clipped to what the model saw (`T / fps`)."""
-    gt = {}
-    for vid, t in lengths.items():
-        end_of_clip = t / FPS
-        spans = []
-        for s, e in normalise_periods(manifest.loc[vid, "fake_periods"]):
-            if s < end_of_clip:
-                spans.append((s, min(e, end_of_clip)))
-        gt[vid] = spans
-    return gt
-
-
-# ---------------------------------------------------------------- post-processing
-
-
-def segments(pred: dict, cfg: PostProcessConfig, smoothed: dict | None = None) -> dict:
-    bounds = pred["bounds"] if cfg.refine_radius else None
-    return {
-        vid: scores_to_segments(
-            s,
-            cfg,
-            boundary_scores=None if bounds is None else bounds[vid],
-            smoothed=None if smoothed is None else smoothed[vid],
-        )
-        for vid, s in pred["frames"].items()
-    }
-
-
-def _grid_for_kernel(job: tuple) -> list[dict]:
-    """One median kernel's slice of the grid. Top-level so worker processes can import it."""
-    kernel, preds, gt, refine = job
-    smoothed = [{vid: smooth(s, kernel) for vid, s in p["frames"].items()} for p in preds]
-    rows = []
-    for tau, mind, gap, mf, rad in itertools.product(
-        GRID["threshold"],
-        GRID["min_duration_s"],
-        GRID["merge_gap_s"],
-        GRID["merge_first"],
-        refine,
-    ):
-        # With no min-duration filter or no merging, the two step orders are identical --
-        # score the configuration once rather than twice.
-        if mf and (mind == 0.0 or gap == 0.0):
-            continue
-        cfg = PostProcessConfig(
-            threshold=tau,
-            median_kernel=kernel,
-            min_duration_s=mind,
-            merge_gap_s=gap,
-            merge_first=mf,
-            refine_radius=rad,
-        )
-        aps = [
-            average_precision_at_iou(segments(p, cfg, sm), gt, 0.5)
-            for p, sm in zip(preds, smoothed, strict=True)
-        ]
-        rows.append({"cfg": cfg.as_dict(), "ap50": float(np.mean(aps))})
-    return rows
-
-
 def grid_search(
     runs: list[dict], gt: dict, has_boundary: bool, workers: int = 4
 ) -> tuple[dict, list[dict]]:
-    """⛔ P10-10: exhaustive search on dev maximising the mean AP@0.5 over seeds.
-
-    Split by median kernel across processes; the result is identical to a serial sweep
-    because the rows are re-assembled in grid order before the (stable) sort.
-    """
-    refine = REFINE if has_boundary else [0]
-    preds = [r["pred"] for r in runs]
-    jobs = [(k, preds, gt, refine) for k in GRID["median_kernel"]]
-    if workers > 1:
-        from concurrent.futures import ProcessPoolExecutor
-
-        with ProcessPoolExecutor(max_workers=min(workers, len(jobs))) as pool:
-            parts = list(pool.map(_grid_for_kernel, jobs))
-    else:
-        parts = [_grid_for_kernel(j) for j in jobs]
-    table = [row for part in parts for row in part]
-    table.sort(key=lambda row: -row["ap50"])  # stable: grid order breaks exact ties
-    return table[0]["cfg"], table
-
-
-# ---------------------------------------------------------------- scoring
+    """⛔ P10-10: exhaustive search on dev maximising the mean AP@0.5 over seeds."""
+    return _grid_search([r["pred"] for r in runs], gt, has_boundary, workers)
 
 
 def score_run(run: dict, gt: dict, cfg: PostProcessConfig) -> dict:
-    segs = segments(run["pred"], cfg)
-    for vid, s in segs.items():  # ⛔ P10-9 on real predictions, not just synthetic ones
-        assert_segment_contract(s, run["pred"]["lengths"][vid] / FPS)
-    rep = localization_report(segs, gt)
+    rep = localization_metrics(run["pred"], gt, cfg, run["pred_nv"])
     rep["frame_ap"] = run["result"]["dev"]["frame_ap"]
     rep["frame_auc"] = run["result"]["dev"]["frame_auc"]
     rep["clip_auc"] = run["result"]["dev"]["auc"]
-    # PF-21 for localization. Refinement is off on *both* sides of this pair: the saved
-    # drop-visual predictions carry no boundary channel, and a like-for-like pair matters
-    # more than the absolute number.
-    if run["pred_nv"] is not None:
-        plain = PostProcessConfig(**{**cfg.as_dict(), "refine_radius": 0})
-        rep["ap@0.5_no_refine"] = average_precision_at_iou(segments(run["pred"], plain), gt, 0.5)
-        rep["ap@0.5_drop_visual"] = average_precision_at_iou(
-            segments(run["pred_nv"], plain), gt, 0.5
-        )
     return rep
-
-
-def summarise(reports: list[dict]) -> dict:
-    keys = [k for k, v in reports[0].items() if isinstance(v, int | float)]
-    return {
-        k: {
-            "mean": float(np.nanmean([r[k] for r in reports])),
-            "std": float(np.nanstd([r[k] for r in reports])),
-        }
-        for k in keys
-    }
-
-
-def compare(a: list[dict], b: list[dict], seeds_a, seeds_b, key: str) -> dict:
-    """`b - a`, paired by seed, section 7.3 criteria 1 and 2 (as in Experiment F)."""
-    pa = dict(zip(seeds_a, [r[key] for r in a], strict=True))
-    pb = dict(zip(seeds_b, [r[key] for r in b], strict=True))
-    shared = sorted(set(pa) & set(pb))
-    diffs = np.array([pb[s] - pa[s] for s in shared])
-    delta = float(np.mean([pb[s] for s in shared]) - np.mean([pa[s] for s in shared]))
-    spread = max(float(np.std(list(pa.values()))), float(np.std(list(pb.values()))))
-    consistent = bool(diffs.size and ((diffs > 0).all() or (diffs < 0).all()))
-    return {
-        "delta": delta,
-        "seed_spread": spread,
-        "per_seed": {int(s): float(pb[s] - pa[s]) for s in shared},
-        "consistent": consistent,
-        "significant": bool(abs(delta) > spread and consistent and len(shared) >= 3),
-        "n_paired": len(shared),
-    }
 
 
 # ---------------------------------------------------------------- figures (P10-13)

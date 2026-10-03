@@ -379,6 +379,15 @@ def main() -> int:
         "resuming instead of stopping at the first run of 404s. 0 (default) = a single "
         "window, the smoke-scale behaviour Phases 1-3 used.",
     )
+    ap.add_argument(
+        "--splits",
+        nargs="+",
+        choices=tuple(SPLIT_PRIORITY),
+        default=None,
+        help="with --subset, fetch only these splits' videos. Phase 11 fetches the test "
+        "split alone: every downstream loader trains on whatever features exist, so "
+        "fetching more train/dev clips would silently change the ablations' training set.",
+    )
     ap.add_argument("--seed", type=int, default=1337)
     args = ap.parse_args()
 
@@ -447,6 +456,8 @@ def main() -> int:
         from src.data.subset import load_subset
 
         ids = load_subset(args.subset, args.subset_dir)
+        if args.splits:
+            ids = [v for v in ids if v.split("_", 1)[0] in args.splits]
         sdir = out / args.subset
         sdir.mkdir(parents=True, exist_ok=True)
         todo = [v for v in ids if not (sdir / f"{v}.mp4").exists()]

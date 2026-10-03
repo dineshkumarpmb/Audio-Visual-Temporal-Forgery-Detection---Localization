@@ -2,6 +2,7 @@
 
     python scripts/34_train_localization.py --arms bce full focal --seeds 3
     python scripts/34_train_localization.py --arms full_l1 full_l4 --seeds 1   # λ tuning
+    python scripts/34_train_localization.py --arms H_nosync I_nomd --seeds 3   # Phase 11
 
 **Training writes predictions, not metrics.** Each finished seed saves its dev per-frame
 probabilities (and boundary probabilities, when the arm has the head) to
@@ -22,6 +23,14 @@ recommendation -- plus one change to the objective:
 | `full_b1` | focal | 2.0 | ✓ 1.0 | λ_bnd tuning on dev |
 
 λ_cls = 1.0 and λ_sync = 0.3 throughout (section 5.4's starting values).
+
+**Phase 11 ablations** (section 7.2) are `full`, Experiment G's headline arm, with exactly one
+thing removed. They write to `experiments/phase11_<arm>/` so Phase 10's tree stays closed:
+
+| arm | removed | answers |
+|---|---|---|
+| `H_nosync` | the InfoNCE sync loss (λ_sync = 0) | Experiment H: G > H? |
+| `I_nomd` | modality dropout (p = 0) | Experiment I: does collapse (section 5.6) get worse? |
 
 **⛔ Model selection is on dev frame AP, for every arm including the control.** Phases 4-9
 picked `best.pt` by clip AUC; Phase 10's headline is localization, and frame AP is the
@@ -53,6 +62,7 @@ sys.path.insert(0, str(REPO_ROOT))
 from src.config import AudioPreprocessConfig, VisualFeatureConfig, config_hash  # noqa: E402
 from src.data.dataset import collate_paired  # noqa: E402
 from src.data.manifest import read_manifest  # noqa: E402
+from src.inference.predict import collect_predictions  # noqa: E402
 from src.models.attention_model import AttentionFusionModel  # noqa: E402
 from src.models.backbones.audio import NATIVE_DIM  # noqa: E402
 from src.seed import seed_everything  # noqa: E402
@@ -83,51 +93,23 @@ ARMS = {
     "full_l1": ("focal", 1.0, 0.5),
     "full_l4": ("focal", 4.0, 0.5),
     "full_b1": ("focal", 2.0, 1.0),
+    "H_nosync": ("focal", 2.0, 0.5),
+    "I_nomd": ("focal", 2.0, 0.5),
+}
+# Phase 11: what each ablation removes from `full`, as overrides of the CLI defaults.
+ABLATIONS = {
+    "H_nosync": {"sync_weight": 0.0},
+    "I_nomd": {"modality_dropout": 0.0},
 }
 
 
-@torch.no_grad()
-def collect_predictions(trainer: Trainer, loader, *, drop_visual: bool = False) -> dict:
-    """Per-clip frame (and boundary) probabilities over valid frames, flattened + offsets."""
-    trainer.model.eval()
-    ids, labels, clip, frames, bounds, lengths = [], [], [], [], [], []
-    for batch in loader:
-        mask = batch["mask"].to(trainer.device)
-        out = trainer.model(
-            batch["features"].to(trainer.device),
-            batch["audio"].to(trainer.device),
-            mask,
-            batch["face"].to(trainer.device),
-            drop_visual=drop_visual,
-        )
-        fp = torch.sigmoid(out["frame_logits"]).float().cpu().numpy()
-        bp = (
-            torch.sigmoid(out["boundary_logits"]).float().cpu().numpy()
-            if "boundary_logits" in out
-            else None
-        )
-        cp = torch.sigmoid(out["logit"]).float().cpu().numpy()
-        m = batch["mask"].numpy().astype(bool)
-        for i, vid in enumerate(batch["video_id"]):
-            t = int(m[i].sum())
-            # Valid frames are a prefix: collate_paired pads at the end only.
-            ids.append(vid)
-            labels.append(int(batch["label"][i]))
-            clip.append(float(cp[i]))
-            frames.append(fp[i, :t])
-            if bp is not None:
-                bounds.append(bp[i, :t])
-            lengths.append(t)
-    return {
-        "video_ids": np.array(ids),
-        "labels": np.array(labels, dtype=np.int8),
-        "clip_scores": np.array(clip, dtype=np.float32),
-        "lengths": np.array(lengths, dtype=np.int32),
-        "frame_scores": np.concatenate(frames).astype(np.float32),
-        "boundary_scores": (
-            np.concatenate(bounds).astype(np.float32) if bounds else np.zeros((0, 2), np.float32)
-        ),
-    }
+def run_prefix(arm: str) -> str:
+    return "phase11" if arm in ABLATIONS else "phase10"
+
+
+def setting(args, arm: str, name: str):
+    """The CLI value for `name`, unless this arm is the ablation that removes it."""
+    return ABLATIONS.get(arm, {}).get(name, getattr(args, name))
 
 
 def main() -> int:
@@ -155,6 +137,12 @@ def main() -> int:
     ap.add_argument("--cls-weight", type=float, default=1.0, help="section 5.4 λ_cls")
     ap.add_argument("--sync-weight", type=float, default=0.3, help="section 5.4 λ_sync")
     ap.add_argument("--skip-overfit", action="store_true")
+    ap.add_argument(
+        "--strict-determinism",
+        action="store_true",
+        help="PF-27: torch.use_deterministic_algorithms + CUBLAS_WORKSPACE_CONFIG. Off by "
+        "default so every pre-PF-27 run keeps the code path it was trained under.",
+    )
     ap.add_argument("--out-root", default="experiments")
     ap.add_argument("--restart", action="store_true")
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
@@ -179,7 +167,7 @@ def main() -> int:
             "feature": args.feature,
             "dropout": args.dropout,
             "attn_dropout": args.attn_dropout,
-            "modality_dropout": args.modality_dropout,
+            "modality_dropout": setting(args, arm, "modality_dropout"),
             "cross_attention": True,
             "temporal": "transformer",
             "positional": True,
@@ -201,7 +189,7 @@ def main() -> int:
             "frame_weight": lam_loc,
             "frame_loss": loss,
             "frame_pos_weight": frame_pw if loss == "bce" else None,
-            "sync_weight": args.sync_weight,
+            "sync_weight": setting(args, arm, "sync_weight"),
             "boundary_weight": lam_bnd,
             "select_metric": "frame_ap",
         }
@@ -216,7 +204,11 @@ def main() -> int:
     print("  selection: dev frame AP, every arm")
     for arm in args.arms:
         loss, lam_loc, lam_bnd = ARMS[arm]
-        print(f"    {arm:<8} frame={loss:<5} λ_loc={lam_loc}  λ_bnd={lam_bnd}")
+        print(
+            f"    {arm:<8} frame={loss:<5} λ_loc={lam_loc}  λ_bnd={lam_bnd}  "
+            f"λ_sync={setting(args, arm, 'sync_weight')}  "
+            f"modality dropout={setting(args, arm, 'modality_dropout')}"
+        )
     for split, ds in datasets.items():
         b = ds.label_balance
         print(
@@ -232,7 +224,7 @@ def main() -> int:
     probe_arm = next((a for a in args.arms if ARMS[a][2] > 0), None)
     if probe_arm and not args.skip_overfit:
         print(f"\n  ⛔ overfit-a-batch (10 samples, arm '{probe_arm}')")
-        seed_everything(1337)
+        seed_everything(1337, strict=args.strict_determinism)
         tiny = collate_paired(
             [datasets["train"][i] for i in range(min(10, len(datasets["train"])))]
         )
@@ -263,7 +255,7 @@ def main() -> int:
             f"\n{DIM}{'=' * 72}{RESET}\n  arm '{arm}'  frame={loss} λ_loc={lam_loc} λ_bnd={lam_bnd}"
         )
         for seed in range(args.first_seed, args.first_seed + args.seeds):
-            run_dir = Path(args.out_root) / f"phase10_{arm}" / f"seed{seed}"
+            run_dir = Path(args.out_root) / f"{run_prefix(arm)}_{arm}" / f"seed{seed}"
             run_dir.mkdir(parents=True, exist_ok=True)
             done = run_dir / "result.json"
             if done.exists() and not args.restart:
@@ -275,7 +267,7 @@ def main() -> int:
                 continue
 
             print(f"\n  seed {seed}")
-            seed_everything(1337 + seed)
+            seed_everything(1337 + seed, strict=args.strict_determinism)
             train_loader = P8.paired_loader(
                 datasets["train"], args.batch_size, shuffle=True, seed=seed
             )
@@ -298,8 +290,10 @@ def main() -> int:
             dev_metrics = P8.diagnostics(runner, dev_loader)
             no_visual = P8.diagnostics(runner, dev_loader, drop_visual=True)
             no_audio = P8.diagnostics(runner, dev_loader, drop_audio=True)
-            preds = collect_predictions(runner, dev_loader)
-            preds_nv = collect_predictions(runner, dev_loader, drop_visual=True)
+            preds = collect_predictions(runner.model, dev_loader, runner.device)
+            preds_nv = collect_predictions(
+                runner.model, dev_loader, runner.device, drop_visual=True
+            )
             np.savez_compressed(run_dir / "dev_predictions.npz", **preds)
             np.savez_compressed(
                 run_dir / "dev_predictions_drop_visual.npz",
@@ -312,10 +306,13 @@ def main() -> int:
                 "frame_loss": loss,
                 "lambda_cls": args.cls_weight,
                 "lambda_loc": lam_loc,
-                "lambda_sync": args.sync_weight,
+                "lambda_sync": setting(args, arm, "sync_weight"),
+                "modality_dropout": setting(args, arm, "modality_dropout"),
+                "ablation_of": "full" if arm in ABLATIONS else None,
                 "lambda_bnd": lam_bnd,
                 "boundary_head": lam_bnd > 0,
                 "select_metric": "frame_ap",
+                "strict_determinism": args.strict_determinism,
                 "backbone": args.backbone,
                 "feature": args.feature,
                 "augmentation": False,

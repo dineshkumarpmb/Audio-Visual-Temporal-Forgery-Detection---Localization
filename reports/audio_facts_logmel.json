@@ -14,15 +14,15 @@
     "feature": "logmel",
     "n_mfcc": 40
   },
-  "n_extracted": 686,
+  "n_extracted": 373,
   "n_failed": 0,
   "n_silent": 0,
   "n_alignment_violations": 0,
-  "n_checked": 698,
-  "wall_clock_s": 62.06,
-  "seconds_per_video": 0.0905,
-  "pad_frames_mean": -1.388,
-  "pad_frames_min": -3.6,
-  "pad_frames_max": 0.2,
-  "cache_bytes": 55949888
+  "n_checked": 1081,
+  "wall_clock_s": 32.27,
+  "seconds_per_video": 0.0865,
+  "pad_frames_mean": -1.417,
+  "pad_frames_min": -3.4,
+  "pad_frames_max": 0.0,
+  "cache_bytes": 82198592
 }
