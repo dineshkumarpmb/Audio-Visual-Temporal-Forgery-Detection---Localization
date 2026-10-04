@@ -22,7 +22,8 @@ TORCH_PINS  := torch==2.7.1+cu118 torchvision==0.22.1+cu118 torchaudio==2.7.1+cu
         train-augmented experiment-f phase9 \
         gt-alignment crosscheck-ap train-localization experiment-g phase10 \
         test-features train-ablations evidence test-once reproduce phase11 \
-        features train evaluate ablations benchmark api frontend demo clean-bench
+        features train evaluate ablations export-model benchmark phase12-gate phase12 \
+        api frontend demo clean-bench
 
 help:  ## Show this help
 	@echo Audio-Visual Temporal Forgery Detection ^& Localization
@@ -48,7 +49,8 @@ help:  ## Show this help
 	@echo     visual overfit train-visual decide-d1 confound phase4
 	@echo     train-audio decide-c1 provenance phase5
 	@echo     train-fusion experiment-c phase6
-	@echo     features train evaluate ablations benchmark
+	@echo     features train evaluate ablations
+	@echo     export-model benchmark phase12-gate phase12
 	@echo.
 	@echo   Serving
 	@echo     api           uvicorn on :8000
@@ -358,8 +360,20 @@ ablations:  ## Phase 11 - ablations, dev evidence, reproducibility, then the sin
 
 phase11: ablations
 
-benchmark:  ## Phase 12 — latency / VRAM / model size, fills Table 8.2.3
-	$(PY) scripts/09_benchmark.py
+# ── Phase 12 — optimization ─────────────────────────────────────────────────
+# Close Chrome first (X-5): its idle load makes every timing pessimistic. No ONNX (PF-29).
+
+export-model:  ## P12-2 - weights-only model file (median-AP@0.5 seed of G), size check
+	$(PY) scripts/40_export_model.py
+
+benchmark:  ## P12-1/3/4 - end-to-end latency / VRAM / RAM per stage, fills Table 8.2.3
+	$(PY) scripts/41_benchmark.py
+
+phase12-gate:  ## ⛔ P12-5/6 - pipeline vs cached dev predictions on all 175 dev clips, then gate
+	$(PY) scripts/42_phase12_gate.py
+
+phase12: export-model benchmark phase12-gate
+	$(PY) -m pytest tests/unit/test_inference_pipeline.py -q
 
 # ── Serving ──────────────────────────────────────────────────────────────────
 

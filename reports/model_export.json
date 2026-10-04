@@ -1,0 +1,34 @@
+{
+  "path": "models/avtfd_g_seed0.pt",
+  "sha256": "b88955423e8ab5d6b911979865dc54fe733881b07bfaca33fc5fd2edcf9fac80",
+  "size_mb": 31.06,
+  "best_pt_size_mb": 66.09,
+  "face_landmarker_mb": 3.58,
+  "total_with_landmarker_mb": 34.65,
+  "size_limit_mb": 50.0,
+  "params_stage_b": 5845581,
+  "params_backbone": 2258042,
+  "dtype": "float32",
+  "arm": "full",
+  "seed_index": 0,
+  "seed": 1337,
+  "dev_ap50_per_seed": [
+    0.863417781862988,
+    0.82578884717182,
+    0.8673577678996673
+  ],
+  "selection_rule": "median dev AP@0.5 (reports/experiment_g.json)",
+  "source_run": "experiments/phase10_full/seed0",
+  "postprocess": {
+    "threshold": 0.2,
+    "median_kernel": 5,
+    "closing": 3,
+    "min_duration_s": 0.2,
+    "merge_gap_s": 0.0,
+    "merge_first": false,
+    "refine_radius": 0,
+    "fps": 25.0
+  },
+  "round_trip_identical": true,
+  "git_sha": "2ed17119cfa5-dirty"
+}

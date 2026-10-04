@@ -7,15 +7,15 @@ Legend: ⛔ = blocking gate item · ⭐ = headline capability · 🔬 = experime
 
 ---
 
-## 📍 CURRENT STATUS — 2026-10-03, Phase 11 complete · Phase 12 next
+## 📍 CURRENT STATUS — 2026-10-04, Phase 12 complete · Phase 13 next
 
 | | |
 |---|---|
-| **Done** | Phase −1 · Phase 0 · **P1 (18/20)** · **P2 (13/15)** · **P3 (9/9)** · **P4 (12/12)** · **P5 (8/8)** · **P6 (8/8)** · **P7 (6/6)** · **P8 (10/10)** · **P9 (7/7)** · **P10 (13/14)** · **P11 (11/11)** · CL-1 ✅ · CL-7 ✅ |
+| **Done** | Phase −1 · Phase 0 · **P1 (18/20)** · **P2 (13/15)** · **P3 (9/9)** · **P4 (12/12)** · **P5 (8/8)** · **P6 (8/8)** · **P7 (6/6)** · **P8 (10/10)** · **P9 (7/7)** · **P10 (13/14)** · **P11 (11/11)** · **P12 (6/6)** · CL-1 ✅ · CL-7 ✅ |
 | **Resolved** | ⛔ **D-1 → MobileNetV2** (0.7189 vs 0.6319). ⛔ **C-1 → log-Mel** (0.9838 vs 0.7677). Both open decisions settled by experiment |
-| **Next** | **Phase 12 — optimization** (ONNX, fp16, Table 8.2.3). ⛔ The test split is spent (`reports/test_once.lock`); P12-5 re-verifies accuracy on **dev**, never test |
-| **Progress** | ~131 of 203 tasks (≈65%) · **13 of 18 phases complete** |
-| **Tests** | **409 passing** (unit + integration against the real 136,304-entry dataset) |
+| **Next** | **Phase 13 — FastAPI backend**, wrapping `src.inference.pipeline.VideoAnalyzer` (load once, `warmup()` at startup, semaphore of 1). Budget: ~1.1 GB RSS per server process (PF-29). ⛔ Test split stays spent |
+| **Progress** | ~137 of 203 tasks (≈67%) · **14 of 18 phases complete** |
+| **Tests** | **418 passing** (unit + integration against the real 136,304-entry dataset; +9 for the Phase 12 pipeline) |
 | **⚠️ Caveat** | ⛔ **PF-17 / PF-19 / PF-20** — the artefacts are inherited by every arm since. Absolute numbers (test included) are **upper bounds**; the trustworthy quantities are the paired deltas in `reports/evidence_table.md`. ⛔ **PF-27**: Phase 4–11 runs reproduce to ~1 seed-sd, not 1e-4 — new training uses `--strict-determinism` |
 | **✋ Awaiting you** | P2-8 (contact sheets) · ⛔ P2-10 (watch 20 overlays) — artefacts in `reports/figures/` · P10-13 (20 timelines, `reports/figures/localization/timelines_dev20.png`) |
 | **Kaggle** | `dinesh1234567` · phone verified · **30 GPU h/week** · P100 16 GB or T4×2 · 12 h/session · 20 GB `/kaggle/working` |
@@ -27,9 +27,26 @@ Legend: ⛔ = blocking gate item · ⭐ = headline capability · 🔬 = experime
 `losses/sync.py`, `localization/targets.py`, `training/{trainer,reporting}.py`,
 `evaluation/metrics.py` and `data/dataset.py`, driven by `scripts/02`–`26`. Phase 9 added
 `training/{augment,gan}.py`, `models/gan/{generator,discriminator}.py` and `scripts/30`–`31`.
-`api/` and `inference/` are still stubs — Phases 11–16 are untouched. Phase 10 added
+`api/` is still a stub — Phases 13–16 are untouched. Phase 12 added `inference/pipeline.py` (raw video → segments) and `scripts/40`–`42`. Phase 10 added
 `evaluation/localization.py`, `localization/{postprocess,chunking}.py`, `losses/localization.py`,
 `models/heads/boundary.py` and `scripts/32`–`35`.
+
+### ⚙️ Phase 12 result — optimization (2026-10-04)
+
+**Gate P12-6 passed.** `reports/benchmark.md` (Table 8.2.3), `reports/phase12_gate.md`, decision **PF-29**.
+
+| | value |
+|---|---|
+| latency, shipped pipeline | **4.45 s per 10 s clip** median, p90 5.26 (3 clean runs: 3.65–5.03 median) |
+| model file | **31.1 MB** `models/avtfd_g_seed0.pt` (+ 3.6 MB face landmarker) |
+| dev accuracy, end to end from raw `.mp4` | **unchanged** on all 175 clips — max \|Δ frame score\| 5.4e-7 |
+| memory | 1.06 GB RSS loaded (fresh process), 242 MB VRAM peak |
+
+The time is in **decode + MediaPipe face landmarks (≈86%)**, not the model (GPU stages ≈8%) —
+so ONNX was dropped and **fp16 lost on every run** (PF-4 again). The win was decoding each file
+once instead of twice (8.88 → 4.45 s). The shipped seed is G seed0 by a pre-set
+median-dev-AP@0.5 rule. ⚠️ Timings swing ~40% run to run on this laptop; benchmark with
+Chrome closed (it alone doubled them).
 
 ### 🔬 Phase 11 result — evidence table + the single test run (2026-10-03)
 
@@ -241,6 +258,8 @@ at `docs/original_report.pdf`.
     → `scripts/28_experiment_e.py` for Experiment E and the ⛔ P8-10 gate.
 11. `make phase9` — F0 → F1 → F2 (F2 needs F1's checkpoint per seed; resumable per seed)
     → `scripts/31_experiment_f.py` for Experiment F and the ⛔ P9-7 gate.
+12. `make phase12` — close Chrome first. Export the model (`40`) → benchmark (`41`, ~6 min)
+    → ⛔ P12-5/6 gate (`42`, all 175 dev clips end to end, ~12 min) → pipeline unit tests.
 
 ### Risk status
 
@@ -287,6 +306,7 @@ requires re-checking at every scale-up — these scale-ups are what exposed both
 | **PF-26** — host RAM kills long runs | Phase 12+ | `make phase10` was reaped mid-run at ≈1.5 GB free, and Phase 11's Experiment I seed 2 again (2026-10-03); resume from `last.pt` exact both times. Close Chrome before long runs |
 | ⛔ **PF-27** — default training is not bit-reproducible | all new training | Re-run of G seed 0 drifted ~1 seed-sd. `--strict-determinism` (`torch.use_deterministic_algorithms`) makes re-runs bit-identical; use it from now on |
 | **PF-28** — sync loss costs boundary precision; modality dropout hides unhelpful video use | Part 11 limitations, Phase 16 | G − H = −0.096 AP@0.75 (significant). I relies on video for localization (0.060 AP@0.5) but does worse on visual-only fakes |
+| **PF-29** — the time is in face detection, not the model | Phase 13 | ~86% of latency is decode + MediaPipe landmarks; ONNX dropped, fp16 slower. Only remaining lever is `detect_every_n`, which needs re-validation. Server budget ~1.1 GB RSS |
 | ⛔ **Test split is spent** | Phases 12–16 | `reports/test_once.lock`. Accuracy re-checks after optimization (P12-5) run on dev |
 | **PF-25** — P9 augmentation hurts on dev | Phase 10 | F1 − F0 = −0.0045 AUC / **−0.0534 frame AP**, significant on 3/3 seeds. Default Experiment G to no augmentation |
 | PF-18 — BatchNorm sees padding | Phase 6+ | `--norm group` ablation exists, not yet measured |
@@ -317,7 +337,7 @@ requires re-checking at every scale-up — these scale-ups are what exposed both
 | 9 Augmentation | 7 | ✅ **7/7** — gate P9-7 passed; F2 − F1 = +0.0009 (**not significant**); F1 − F0 = −0.0045 (augmentation hurt) |
 | 10 Localization ⭐ | 14 | ✅ **13/14** — gate P10-14 passed; AP@0.5 **0.8522** (dev); arms tie at AP@0.5, focal significantly sharper at AP@0.75; P10-13 awaits ✋ |
 | 11 Ablations | 11 | ✅ **11/11** — gate P11-11 passed; **test AUC 0.9842, AP@0.5 0.8005**; H and I not significant at AP@0.5; P11-10 bit-identical in strict mode (PF-27) |
-| 12 Optimization | 6 | ⬜ Not started |
+| 12 Optimization | 6 | ✅ **6/6** — gate P12-6 passed; **4.45 s per 10 s clip** (p90 5.26), 31.1 MB, dev accuracy unchanged end to end (Δ ≤ 5.4e-7); no ONNX, no fp16 (PF-29) |
 | 13 API | 12 | ⬜ Not started |
 | 14 Frontend | 12 | ⬜ Not started (also gated by P14-0) |
 | 15 Testing | 9 | ⬜ Not started |
@@ -825,16 +845,16 @@ Otherwise `E − D` would be unattributable — the failure P7-6 exists to preve
 
 ---
 
-## PHASE 12 — Model Optimization
+## PHASE 12 — Model Optimization — ✅ **COMPLETE 6/6, gate passed (2026-10-04)**
 
-| ID | Task |
-|---|---|
-| P12-1 | `scripts/09_benchmark.py` — profile end-to-end, broken into decode/align, visual extract, audio extract, Stage-B forward, post-process |
-| P12-2 | ONNX export (`scripts/10_export_model.py`) |
-| P12-3 | fp16 inference; batched extraction; model cached in memory |
-| P12-4 | Fill Table 8.2.3 (latency, peak VRAM, peak RAM per component) |
-| P12-5 | ⛔ **Re-verify accuracy after optimization** — quantization can degrade it; a demo that contradicts the results table is a failure |
-| P12-6 | ⛔ **Gate:** < 10 s per 10 s clip, model < 50 MB, accuracy confirmed unchanged |
+| ID | Task | Status |
+|---|---|---|
+| P12-1 | Profile end-to-end, broken into decode/align, visual extract, audio extract, Stage-B forward, post-process | ✅ `src/inference/pipeline.py` (`VideoAnalyzer`: raw `.mp4` → verdict + segments, the path Phase 13 serves) + `scripts/41_benchmark.py` (`09_` was taken). Decode + MediaPipe landmarks **≈86%** of the time; both GPU stages together ≈8% |
+| P12-2 | Export the deployable model | ✅ **No ONNX — PF-29.** `scripts/40_export_model.py` → `models/avtfd_g_seed0.pt`, **31.1 MB** weights-only (Stage-B + backbone + frozen post-processing), round-trip identical to `best.pt`. Seed by the pre-set median-dev-AP@0.5 rule |
+| P12-3 | fp16 inference; batched extraction; model cached in memory | ✅ Measured, not assumed. **Decode once** (frames kept within a 256 MB budget): 8.88 → 4.45 s per 10 s. Model held in memory + `warmup()`: first request ~40 s → ~0.3 s at startup. **fp16 rejected**: slower on backbone and model in all 3 runs, and drifts 2–5e-4 (PF-4 confirmed) |
+| P12-4 | Fill Table 8.2.3 (latency, peak VRAM, peak RAM per component) | ✅ `reports/benchmark.md`. **4.45 s per 10 s clip** median (p90 5.26) over 20 dev clips; 3 clean runs ranged 3.65–5.03 s median. Peak VRAM 242 MB; fresh-process RSS **1.06 GB** loaded, 1.18 GB peak |
+| P12-5 | ⛔ **Re-verify accuracy after optimization** | ✅ ⛔ `scripts/42_phase12_gate.py` — all **175 dev clips** end to end from raw video: max \|Δ frame score\| **5.4e-7**; AUC 0.9843, frame AP 0.9253, AP@0.5 0.8634, AP@0.75 0.5826 **unchanged**; segment count identical on every clip. Dev only — test is spent |
+| P12-6 | ⛔ **Gate:** < 10 s per 10 s clip, model < 50 MB, accuracy confirmed unchanged | ✅ ⛔ **GATE PASSED** — p90 5.26 s < 10 s, 31.1 MB < 50 MB, P12-5 passed, same model file (sha256) in benchmark and check (`reports/phase12_gate.md`) |
 
 ---
 

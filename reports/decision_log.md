@@ -888,6 +888,66 @@ costs AUC 0.0016 and *raises* AP@0.5 by 0.0096: PF-21 holds on held-out data.
 
 ---
 
+### PF-29 · Phase 12: no ONNX, no fp16 — the time is in face detection, not the model
+
+**Decision, recorded 2026-10-04**, from `reports/benchmark.md` (`scripts/41_benchmark.py`,
+20 dev clips, Chrome closed, burn-in pass first) and `reports/phase12_gate.md`.
+
+**ONNX (P12-2) dropped, recommended and accepted before any Phase 12 code was written.** The
+plan lists it as a speed lever; measured, it cannot be one here. The two GPU stages together
+are ~8% of end-to-end time (MobileNetV2 ~0.31 s + Stage-B ~0.05 s per 10 s clip); decode +
+MediaPipe landmarks are ~86%, and MediaPipe is already its own CPU runtime. The size gate is met
+in plain PyTorch, and Phases 13–14 run locally in the same Python environment, so ONNX would
+only add a second copy of the model to keep in parity. P12-2 is instead a **weights-only
+bundle** (`scripts/40_export_model.py` → `models/avtfd_g_seed0.pt`, 31.1 MB: Stage-B +
+backbone + frozen post-processing; `best.pt` is 66 MB only because it carries Adam's moments).
+
+**Which seed ships:** the median dev AP@0.5 of G's three (seed0, 0.8634 between 0.8258 and
+0.8674) — fixed as a rule before any Phase 12 number existed, so the demo neither flatters nor
+undersells the results table.
+
+**Three clean benchmark runs, same code, same clips** (s per 10 s clip, median / p90):
+
+| variant | run 1 | run 2 | run 3 (committed) | verdict |
+|---|---|---|---|---|
+| `two_pass` (decode twice, as Phase 2–4) | 5.95 / 6.21 | 6.61 / 8.90 | 8.88 / 9.59 | — |
+| **`optimized`** (decode once, fp32) | **3.65 / 3.88** | **5.03 / 5.30** | **4.45 / 5.26** | **shipped** |
+| backbone fp16 | 3.76 / 4.00 | 5.75 / 6.52 | 5.75 / 6.16 | slower, drift 2.0e-4 |
+| model fp16 (autocast) | 3.67 / 3.94 | 5.66 / 6.31 | 5.59 / 6.06 | slower, drift 5.3e-4 |
+
+Absolute times move ~40% between runs on this laptop (2.1 GHz cap, thermals after a 12-minute
+gate run), almost entirely in the CPU detection stage. **The orderings never move:** decoding
+once wins every run, fp16 loses every run (confirming PF-4 on the real pipeline), and the worst
+p90 of the shipped variant (5.30 s) clears the 10 s target by ~1.9x.
+
+**fp16 is rejected** on both counts: slower, and not numerically identical (the adoption rule
+admits a variant only with drift <= 1e-5, so P12-5's "accuracy unchanged" holds by
+construction).
+
+**What did help: decoding once.** Pass 1's frames are kept when they fit a 256 MB budget (a 10 s
+LAV-DF clip is 37 MB) and the file is re-decoded only above it — bit-identical output
+(unit-tested). The other P12-3 item, the model held in memory, is `VideoAnalyzer` + `warmup()`:
+the first request after construction measured ~40 s (CUDA/cuDNN init + librosa/numba JIT) and
+now costs ~0.3 s at startup instead (construction ~6 s).
+
+**Accuracy (P12-5), all 175 dev clips end to end from raw `.mp4`:** max |Δ frame score| 5.4e-7
+against the cached-feature predictions; AUC 0.9843, frame AP 0.9253, AP@0.5 0.8634, AP@0.75
+0.5826 — all unchanged; segment count identical on every clip.
+
+**Memory for Phase 13:** a fresh process holds 1,057 MB loaded + warm, 1,083 MB after the
+longest clip (peak working set 1,182 MB); peak VRAM 242 MB of 4 GB.
+
+**The lever left is `detect_every_n`** (landmarks every 5th frame). Raising it would cut the
+dominant stage, but it changes the preprocessing the model was trained on, so it needs
+re-extraction and re-validation — out of Phase 12's scope and not needed.
+
+**Benchmark hygiene, learned the hard way:** with Chrome open the same work measured up to 2x
+slower, and run order alone moved a median by 2x (cold disk + first-use process costs). The
+benchmark therefore pre-reads every clip, runs an unrecorded burn-in pass, records ambient CPU /
+RAM / Chrome with every run, measures memory in a fresh process, and gates on the p90.
+
+---
+
 ## Appendix B — architectural decisions
 
 | ID | Decision | Options | Resolved by | Date | Outcome |
