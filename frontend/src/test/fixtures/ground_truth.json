@@ -1,0 +1,75 @@
+{
+  "dev_004337": {
+    "note": "real",
+    "label": 0,
+    "class_name": "real",
+    "fake_periods": [],
+    "best_iou_per_true_span": []
+  },
+  "dev_034103": {
+    "note": "most-forged clip on disk (21.7%, both modalities), single span",
+    "label": 1,
+    "class_name": "both",
+    "fake_periods": [
+      [
+        1.9,
+        2.864
+      ]
+    ],
+    "best_iou_per_true_span": [
+      0.893
+    ]
+  },
+  "dev_004623": {
+    "note": "two spans, both modalities",
+    "label": 1,
+    "class_name": "both",
+    "fake_periods": [
+      [
+        7.0,
+        8.414
+      ],
+      [
+        10.114,
+        10.868
+      ]
+    ],
+    "best_iou_per_true_span": [
+      0.93,
+      0.898
+    ]
+  },
+  "dev_005675": {
+    "note": "two spans, visual_only (the weak class on test)",
+    "label": 1,
+    "class_name": "visual_only",
+    "fake_periods": [
+      [
+        14.8,
+        15.32
+      ],
+      [
+        5.5,
+        6.1
+      ]
+    ],
+    "best_iou_per_true_span": [
+      0.375,
+      0.548
+    ]
+  },
+  "dev_005417": {
+    "note": "single span, audio_only",
+    "label": 1,
+    "class_name": "audio_only",
+    "fake_periods": [
+      [
+        2.4,
+        3.124
+      ]
+    ],
+    "best_iou_per_true_span": [
+      0.862
+    ]
+  }
+}

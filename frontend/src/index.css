@@ -1,0 +1,88 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Colour roles. Chrome and status values are the dataviz reference palette: status colours
+ * (fake = critical, real = good, warn = warning) are reserved and always paired with an icon
+ * and a label. Dark mode is its own selected steps, not an automatic flip.
+ */
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.1);
+  --track: #e8e7e1;
+  --accent: #2a78d6;
+  --fake: #d03b3b;
+  --fake-wash: rgba(208, 59, 59, 0.1);
+  --hatch: rgba(255, 255, 255, 0.35);
+  --real: #0ca30c;
+  --warn: #8a5a00; /* warning hue darkened for 4.5:1 text on the light surface */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --ink: #f0efec;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --border: rgba(255, 255, 255, 0.1);
+    --track: #232322; /* 3.27:1 under the critical red; ringed to show its extent */
+    --accent: #3987e5;
+    --fake: #d03b3b;
+    --fake-wash: rgba(208, 59, 59, 0.18);
+    --hatch: rgba(0, 0, 0, 0.3);
+    --real: #0ca30c;
+    --warn: #fab219;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d;
+  --surface: #1a1a19;
+  --ink: #f0efec;
+  --ink-2: #c3c2b7;
+  --muted: #898781;
+  --grid: #2c2c2a;
+  --axis: #383835;
+  --border: rgba(255, 255, 255, 0.1);
+  --track: #232322; /* 3.27:1 under the critical red; ringed to show its extent */
+  --accent: #3987e5;
+  --fake: #d03b3b;
+  --fake-wash: rgba(208, 59, 59, 0.18);
+  --hatch: rgba(0, 0, 0, 0.3);
+  --real: #0ca30c;
+  --warn: #fab219;
+}
+
+body {
+  background: var(--page);
+  color: var(--ink);
+}
+
+/* The secondary channel for forged spans: a 45° hatch, so they never rely on red alone. */
+.hatch {
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--hatch) 0 2px,
+    transparent 2px 6px
+  );
+}
+
+@media (forced-colors: active) {
+  .hatch {
+    forced-color-adjust: none;
+    background-color: Mark;
+  }
+}

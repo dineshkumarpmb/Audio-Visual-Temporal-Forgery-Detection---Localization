@@ -7,17 +7,17 @@ Legend: ⛔ = blocking gate item · ⭐ = headline capability · 🔬 = experime
 
 ---
 
-## 📍 CURRENT STATUS — 2026-10-04, Phase 12 complete · Phase 13 next
+## 📍 CURRENT STATUS — 2026-10-18, Phase 14 built (10/13) · ✋ demo + gate await you · Phase 15 next
 
 | | |
 |---|---|
-| **Done** | Phase −1 · Phase 0 · **P1 (18/20)** · **P2 (13/15)** · **P3 (9/9)** · **P4 (12/12)** · **P5 (8/8)** · **P6 (8/8)** · **P7 (6/6)** · **P8 (10/10)** · **P9 (7/7)** · **P10 (13/14)** · **P11 (11/11)** · **P12 (6/6)** · CL-1 ✅ · CL-7 ✅ |
+| **Done** | Phase −1 · Phase 0 · **P1 (18/20)** · **P2 (13/15)** · **P3 (9/9)** · **P4 (12/12)** · **P5 (8/8)** · **P6 (8/8)** · **P7 (6/6)** · **P8 (10/10)** · **P9 (7/7)** · **P10 (13/14)** · **P11 (11/11)** · **P12 (6/6)** · **P13 (12/12)** · **P14 (10/13, ✋ gate pending)** · CL-1 ✅ · CL-7 ✅ |
 | **Resolved** | ⛔ **D-1 → MobileNetV2** (0.7189 vs 0.6319). ⛔ **C-1 → log-Mel** (0.9838 vs 0.7677). Both open decisions settled by experiment |
-| **Next** | **Phase 13 — FastAPI backend**, wrapping `src.inference.pipeline.VideoAnalyzer` (load once, `warmup()` at startup, semaphore of 1). Budget: ~1.1 GB RSS per server process (PF-29). ⛔ Test split stays spent |
-| **Progress** | ~137 of 203 tasks (≈67%) · **14 of 18 phases complete** |
-| **Tests** | **418 passing** (unit + integration against the real 136,304-entry dataset; +9 for the Phase 12 pipeline) |
+| **Next** | ✋ **Close Phase 14**: run `make api` + `make frontend`, try a real / partially fake clip in the browser (P14-10), record the screen capture (P14-11), and have a non-expert read a result unaided (P14-12). Then **Phase 15 — Testing**. ⛔ Test split stays spent |
+| **Progress** | ~159 of 203 tasks (≈78%) · **15 of 18 phases complete**, Phase 14 built and awaiting its manual gate |
+| **Tests** | **463 Python passing** (unit + integration against the real 136,304-entry dataset; +44 API tests and +1 deadline test in Phase 13) · **39 frontend (Vitest)**, on real API responses |
 | **⚠️ Caveat** | ⛔ **PF-17 / PF-19 / PF-20** — the artefacts are inherited by every arm since. Absolute numbers (test included) are **upper bounds**; the trustworthy quantities are the paired deltas in `reports/evidence_table.md`. ⛔ **PF-27**: Phase 4–11 runs reproduce to ~1 seed-sd, not 1e-4 — new training uses `--strict-determinism` |
-| **✋ Awaiting you** | P2-8 (contact sheets) · ⛔ P2-10 (watch 20 overlays) — artefacts in `reports/figures/` · P10-13 (20 timelines, `reports/figures/localization/timelines_dev20.png`) |
+| **✋ Awaiting you** | P2-8 (contact sheets) · ⛔ P2-10 (watch 20 overlays) — artefacts in `reports/figures/` · P10-13 (20 timelines, `reports/figures/localization/timelines_dev20.png`) · **P14-10 / ⛔ P14-11 / ⛔ P14-12** (browser run, demo capture, non-expert read) |
 | **Kaggle** | `dinesh1234567` · phone verified · **30 GPU h/week** · P100 16 GB or T4×2 · 12 h/session · 20 GB `/kaggle/working` |
 | **Branch** | `master` |
 
@@ -27,9 +27,54 @@ Legend: ⛔ = blocking gate item · ⭐ = headline capability · 🔬 = experime
 `losses/sync.py`, `localization/targets.py`, `training/{trainer,reporting}.py`,
 `evaluation/metrics.py` and `data/dataset.py`, driven by `scripts/02`–`26`. Phase 9 added
 `training/{augment,gan}.py`, `models/gan/{generator,discriminator}.py` and `scripts/30`–`31`.
-`api/` is still a stub — Phases 13–16 are untouched. Phase 12 added `inference/pipeline.py` (raw video → segments) and `scripts/40`–`42`. Phase 10 added
+Phase 13 filled `api/` (`main.py`, `settings.py`, `errors.py`, `schemas.py`, `routes/{analyze,health}.py`, `services/{upload,job_store,inference_service}.py`) and added `scripts/43`; Phases 14–16 are untouched. Phase 12 added `inference/pipeline.py` (raw video → segments) and `scripts/40`–`42`. Phase 10 added
 `evaluation/localization.py`, `localization/{postprocess,chunking}.py`, `losses/localization.py`,
 `models/heads/boundary.py` and `scripts/32`–`35`.
+
+### 🖥️ Phase 14 result — frontend (2026-10-18)
+
+**Built and tested; the gate is a human one and still open.** `frontend/` — React 18 + Vite 5 +
+Tailwind 3, run with `make api` and `make frontend` (Vite on :5173 proxies `/api` to :8000).
+Decision **PF-31**; screenshots in `reports/figures/frontend/`.
+
+| | |
+|---|---|
+| flow | drag-drop or pick → upload with progress (XHR) → queue position → analysing → result, or a plain-language error for every API code |
+| ⭐ timeline | the whole clip as a strip; forged spans are critical red **+ 45° hatch** on a neutral track, legend, accessible labels; click a span to play it, click the track to seek; playhead follows the video |
+| also | per-frame score chart (threshold, forged bands, crosshair tooltip, click to seek), verdict badge, segment table with Play, JSON download, "how to read this", dark mode, 390 px phone layout |
+| tests | **39 Vitest** — the timeline is checked span-by-span against **real API responses** for 5 LAV-DF dev clips (`scripts/44_frontend_fixtures.py`), plus flow, polling, errors, upload checks |
+| checked by eye | headless Edge screenshots: light, dark, real clip, phone width, landing, error |
+
+⚠️ **PF-31.** P14-0 turned out not to be needed (longest `node_modules` path 186 chars; guarded by
+`npm run check-paths`). The thing that *did* break was the **`&` in the repo path**, which splits
+npm's cmd shims — every script now calls its tool through `node`. **LAV-DF has no fully fake clip**
+(max 21.7% forged), so P14-10's "fully fake" case can only be approximated. The plan's green/red
+timeline fails colour-blind readers (ΔE 4.1), so it is red + hatch on neutral grey instead.
+
+### 🌐 Phase 13 result — FastAPI backend (2026-10-18)
+
+**Gate P13-12 passed.** `reports/phase13_gate.md`, decision **PF-30**. `make api` serves
+`POST /api/v1/analyze` → job id, `GET /api/v1/jobs/{id}`, `GET /health`, `GET /api/v1/model-info`;
+OpenAPI at `/docs`.
+
+| | value |
+|---|---|
+| tests | **44** in `tests/integration/test_api.py` — contract tests around a fake analyzer + the shipped model behind the real app |
+| error matrix over real HTTP | **13/13** structured — oversized (with and without `Content-Length`), wrong extension, wrong MIME, not multipart, empty, garbage, truncated, AVI-named-.mp4, no audio, 0.2 s, no face, unknown job |
+| load once (P13-8) | startup 22–27 s incl. ~10 s warm-up; repeat request 2.35 s vs 2.39 s first, identical scores |
+| ⛔ concurrency (P13-9) | burst of 6: 5 accepted, #6 → 503 `queue_full` + `Retry-After`; **0 overlapping** run intervals |
+| memory | server 2.31 GB idle vs **2.33 GB** for the bare analyzer in the same conditions; 3.04 GB peak under the burst |
+
+⚠️ **PF-30 — no face is an error, and 4 of 1,159 LAV-DF clips have none.** MediaPipe misses on
+0.35% of cached clips (e.g. `dev_004217`), which the plan's policy refuses with `no_face`
+(`AVTFD_REQUIRE_FACE=false` scores them from audio instead). And **PF-29's 1.06 GB is not a
+budget**: Windows RSS is an elastic working set — the same analyzer measured 1.70–2.87 GB today.
+The API adds nothing over the bare analyzer; a second analyzer would not fit, so the semaphore of
+1 matters more than PF-29 suggested.
+
+The 300 s timeout is real: `VideoAnalyzer.analyze(deadline=...)` checks once per second of
+video inside the frame loops and raises `AnalysisTimeoutError` — a thread cannot be killed
+mid-CUDA. Uploads stream straight to disk with the cap enforced while reading.
 
 ### ⚙️ Phase 12 result — optimization (2026-10-04)
 
@@ -260,6 +305,11 @@ at `docs/original_report.pdf`.
     → `scripts/31_experiment_f.py` for Experiment F and the ⛔ P9-7 gate.
 12. `make phase12` — close Chrome first. Export the model (`40`) → benchmark (`41`, ~6 min)
     → ⛔ P12-5/6 gate (`42`, all 175 dev clips end to end, ~12 min) → pipeline unit tests.
+13. `make phase13` — close Chrome first. API tests, then a real `uvicorn` server driven over HTTP
+    (`43`, ~3 min): error matrix → load-once → burst → ⛔ P13-12 gate. `make api` to serve.
+14. `make frontend-install` once (npm ci + MAX_PATH guard), then `make phase14` (39 Vitest + build).
+    Demo: `make api` and `make frontend` in two shells → http://127.0.0.1:5173. Visual check without
+    uploading: `/preview.html?fixture=dev_004623&theme=dark&width=390`.
 
 ### Risk status
 
@@ -306,7 +356,9 @@ requires re-checking at every scale-up — these scale-ups are what exposed both
 | **PF-26** — host RAM kills long runs | Phase 12+ | `make phase10` was reaped mid-run at ≈1.5 GB free, and Phase 11's Experiment I seed 2 again (2026-10-03); resume from `last.pt` exact both times. Close Chrome before long runs |
 | ⛔ **PF-27** — default training is not bit-reproducible | all new training | Re-run of G seed 0 drifted ~1 seed-sd. `--strict-determinism` (`torch.use_deterministic_algorithms`) makes re-runs bit-identical; use it from now on |
 | **PF-28** — sync loss costs boundary precision; modality dropout hides unhelpful video use | Part 11 limitations, Phase 16 | G − H = −0.096 AP@0.75 (significant). I relies on video for localization (0.060 AP@0.5) but does worse on visual-only fakes |
-| **PF-29** — the time is in face detection, not the model | Phase 13 | ~86% of latency is decode + MediaPipe landmarks; ONNX dropped, fp16 slower. Only remaining lever is `detect_every_n`, which needs re-validation. Server budget ~1.1 GB RSS |
+| **PF-29** — the time is in face detection, not the model | Phase 13 | ~86% of latency is decode + MediaPipe landmarks; ONNX dropped, fp16 slower. Only remaining lever is `detect_every_n`, which needs re-validation. The 1.06 GB memory figure is superseded by PF-30 |
+| **PF-30** — `no_face` refuses 0.35% of LAV-DF clips; memory is an elastic working set | Phase 14, Phase 16 | MediaPipe finds no face on 4/1,159 cached clips; the API refuses them by default (`AVTFD_REQUIRE_FACE`). The analyzer's working set measured 1.70–2.87 GB on one day; the server adds nothing, peaks ~3.1 GB under a burst. Frontend must show `no_face` and the low-face warning clearly |
+| **PF-31** — `&` in the repo path breaks npm's cmd shims; LAV-DF has no fully fake clip | Phase 15–16 | Scripts call tools via `node`; never reintroduce `npx` or bare bin names in `package.json` or CI. P14-10's "fully fake" case is approximated by the 21.7%-forged `dev_034103` |
 | ⛔ **Test split is spent** | Phases 12–16 | `reports/test_once.lock`. Accuracy re-checks after optimization (P12-5) run on dev |
 | **PF-25** — P9 augmentation hurts on dev | Phase 10 | F1 − F0 = −0.0045 AUC / **−0.0534 frame AP**, significant on 3/3 seeds. Default Experiment G to no augmentation |
 | PF-18 — BatchNorm sees padding | Phase 6+ | `--norm group` ablation exists, not yet measured |
@@ -315,7 +367,7 @@ requires re-checking at every scale-up — these scale-ups are what exposed both
 | ⛔ PF-10 — crops are 7.52 MB/video | Phase 9+ | Streaming `--from-video` solves it; features are 228–569 KB/video |
 | ✋ P2-8 / ⛔ P2-10 manual checks | Phase 2 sign-off | Rendered in `reports/figures/`. Backed by 7/7 objective label verification but still needs a human watch |
 | ✋ Attach the mirror in a Kaggle notebook | dev-10k and above | Manual browser step (*Add Data*). No longer blocks subset-scale work (PF-16) |
-| P14-0 — Windows long paths disabled | Phase 14 | `LongPathsEnabled = 0`. Needs an elevated shell + reboot before `npm install` |
+| P14-0 — Windows long paths disabled | — | **Resolved by measurement (PF-31)**: longest `node_modules` path 186/260. Still disabled; `npm run check-paths` guards it |
 | PF-4 — precision re-benchmark on Kaggle | Phase 9–11 | fp32 locally is settled; the cloud figure is assumed until measured |
 
 ---
@@ -338,8 +390,8 @@ requires re-checking at every scale-up — these scale-ups are what exposed both
 | 10 Localization ⭐ | 14 | ✅ **13/14** — gate P10-14 passed; AP@0.5 **0.8522** (dev); arms tie at AP@0.5, focal significantly sharper at AP@0.75; P10-13 awaits ✋ |
 | 11 Ablations | 11 | ✅ **11/11** — gate P11-11 passed; **test AUC 0.9842, AP@0.5 0.8005**; H and I not significant at AP@0.5; P11-10 bit-identical in strict mode (PF-27) |
 | 12 Optimization | 6 | ✅ **6/6** — gate P12-6 passed; **4.45 s per 10 s clip** (p90 5.26), 31.1 MB, dev accuracy unchanged end to end (Δ ≤ 5.4e-7); no ONNX, no fp16 (PF-29) |
-| 13 API | 12 | ⬜ Not started |
-| 14 Frontend | 12 | ⬜ Not started (also gated by P14-0) |
+| 13 API | 12 | ✅ **12/12** — gate P13-12 passed; 44 API tests, error matrix 13/13 over real HTTP, 0 overlapping jobs under a burst, model loaded once (PF-30) |
+| 14 Frontend | 12 | 🟡 **10/13** (incl. P14-0) — built, 39 tests on real API responses; ✋ P14-10 browser run, ⛔ P14-11 demo capture, ⛔ P14-12 non-expert gate await you (PF-31) |
 | 15 Testing | 9 | ⬜ Not started |
 | 16 Documentation | 11 | ⬜ Not started (needs PRE-1) |
 | Cloud (Kaggle) | 8 | 🟡 2/8 — CL-1 ✅, CL-7 ✅. No longer on Phase 4's critical path (PF-16) |
@@ -858,42 +910,42 @@ Otherwise `E − D` would be unattributable — the failure P7-6 exists to preve
 
 ---
 
-## PHASE 13 — FastAPI Backend
+## PHASE 13 — FastAPI Backend — ✅ **COMPLETE 12/12, gate passed (2026-10-18)**
 
-| ID | Task |
-|---|---|
-| P13-1 | `POST /api/v1/analyze` → returns job id |
-| P13-2 | `GET /api/v1/jobs/{id}` → status / result |
-| P13-3 | `GET /health` and `GET /api/v1/model-info` |
-| P13-4 | Pydantic request/response schemas; auto-generated OpenAPI at `/docs` |
-| P13-5 | In-process background job queue + job store |
-| P13-6 | Strict input validation: max 200 MB, allowed [mp4, avi, mov, mkv], MIME + codec check, duration bounds, 300 s timeout |
-| P13-7 | **Stream uploads to disk** — never read a large file into memory on a 6 GB machine |
-| P13-8 | Load the model **once at startup**; verify by timing the second request |
-| P13-9 | ⛔ Enforce a concurrency **semaphore of 1** — 6 GB RAM cannot support more |
-| P13-10 | Structured error responses — oversized / corrupt / no-audio / no-face must never return a 500 stack trace |
-| P13-11 | `tests/integration/test_api.py` with pytest + httpx covering every error case |
-| P13-12 | ⛔ **Gate:** API tested and stable under all error cases |
+| ID | Task | Status |
+|---|---|---|
+| P13-1 | `POST /api/v1/analyze` → returns job id | ✅ `api/routes/analyze.py` — 202 with `job_id`, `status_url`, `queue_position` |
+| P13-2 | `GET /api/v1/jobs/{id}` → status / result | ✅ `queued → running → succeeded / failed`; result has verdict, clip score, segments, per-frame scores, warnings, timings; failure has a structured `error` |
+| P13-3 | `GET /health` and `GET /api/v1/model-info` | ✅ `api/routes/health.py` — health reports busy / queued; model-info reports the bundle (sha256, backbone, post-processing, parameter counts, warm-up s) and every limit |
+| P13-4 | Pydantic request/response schemas; auto-generated OpenAPI at `/docs` | ✅ `api/schemas.py`; the hand-parsed upload is declared via `openapi_extra` so `/docs` shows the file field |
+| P13-5 | In-process background job queue + job store | ✅ `api/services/job_store.py` (locked dict, TTL 1 h, cap 200) + one worker thread in `inference_service.py` |
+| P13-6 | Strict input validation: max 200 MB, allowed [mp4, avi, mov, mkv], MIME + codec check, duration bounds, 300 s timeout | ✅ `api/services/upload.py` — extension + client MIME (advisory), then PyAV: demuxer matches extension, codec allow-list, audio stream, 0.5–300 s, one frame decodes. Timeout via new `VideoAnalyzer.analyze(deadline=)` → `AnalysisTimeoutError` |
+| P13-7 | **Stream uploads to disk** — never read a large file into memory on a 6 GB machine | ✅ streaming `python_multipart` parser straight to a file; cap enforced mid-stream (chunked upload with no length cut off at 200 MB); honest `Content-Length` over the cap refused before reading; full queue refused before reading |
+| P13-8 | Load the model **once at startup**; verify by timing the second request | ✅ lifespan loads + warms once (factory called once, asserted); repeat request 2.35 s vs 2.39 s, identical frame scores |
+| P13-9 | ⛔ Enforce a concurrency **semaphore of 1** — 6 GB RAM cannot support more | ✅ ⛔ single worker + `BoundedSemaphore(1)`; `max_concurrent_jobs` validated `== 1`; burst of 6 → 5 accepted, 503 `queue_full`, **0 overlapping** runs, observed peak concurrency 1 |
+| P13-10 | Structured error responses — oversized / corrupt / no-audio / no-face must never return a 500 stack trace | ✅ `api/errors.py` — every failure is `{"error": {code, message, detail}}`; exception text never returned. `no_face` refuses 4/1,159 LAV-DF clips by default (PF-30) |
+| P13-11 | `tests/integration/test_api.py` with pytest + httpx covering every error case | ✅ **44 tests**: 40 contract tests (fake analyzer, real upload/vetting/worker) + 3 on the shipped model + parity of the face mask with the training cache |
+| P13-12 | ⛔ **Gate:** API tested and stable under all error cases | ✅ ⛔ **GATE PASSED** — `scripts/43_phase13_gate.py` on a real `uvicorn --workers 1`: tests green, error matrix 13/13, load-once, burst, server alive with no traceback and no upload left (`reports/phase13_gate.md`) |
 
 ---
 
-## PHASE 14 — Frontend
+## PHASE 14 — Frontend — 🟡 **BUILT 10/13 — ✋ manual gate pending (2026-10-18)**
 
-| ID | Task |
-|---|---|
-| P14-0 | ⛔ **Enable Windows long-path support before `npm install`** (elevated + reboot). `node_modules` nests deeper than JupyterLab, which already broke a pip transaction in Phase 0 — see decision PF-5 |
-| P14-1 | Scaffold React + Vite + TailwindCSS (`frontend/`) |
-| P14-2 | Drag-drop upload component with progress |
-| P14-3 | Job polling (1 s interval) with graceful error states |
-| P14-4 | ⭐ **Timeline strip with forged spans highlighted** (green/red) — the centrepiece |
-| P14-5 | Video player that seeks to a span on click |
-| P14-6 | Verdict badge + confidence display |
-| P14-7 | Per-frame score line chart |
-| P14-8 | JSON download of the full result |
-| P14-9 | Component tests (Vitest) |
-| P14-10 | ✋ Test with a **real**, a **fully fake**, and a **partially fake** video; verify the timeline matches the returned segments |
-| P14-11 | ⛔ **Record a screen capture of the demo** — the single most effective portfolio artifact this project produces |
-| P14-12 | ⛔ **Gate:** a non-expert can upload a video and correctly read the result unaided |
+| ID | Task | Status |
+|---|---|---|
+| P14-0 | ⛔ **Enable Windows long-path support before `npm install`** (elevated + reboot). `node_modules` nests deeper than JupyterLab, which already broke a pip transaction in Phase 0 — see decision PF-5 | ✅ **Resolved by measurement, not enabled (PF-31)**: longest path under `node_modules` is **186** chars (limit 260). `npm run check-paths` fails within 20 of the limit and runs after every `make frontend-install`. The real Windows hazard was the `&` in the repo path (cmd shims) — fixed by calling tools through `node` |
+| P14-1 | Scaffold React + Vite + TailwindCSS (`frontend/`) | ✅ React 18.3.1, Vite 5.4.11, Tailwind 3.4.17, TS 5.7 strict, all pinned; Vite proxies `/api` + `/health` to :8000 (same-origin, no CORS) |
+| P14-2 | Drag-drop upload component with progress | ✅ `Upload.tsx` — drop or pick, keyboard-operable; type and size pre-checked against `/api/v1/model-info` limits; XHR upload with a real progress bar |
+| P14-3 | Job polling (1 s interval) with graceful error states | ✅ `useJobPolling.ts` — 1 s; shows queue position; rides out network blips (gives up after 5), a 404 is final; every API error code mapped to plain words (`lib/errors.ts`) |
+| P14-4 | ⭐ **Timeline strip with forged spans highlighted** (green/red) — the centrepiece | ✅ ⭐ `Timeline.tsx` — critical red **+ 45° hatch** on a neutral track, legend and spoken labels, not green/red (fails CVD at ΔE 4.1, PF-31); 4 px minimum span width; playhead |
+| P14-5 | Video player that seeks to a span on click | ✅ `VideoPlayer.tsx` plays the local file (object URL); timeline spans, the track, the chart and the table's Play buttons all seek it |
+| P14-6 | Verdict badge + confidence display | ✅ `Verdict.tsx` — "Likely manipulated" / "No manipulation detected" with icon, a one-sentence summary (segments, seconds of video), whole-video score (never shown as 100% / 0%), API warnings |
+| P14-7 | Per-frame score line chart | ✅ `ScoreChart.tsx` — 2 px line, segment threshold from model-info, forged bands behind, crosshair tooltip, click to seek |
+| P14-8 | JSON download of the full result | ✅ "Download full result (JSON)" — the complete job body, tested |
+| P14-9 | Component tests (Vitest) | ✅ **39 tests** on real API responses (`scripts/44_frontend_fixtures.py`, 5 LAV-DF dev clips): timeline geometry span-by-span, the partially fake clip's span over its labelled forgery, flow, polling, errors, upload checks; plus typecheck + build (`make phase14`) |
+| P14-10 | ✋ Test with a **real**, a **fully fake**, and a **partially fake** video; verify the timeline matches the returned segments | 🟡 **Automated half done**: timeline = returned segments on real API output for real / partial / two-span / visual-only / audio-only clips; screenshots in `reports/figures/frontend/`; upload through the proxy verified with curl. **LAV-DF has no fully fake clip** (max 21.7%, PF-31). ✋ A human browser run with real uploads is still needed |
+| P14-11 | ⛔ **Record a screen capture of the demo** — the single most effective portfolio artifact this project produces | ✋ Needs you — `make api` + `make frontend`, upload `data/raw/LAV-DF/dev-2k/dev_004623.mp4` (two spans) |
+| P14-12 | ⛔ **Gate:** a non-expert can upload a video and correctly read the result unaided | ✋ Needs a non-expert. Everything the result says is in plain words with a "How to read this" panel, but only a person can pass this |
 
 ---
 
@@ -993,7 +1045,7 @@ Not a separate phase — these are the tasks the local+Kaggle strategy adds.
 
 *Phase −1 complete except PRE-1 (report retrieval), which does not block Phases 0–15.*
 
-*Completed as of 2026-09-05: ~100 of 203 tasks (≈49%). Phases −1, 0, 1, 2, 3, 4, 5, 6, 7, 8 done.
+*Completed as of 2026-10-18: ~159 of 203 tasks (≈78%) — see the status table at the top. Snapshot from 2026-09-05 follows: ~100 of 203 tasks (≈49%). Phases −1, 0, 1, 2, 3, 4, 5, 6, 7, 8 done.
 **D-1 → MobileNetV2, C-1 → log-Mel**, Experiment C is a documented negative result (PF-20),
 **Experiment D a decisive positive one** (+0.0844, gate P7-6 passed) whose frame AP survived its own
 confound check (position explains 8.1%), and **Experiment E a mixed one** (+0.0045, gate P8-10
