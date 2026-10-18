@@ -18,6 +18,12 @@ let longest = "";
 
 console.log(`longest path: ${longest.length} chars (limit ${LIMIT}, margin ${MARGIN})`);
 console.log(longest);
+// MAX_PATH is a Windows limit. On Linux (PATH_MAX 4096) the absolute path is dominated by
+// where the checkout lives -- a CI runner nests the repo name twice -- so only report there.
+if (process.platform !== "win32") {
+  console.log(`not Windows (${process.platform}): MAX_PATH does not apply, reported only`);
+  process.exit(0);
+}
 if (longest.length > LIMIT - MARGIN) {
   console.error("FAIL: within the margin of MAX_PATH -- enable long paths (P14-0) first");
   process.exit(1);

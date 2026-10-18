@@ -28,9 +28,9 @@ jobs:
     env:
       HYPOTHESIS_PROFILE: ci  # derandomized: a failure here reproduces locally
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.10"
           cache: pip
@@ -65,12 +65,24 @@ jobs:
           ruff check .
           ruff format --check .
 
+      # Job logs need admin rights to read through the API; annotations are public. Every
+      # FAILED/ERROR line and the coverage verdict are re-emitted as annotations so a failure
+      # can be diagnosed from the run page or the checks API without a token.
       - name: Tests with coverage (fails under 70% on src/)
-        run: pytest -q --cov=src --cov-report=term-missing:skip-covered --cov-report=xml
+        run: |
+          set -o pipefail
+          pytest -q -rfE --cov=src --cov-report=term-missing:skip-covered --cov-report=xml             2>&1 | tee "$RUNNER_TEMP/pytest.log"
+
+      - name: Surface failures as annotations
+        if: failure()
+        run: |
+          grep -E "^(FAILED|ERROR) " "$RUNNER_TEMP/pytest.log" | head -40             | while IFS= read -r line; do echo "::error title=pytest::${line}"; done
+          grep -E "^E  +" "$RUNNER_TEMP/pytest.log" | head -40             | while IFS= read -r line; do echo "::error title=assertion::${line}"; done
+          grep -E "Required test coverage|TOTAL|passed|failed" "$RUNNER_TEMP/pytest.log" | tail -4             | while IFS= read -r line; do echo "::notice title=summary::${line}"; done
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: coverage-xml
           path: coverage.xml
@@ -84,9 +96,9 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "22"
           cache: npm
