@@ -1,0 +1,229 @@
+{
+  "generated_at": "2026-10-18T13:15:23",
+  "git_sha": "422ce79af61e-dirty",
+  "model": {
+    "name": "avtfd_g_seed0",
+    "file": "models/avtfd_g_seed0.pt",
+    "size_mb": 31.06,
+    "sha256": "b88955423e8ab5d6b911979865dc54fe733881b07bfaca33fc5fd2edcf9fac80",
+    "device": "cuda"
+  },
+  "warmup_s": 11.59,
+  "startup_s": 24.69,
+  "rss_gb": {
+    "server_idle": 2.31,
+    "server_peak": 3.045,
+    "direct_analyzer_same_conditions": 2.329,
+    "free_at_start": 2.641,
+    "pf29_fresh_process_reference": 1.1
+  },
+  "skipped_faceless_clips": [
+    "dev_004210",
+    "dev_004217"
+  ],
+  "limits": {
+    "max_upload_mb": 200.0,
+    "allowed_extensions": [
+      ".mp4",
+      ".avi",
+      ".mov",
+      ".mkv"
+    ],
+    "min_duration_s": 0.5,
+    "max_duration_s": 300.0,
+    "job_timeout_s": 300.0,
+    "max_concurrent_jobs": 1,
+    "max_queued_jobs": 4
+  },
+  "tests": {
+    "returncode": 0,
+    "summary": "44 passed, 2 warnings in 37.39s",
+    "passed": 44
+  },
+  "endpoints": {
+    "/health 200": true,
+    "/api/v1/model-info names the shipped model": true,
+    "/openapi.json lists all four endpoints": true,
+    "/docs renders (Swagger UI)": true
+  },
+  "error_matrix": [
+    {
+      "case": "oversized, Content-Length",
+      "expected": "413 file_too_large",
+      "got": "413 file_too_large",
+      "ok": true,
+      "5xx": false
+    },
+    {
+      "case": "oversized, chunked (no length)",
+      "expected": "413 file_too_large",
+      "got": "413 file_too_large",
+      "ok": true,
+      "5xx": false
+    },
+    {
+      "case": "wrong extension (.webm)",
+      "expected": "415 unsupported_format",
+      "got": "415 unsupported_format",
+      "ok": true,
+      "5xx": false
+    },
+    {
+      "case": "wrong MIME (text/plain)",
+      "expected": "415 unsupported_media_type",
+      "got": "415 unsupported_media_type",
+      "ok": true,
+      "5xx": false
+    },
+    {
+      "case": "not multipart (JSON body)",
+      "expected": "415 unsupported_media_type",
+      "got": "415 unsupported_media_type",
+      "ok": true,
+      "5xx": false
+    },
+    {
+      "case": "empty file",
+      "expected": "422 empty_file",
+      "got": "422 empty_file",
+      "ok": true,
+      "5xx": false
+    },
+    {
+      "case": "random bytes as .mp4",
+      "expected": "422 corrupt_video",
+      "got": "422 corrupt_video",
+      "ok": true,
+      "5xx": false
+    },
+    {
+      "case": "truncated .mp4",
+      "expected": "422 corrupt_video",
+      "got": "422 corrupt_video",
+      "ok": true,
+      "5xx": false
+    },
+    {
+      "case": "AVI contents named .mp4",
+      "expected": "415 format_mismatch",
+      "got": "415 format_mismatch",
+      "ok": true,
+      "5xx": false
+    },
+    {
+      "case": "no audio track",
+      "expected": "422 no_audio",
+      "got": "422 no_audio",
+      "ok": true,
+      "5xx": false
+    },
+    {
+      "case": "0.2 s clip",
+      "expected": "422 duration_out_of_range",
+      "got": "422 duration_out_of_range",
+      "ok": true,
+      "5xx": false
+    },
+    {
+      "case": "no face (test pattern)",
+      "expected": "202 no_face",
+      "got": "202 -> job failed / no_face",
+      "ok": true,
+      "5xx": false
+    },
+    {
+      "case": "unknown job id",
+      "expected": "404 job_not_found",
+      "got": "404 job_not_found",
+      "ok": true,
+      "5xx": false
+    }
+  ],
+  "real_clips": [
+    {
+      "clip": "dev_004337",
+      "label": 0,
+      "status": "succeeded",
+      "verdict": "real",
+      "clip_score": 0.00267,
+      "n_segments": 0,
+      "face_found_fraction": 1.0,
+      "analysis_s": 2.3906,
+      "wall_s": 2.55
+    },
+    {
+      "clip": "dev_004337",
+      "label": 0,
+      "status": "succeeded",
+      "verdict": "real",
+      "clip_score": 0.00267,
+      "n_segments": 0,
+      "face_found_fraction": 1.0,
+      "analysis_s": 2.3457,
+      "wall_s": 2.53
+    },
+    {
+      "clip": "dev_004622",
+      "label": 0,
+      "status": "succeeded",
+      "verdict": "real",
+      "clip_score": 0.003939,
+      "n_segments": 0,
+      "face_found_fraction": 0.9906,
+      "analysis_s": 4.6169,
+      "wall_s": 4.83
+    },
+    {
+      "clip": "dev_004618",
+      "label": 1,
+      "status": "succeeded",
+      "verdict": "fake",
+      "clip_score": 0.99993,
+      "n_segments": 2,
+      "face_found_fraction": 0.99,
+      "analysis_s": 4.5786,
+      "wall_s": 4.62
+    }
+  ],
+  "load_once": {
+    "every real clip succeeded": true,
+    "2nd request on the same clip not slower than 1.5x the 1st (2.3457 vs 2.3906 s)": true,
+    "repeat request returns identical frame scores": true,
+    "model warmed at startup (warmup_s recorded)": true
+  },
+  "burst": {
+    "codes": [
+      202,
+      202,
+      202,
+      202,
+      202,
+      503
+    ],
+    "overlaps": 0,
+    "n_jobs": 5
+  },
+  "concurrency": {
+    "5 accepted, upload #6 refused ([202, 202, 202, 202, 202, 503])": true,
+    "refusal is structured 503 queue_full with Retry-After": true,
+    "/health mid-burst: busy=True, queued=4": true,
+    "no two jobs' run intervals overlap (0 overlaps in 5 jobs)": true,
+    "every burst job succeeded": true
+  },
+  "stability": {
+    "server still running": true,
+    "/health ok after everything": true,
+    "no 5xx on any error case": true,
+    "no upload left on disk": true,
+    "no traceback in the server log": true
+  },
+  "gate": {
+    "P13-11 test suite green (44 passed, 2 warnings in 37.39s)": true,
+    "P13-3/4 endpoints and /docs": true,
+    "P13-6/10 error matrix 13/13": true,
+    "P13-8 model loaded once, warm per request": true,
+    "\u26d4 P13-9 concurrency of one under a burst": true,
+    "stable after all of the above": true
+  },
+  "gate_passed": true
+}

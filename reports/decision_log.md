@@ -946,6 +946,88 @@ slower, and run order alone moved a median by 2x (cold disk + first-use process 
 benchmark therefore pre-reads every clip, runs an unrecorded burn-in pass, records ambient CPU /
 RAM / Chrome with every run, measures memory in a fresh process, and gates on the p90.
 
+
+### PF-30 · Phase 13: the API's error policy, and why PF-29's memory figure is not a budget
+
+**Decision, recorded 2026-10-18**, from `reports/phase13_gate.md` (`scripts/43_phase13_gate.py`,
+real `uvicorn --workers 1` on `models/avtfd_g_seed0.pt`, Chrome closed) and
+`tests/integration/test_api.py` (44 tests).
+
+**No face is an error by default, and it is not rare in LAV-DF.** P13-10 asks for a structured
+`no_face` error. MediaPipe finds no face in *any* frame on **4 of 1,159** cached clips (0.35%) and
+in under half the frames on 21 — so `dev_004217`, a genuine LAV-DF fake, is refused with
+`no_face` even though the model was trained on clips like it (visual stream zeroed, scored from
+audio — which is what the model leans on anyway, PF-21). The plan's policy stands as the default
+(`AVTFD_REQUIRE_FACE=true`); `false` scores such clips instead, with a warning. Any result whose
+face was found in under 50% of frames carries a warning saying those frames were scored from
+audio alone. The pipeline's face mask matches the training cache exactly (`dev_004210`: 0.3151
+in both), so this is a property of the clips, not an API regression.
+
+**PF-29's 1,057 MB is a squeezed working set, not a budget.** Windows RSS is the working set,
+which the OS lets grow while RAM is free and trims under pressure. Loading the same analyzer in a
+fresh process measured **1.70, 2.33, 2.34 and 2.87 GB** on 2026-10-18 at 2.8–3.1 GB free, against
+PF-29's 1.06 GB at 1.86 GB free. The server is no worse than the bare analyzer under the same
+conditions — in the committed gate run **2.31 GB idle vs 2.33 GB direct** (earlier runs 2.29 vs
+1.70 and 2.34 vs 2.87, inside the swing) — and peaked at **3.04–3.09 GB** during a five-job burst. That makes ⛔ P13-9's semaphore of 1 more
+important, not less: two analyzers would not fit beside the OS on this machine. Memory is
+reported by the gate, not gated, because the number depends on what else is running.
+
+**How the other P13 requirements were met:**
+
+- **Timeout (P13-6).** A worker thread cannot be killed safely mid-CUDA, so
+  `VideoAnalyzer.analyze(deadline=...)` checks the deadline once per second of video inside the
+  two frame loops (~90% of the time, PF-29) and raises `AnalysisTimeoutError`; the job fails with
+  `timeout` and the worker is free again.
+- **Streaming uploads (P13-7).** The multipart body is parsed with `python_multipart`'s streaming
+  parser straight into a file; the 200 MB cap is enforced while reading (a chunked upload with no
+  `Content-Length` is cut off at the cap), and an honest `Content-Length` over the cap is refused
+  before a byte is read. A full queue is refused *before* the body is read too.
+- **MIME (P13-6).** The client's extension and `Content-Type` are checked, but are advisory; the
+  authoritative check opens the container with PyAV — demuxer family must match the extension,
+  video codec on an allow-list, an audio stream present, 0.5–300 s long, and one frame must decode.
+- **Errors (P13-10).** Every failure is `{"error": {"code", "message", "detail"}}`; exception
+  text (which can hold server paths) is never returned. 13/13 error cases pass over real HTTP.
+- **Concurrency (P13-9).** One worker thread *and* a `BoundedSemaphore(1)`; up to 4 jobs wait,
+  the next upload gets 503 `queue_full` with `Retry-After`. `max_concurrent_jobs` is validated
+  `== 1` so it cannot be configured up.
+
+### PF-31 · Phase 14: long paths were not the problem — the `&` in the repo path was
+
+**Decision, recorded 2026-10-18**, from building `frontend/` (React 18.3.1 + Vite 5.4.11 +
+Tailwind 3.4.17, Vitest 2.1.8, all pinned).
+
+**P14-0 resolved by measurement, not by a reboot.** The plan made enabling Windows long paths
+(elevated shell + reboot) a ⛔ prerequisite of `npm install`, from PF-5's pip failure. It is still
+disabled (`LongPathsEnabled = 0`). npm installs flat, and Node handles long paths itself: across
+~9,000 entries the longest path under `frontend/node_modules` is **186 characters**, 74 under
+MAX_PATH. `npm run check-paths` (`frontend/check-paths.mjs`) re-measures and fails within 20 of
+the limit; `make frontend-install` runs it after every install. Long paths only need enabling if
+a future dependency crosses that line.
+
+**The real breakage was `&`.** npm's `node_modules/.bin/*.cmd` shims expand `%~dp0`, and cmd.exe
+splits the repo path (`...Detection & Localization\...`) at the ampersand — `npx tsc` and every
+`npm run` script failed with `'Localization\frontend\node_modules\.bin\' is not recognized`.
+Fix: every script in `package.json` invokes its tool's JS entry through `node`
+(`node node_modules/vite/bin/vite.js`), so no shim and no shell parsing is involved. Verified
+through `npm run` and through `make` (cmd).
+
+**Forged spans are critical red + a 45° hatch on a neutral track — not green/red.** P14-4 says
+"green/red". The palette validator measures red vs green at **ΔE 4.1 under deuteranopia** (fail;
+the floor is 6–8 even *with* secondary encoding), and green would also claim "verified
+authentic", which the model cannot — it can only say nothing was flagged. So untouched time is a
+neutral track labelled "No manipulation detected"; forged spans carry colour *and* hatch *and* a
+legend *and* an accessible label. Green appears only on the real-verdict badge, with a check icon
+and a heading, never next to red. Contrast fixes from the same pass: the dark track is `#232322`
+(3.27:1 under the red, hairline-ringed), warning text on light is `#8a5a00` (5.77:1).
+
+**LAV-DF has no fully fake clip.** P14-10 asks for real, fully fake and partially fake inputs.
+The most-forged local dev clip is 21.7% manipulated (`dev_034103`); every LAV-DF fake replaces a
+word or two. "Fully fake" is therefore covered only by that clip, and nothing is fabricated to
+fill the gap. `scripts/44_frontend_fixtures.py` records real API responses for five dev clips —
+real, most-forged, two two-span fakes (one `visual_only`), one `audio_only` — and the frontend
+tests render exactly those. Predicted vs labelled spans: IoU 0.86–0.93, except `visual_only`
+`dev_005675` at 0.38 / 0.55, the weak class on test as well (P11-8).
+
 ---
 
 ## Appendix B — architectural decisions

@@ -23,7 +23,8 @@ TORCH_PINS  := torch==2.7.1+cu118 torchvision==0.22.1+cu118 torchaudio==2.7.1+cu
         gt-alignment crosscheck-ap train-localization experiment-g phase10 \
         test-features train-ablations evidence test-once reproduce phase11 \
         features train evaluate ablations export-model benchmark phase12-gate phase12 \
-        api frontend demo clean-bench
+        test-api phase13-gate phase13 api frontend frontend-install frontend-test \
+        frontend-fixtures phase14 demo clean-bench
 
 help:  ## Show this help
 	@echo Audio-Visual Temporal Forgery Detection ^& Localization
@@ -51,6 +52,8 @@ help:  ## Show this help
 	@echo     train-fusion experiment-c phase6
 	@echo     features train evaluate ablations
 	@echo     export-model benchmark phase12-gate phase12
+	@echo     test-api phase13-gate phase13
+	@echo     frontend-install frontend-test frontend-fixtures phase14
 	@echo.
 	@echo   Serving
 	@echo     api           uvicorn on :8000
@@ -375,13 +378,32 @@ phase12-gate:  ## ⛔ P12-5/6 - pipeline vs cached dev predictions on all 175 de
 phase12: export-model benchmark phase12-gate
 	$(PY) -m pytest tests/unit/test_inference_pipeline.py -q
 
+test-api:   ## P13-11 - API contract tests + the shipped model behind the real app
+	$(PY) -m pytest tests/integration/test_api.py -q
+
+phase13-gate:  ## ⛔ P13-12 - real uvicorn server: error matrix, load-once, burst. Close Chrome first
+	$(PY) scripts/43_phase13_gate.py
+
+phase13: phase13-gate
+
 # ── Serving ──────────────────────────────────────────────────────────────────
 
 api:        ## FastAPI on :8000. Concurrency is capped at 1 by design (6 GB RAM).
 	$(PY) -m uvicorn api.main:app --host 127.0.0.1 --port 8000 --workers 1
 
-frontend:
+frontend:   ## Vite on :5173, proxying /api to :8000. Needs `make frontend-install` once
 	cd frontend && npm run dev
+
+frontend-install:  ## npm ci, then the MAX_PATH guard (P14-0 / PF-31)
+	cd frontend && npm ci --no-audit --no-fund && npm run check-paths
+
+frontend-test:  ## P14-9 - Vitest component tests on real API fixtures, typecheck, build
+	cd frontend && npm test && npm run build
+
+frontend-fixtures:  ## re-record frontend/src/test/fixtures from the real API (dev clips)
+	$(PY) scripts/44_frontend_fixtures.py
+
+phase14: frontend-test
 
 demo:       ## API + frontend together
 	start "avtfd-api" cmd /c "$(PY) -m uvicorn api.main:app --host 127.0.0.1 --port 8000 --workers 1"

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import time
 
 import numpy as np
 import pytest
@@ -18,6 +19,7 @@ import torch
 from src.inference.pipeline import (
     BUNDLE_FORMAT,
     STAGES,
+    AnalysisTimeoutError,
     VideoAnalyzer,
     bundle_parameter_count,
     model_kwargs_from_result,
@@ -164,6 +166,12 @@ class TestAnalyze:
 
     def test_warmup_runs(self, analyzer):
         assert analyzer.warmup() >= 0.0
+
+    def test_past_deadline_raises_and_resets(self, analyzer, clip):
+        """P13-6's job timeout: the analyzer stops itself, then serves the next call."""
+        with pytest.raises(AnalysisTimeoutError):
+            analyzer.analyze(clip, deadline=time.monotonic() - 1.0)
+        assert analyzer.analyze(clip, deadline=time.monotonic() + 600).n_frames == 50
 
 
 @needs_media

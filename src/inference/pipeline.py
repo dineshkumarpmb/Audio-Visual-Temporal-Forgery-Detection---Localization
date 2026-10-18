@@ -55,6 +55,15 @@ from src.preprocessing.video import DecodeError, iter_frames
 
 BUNDLE_FORMAT = 1
 STAGES = ("detect", "align", "visual", "audio", "model", "postprocess")
+DEADLINE_CHECK_EVERY = 25  # frames; one second of video between deadline checks
+
+
+class AnalysisTimeoutError(RuntimeError):
+    """`analyze(deadline=...)` ran past its deadline (P13-6's 300 s job timeout).
+
+    Cooperative: checked inside the two frame loops, which hold ~90% of the time (PF-29). A
+    worker thread cannot be killed safely mid-CUDA, so the analyzer stops itself instead.
+    """
 
 
 @dataclass
@@ -186,6 +195,7 @@ class VideoAnalyzer:
         self.model = self.model.to(self.device).eval()
 
         self.landmarker = FaceLandmarkerPool(landmarker_path)
+        self._deadline: float | None = None
 
     @torch.no_grad()
     def warmup(self) -> float:
@@ -230,6 +240,14 @@ class VideoAnalyzer:
         if self.device == "cuda":
             torch.cuda.synchronize()
 
+    def _check_deadline(self, i: int) -> None:
+        if (
+            self._deadline is not None
+            and i % DEADLINE_CHECK_EVERY == 0
+            and time.monotonic() > self._deadline
+        ):
+            raise AnalysisTimeoutError(f"analysis passed its deadline at frame {i}")
+
     # -- stages ------------------------------------------------------------
 
     def _track(self, path: Path):
@@ -246,6 +264,7 @@ class VideoAnalyzer:
         kept_bytes = 0
         for i, frame in enumerate(iter_frames(path, target_fps=self.video_cfg.target_fps)):
             n = i + 1
+            self._check_deadline(i)
             if kept is not None:
                 kept_bytes += frame.nbytes
                 if kept_bytes <= self.frame_budget:
@@ -301,6 +320,7 @@ class VideoAnalyzer:
         for i, frame in enumerate(source):
             if i >= n_frames:
                 break
+            self._check_deadline(i)
             batch[fill] = align_face(
                 frame, track.points[i], crop_size=size, margin=self.video_cfg.face_margin
             )
@@ -352,8 +372,15 @@ class VideoAnalyzer:
 
     # -- public ------------------------------------------------------------
 
-    def analyze(self, path: str | Path) -> AnalysisResult:
-        path = Path(path)
+    def analyze(self, path: str | Path, *, deadline: float | None = None) -> AnalysisResult:
+        """`deadline` is a `time.monotonic()` value; past it, `AnalysisTimeoutError` is raised."""
+        self._deadline = deadline
+        try:
+            return self._analyze(Path(path))
+        finally:
+            self._deadline = None
+
+    def _analyze(self, path: Path) -> AnalysisResult:
         timings: dict[str, float] = {}
 
         t0 = time.perf_counter()
