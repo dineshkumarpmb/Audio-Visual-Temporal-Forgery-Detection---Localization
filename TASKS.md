@@ -7,15 +7,15 @@ Legend: ⛔ = blocking gate item · ⭐ = headline capability · 🔬 = experime
 
 ---
 
-## 📍 CURRENT STATUS — 2026-10-18, Phase 14 built (10/13) · ✋ demo + gate await you · Phase 15 next
+## 📍 CURRENT STATUS — 2026-10-18, Phase 15 built (8/9) · CI awaits first push · ✋ Phase 14 gate awaits you
 
 | | |
 |---|---|
-| **Done** | Phase −1 · Phase 0 · **P1 (18/20)** · **P2 (13/15)** · **P3 (9/9)** · **P4 (12/12)** · **P5 (8/8)** · **P6 (8/8)** · **P7 (6/6)** · **P8 (10/10)** · **P9 (7/7)** · **P10 (13/14)** · **P11 (11/11)** · **P12 (6/6)** · **P13 (12/12)** · **P14 (10/13, ✋ gate pending)** · CL-1 ✅ · CL-7 ✅ |
+| **Done** | Phase −1 · Phase 0 · **P1 (18/20)** · **P2 (13/15)** · **P3 (9/9)** · **P4 (12/12)** · **P5 (8/8)** · **P6 (8/8)** · **P7 (6/6)** · **P8 (10/10)** · **P9 (7/7)** · **P10 (13/14)** · **P11 (11/11)** · **P12 (6/6)** · **P13 (12/12)** · **P14 (10/13, ✋ gate pending)** · **P15 (8/9, CI pending)** · CL-1 ✅ · CL-7 ✅ |
 | **Resolved** | ⛔ **D-1 → MobileNetV2** (0.7189 vs 0.6319). ⛔ **C-1 → log-Mel** (0.9838 vs 0.7677). Both open decisions settled by experiment |
-| **Next** | ✋ **Close Phase 14**: run `make api` + `make frontend`, try a real / partially fake clip in the browser (P14-10), record the screen capture (P14-11), and have a non-expert read a result unaided (P14-12). Then **Phase 15 — Testing**. ⛔ Test split stays spent |
-| **Progress** | ~159 of 203 tasks (≈78%) · **15 of 18 phases complete**, Phase 14 built and awaiting its manual gate |
-| **Tests** | **463 Python passing** (unit + integration against the real 136,304-entry dataset; +44 API tests and +1 deadline test in Phase 13) · **39 frontend (Vitest)**, on real API responses |
+| **Next** | **Push** so GitHub Actions runs for the first time (P15-8/9 need CI green). ✋ **Close Phase 14**: browser run (P14-10), demo capture (P14-11), non-expert read (P14-12). Then **Phase 16 — Documentation** (needs PRE-1). ⛔ Test split stays spent |
+| **Progress** | ~167 of 203 tasks (≈82%) · **15 of 18 phases complete**; Phase 14 awaits its manual gate, Phase 15 its first CI run |
+| **Tests** | **553 Python passing**, coverage **81%** of `src/` (gate 70%) — 533 + 20 skipped in a data-free copy, also 81% · **39 frontend (Vitest)** · CI: `.github/workflows/ci.yml` |
 | **⚠️ Caveat** | ⛔ **PF-17 / PF-19 / PF-20** — the artefacts are inherited by every arm since. Absolute numbers (test included) are **upper bounds**; the trustworthy quantities are the paired deltas in `reports/evidence_table.md`. ⛔ **PF-27**: Phase 4–11 runs reproduce to ~1 seed-sd, not 1e-4 — new training uses `--strict-determinism` |
 | **✋ Awaiting you** | P2-8 (contact sheets) · ⛔ P2-10 (watch 20 overlays) — artefacts in `reports/figures/` · P10-13 (20 timelines, `reports/figures/localization/timelines_dev20.png`) · **P14-10 / ⛔ P14-11 / ⛔ P14-12** (browser run, demo capture, non-expert read) |
 | **Kaggle** | `dinesh1234567` · phone verified · **30 GPU h/week** · P100 16 GB or T4×2 · 12 h/session · 20 GB `/kaggle/working` |
@@ -30,6 +30,24 @@ Legend: ⛔ = blocking gate item · ⭐ = headline capability · 🔬 = experime
 Phase 13 filled `api/` (`main.py`, `settings.py`, `errors.py`, `schemas.py`, `routes/{analyze,health}.py`, `services/{upload,job_store,inference_service}.py`) and added `scripts/43`; Phases 14–16 are untouched. Phase 12 added `inference/pipeline.py` (raw video → segments) and `scripts/40`–`42`. Phase 10 added
 `evaluation/localization.py`, `localization/{postprocess,chunking}.py`, `losses/localization.py`,
 `models/heads/boundary.py` and `scripts/32`–`35`.
+
+### 🧪 Phase 15 result — testing (2026-10-18)
+
+**Built and green locally; the gate's last box is CI's first run.** Decision **PF-32**.
+
+| | |
+|---|---|
+| suite | **553 passing** (+90): `test_gt_alignment` ⛔, `test_ap_metric` ⛔, `test_model_shapes`, `test_losses`, `test_properties`, `test_pipeline_e2e` |
+| coverage | **81%** of `src/`, gated at 70% in `pyproject.toml`; the same 81% in a clean copy with no data or weights (what CI sees) |
+| ⛔ GT alignment | `frame_targets` = an exact `Fraction` reference on every ms-grid label (exhaustive 0–12 s) and on 450 real labels, 150 of them float-edge cases (the manifest has 7,061) |
+| ⛔ AP metric | frame/clip AP + AUC = scikit-learn on tie-heavy inputs; interval AP = a pure-Python reference |
+| e2e + regression | committed `tiny_real.mkv` / `tiny_fake.mkv` through the real pipeline and the real API; outputs pinned to 1e-4 with a platform-independent seeded model; the shipped model pinned on `dev_004623` (local) |
+| CI | GitHub Actions: Python (CPU torch, ffmpeg, lint, tests + coverage gate) and frontend (tests, build) — not yet run |
+
+⚠️ **PF-32.** CI cannot see LAV-DF, the weights or a GPU, so it protects the *code* behind the
+numbers, not the numbers. Fixtures are `.mkv` + PCM rather than `.mp4` so no codec drift hides in
+the regression. A property test re-found that interval AP depends on input order for **exactly
+tied** confidences — documented behaviour, now pinned by its own test.
 
 ### 🖥️ Phase 14 result — frontend (2026-10-18)
 
@@ -310,6 +328,9 @@ at `docs/original_report.pdf`.
 14. `make frontend-install` once (npm ci + MAX_PATH guard), then `make phase14` (39 Vitest + build).
     Demo: `make api` and `make frontend` in two shells → http://127.0.0.1:5173. Visual check without
     uploading: `/preview.html?fixture=dev_004623&theme=dark&width=390`.
+15. `make phase15` — exactly what CI runs: ruff, the full suite with the 70% coverage gate, the
+    frontend tests and build (~4 min). `make test-fixtures` re-derives `tests/fixtures/` — only
+    for a deliberate pipeline change, and say so in the commit.
 
 ### Risk status
 
@@ -392,7 +413,7 @@ requires re-checking at every scale-up — these scale-ups are what exposed both
 | 12 Optimization | 6 | ✅ **6/6** — gate P12-6 passed; **4.45 s per 10 s clip** (p90 5.26), 31.1 MB, dev accuracy unchanged end to end (Δ ≤ 5.4e-7); no ONNX, no fp16 (PF-29) |
 | 13 API | 12 | ✅ **12/12** — gate P13-12 passed; 44 API tests, error matrix 13/13 over real HTTP, 0 overlapping jobs under a burst, model loaded once (PF-30) |
 | 14 Frontend | 12 | 🟡 **10/13** (incl. P14-0) — built, 39 tests on real API responses; ✋ P14-10 browser run, ⛔ P14-11 demo capture, ⛔ P14-12 non-expert gate await you (PF-31) |
-| 15 Testing | 9 | ⬜ Not started |
+| 15 Testing | 9 | 🟡 **8/9** — 553 tests, 81% coverage (gate 70%), GT-alignment and AP tests against independent references; CI written, ⛔ P15-9 needs its first green run (PF-32) |
 | 16 Documentation | 11 | ⬜ Not started (needs PRE-1) |
 | Cloud (Kaggle) | 8 | 🟡 2/8 — CL-1 ✅, CL-7 ✅. No longer on Phase 4's critical path (PF-16) |
 | Cross-cutting | 7 | 🔄 Continuous |
@@ -949,19 +970,19 @@ Otherwise `E − D` would be unattributable — the failure P7-6 exists to preve
 
 ---
 
-## PHASE 15 — Testing
+## PHASE 15 — Testing — 🟡 **8/9 — ⛔ gate waits on the first CI run (2026-10-18)**
 
-| ID | Task |
-|---|---|
-| P15-1 | Unit: `test_manifest`, `test_audio_align`, `test_model_shapes`, `test_losses`, `test_postprocess` |
-| P15-2 | ⛔ Unit: `test_gt_alignment` — protects every localization number |
-| P15-3 | ⛔ Unit: `test_ap_metric` — protects every experiment in Part 7 |
-| P15-4 | Integration: `test_pipeline_e2e` on tiny fixtures (`tiny_real.mp4`, `tiny_fake.mp4`) |
-| P15-5 | Property tests: segments sorted, non-overlapping, in-bounds |
-| P15-6 | Regression test on a fixed fixture with committed expected outputs |
-| P15-7 | Coverage report — target > 70% on `src/` |
-| P15-8 | GitHub Actions CI (test-only; **no deployment**, per §0.2) |
-| P15-9 | ⛔ **Gate:** suite green, coverage met, CI green |
+| ID | Task | Status |
+|---|---|---|
+| P15-1 | Unit: `test_manifest`, `test_audio_align`, `test_model_shapes`, `test_losses`, `test_postprocess` | ✅ the first, second and fifth existed; **new** `test_model_shapes.py` (output length = input length at 1/7/50/187/750 frames for every frame-output model, padding cannot reach valid frames, past-the-table refusal) and `test_losses.py` (focal, boundary, InfoNCE, pos-weighted BCE: finite, ordered, padding-blind, differentiable) |
+| P15-2 | ⛔ Unit: `test_gt_alignment` — protects every localization number | ✅ ⛔ `test_gt_alignment.py` — exact `Fraction` reference, exhaustive over every ms start/end in 0–12 s, Hypothesis on random labels, **450 real LAV-DF labels** (`tests/fixtures/lavdf_labels_sample.json`, 150 float-edge cases of the manifest's 7,061), and prediction-meets-label: a perfect score trace post-processes to exactly the labelled frames |
+| P15-3 | ⛔ Unit: `test_ap_metric` — protects every experiment in Part 7 | ✅ ⛔ `test_ap_metric.py` — frame/clip AP and ROC-AUC = **scikit-learn** on tie-heavy inputs; interval AP = a **pure-Python from-the-definition reference**; invariants (bounded, perfect = 1, a false accusation never helps, IoU symmetric, monotone-rescaling invariant). Found: exact confidence ties rank by input order — documented, now pinned (PF-32) |
+| P15-4 | Integration: `test_pipeline_e2e` on tiny fixtures (`tiny_real.mp4`, `tiny_fake.mp4`) | ✅ `tests/integration/test_pipeline_e2e.py` on committed **`tiny_real.mkv` / `tiny_fake.mkv`** (`.mkv` + PCM for exact decode, PF-32) — through `VideoAnalyzer` and through the API, upload to result; the fake's swapped span verified in the pixels |
+| P15-5 | Property tests: segments sorted, non-overlapping, in-bounds | ✅ `test_properties.py` (Hypothesis): the contract for any scores × any legal config incl. boundary refinement, frame-grid edges, min duration, low scores → `[]`, determinism, chunk coverage, exact stitching; derandomized in CI (`tests/conftest.py`) |
+| P15-6 | Regression test on a fixed fixture with committed expected outputs | ✅ `expected_tiny_*.json` (`scripts/45_make_test_fixtures.py`) with a **platform-independent seeded model** — frame scores, clip score and segments pinned to 1e-4; plus the shipped model on `dev_004623` against the recorded API response (local only) |
+| P15-7 | Coverage report — target > 70% on `src/` | ✅ **81%** locally and in a clean data-free copy; `fail_under = 70` in `pyproject.toml`; `make test-cov` writes `htmlcov/`, CI uploads `coverage.xml` |
+| P15-8 | GitHub Actions CI (test-only; **no deployment**, per §0.2) | ✅ `.github/workflows/ci.yml` — Python job (CPU torch 2.7.1, pins from `requirements.txt` as constraints, ffmpeg, hash-pinned MediaPipe fetch, ruff, tests + coverage gate) and frontend job (npm ci, path guard, Vitest, build). Linux wheels for every pinned native package verified to exist. ⏳ Not yet run |
+| P15-9 | ⛔ **Gate:** suite green, coverage met, CI green | 🟡 suite green ✅ (553) · coverage met ✅ (81%) · **CI green ⏳ — needs a push** |
 
 ---
 
@@ -1045,7 +1066,7 @@ Not a separate phase — these are the tasks the local+Kaggle strategy adds.
 
 *Phase −1 complete except PRE-1 (report retrieval), which does not block Phases 0–15.*
 
-*Completed as of 2026-10-18: ~159 of 203 tasks (≈78%) — see the status table at the top. Snapshot from 2026-09-05 follows: ~100 of 203 tasks (≈49%). Phases −1, 0, 1, 2, 3, 4, 5, 6, 7, 8 done.
+*Completed as of 2026-10-18: ~167 of 203 tasks (≈82%) — see the status table at the top. Snapshot from 2026-09-05 follows: ~100 of 203 tasks (≈49%). Phases −1, 0, 1, 2, 3, 4, 5, 6, 7, 8 done.
 **D-1 → MobileNetV2, C-1 → log-Mel**, Experiment C is a documented negative result (PF-20),
 **Experiment D a decisive positive one** (+0.0844, gate P7-6 passed) whose frame AP survived its own
 confound check (position explains 8.1%), and **Experiment E a mixed one** (+0.0045, gate P8-10

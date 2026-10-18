@@ -1028,6 +1028,52 @@ real, most-forged, two two-span fakes (one `visual_only`), one `audio_only` — 
 tests render exactly those. Predicted vs labelled spans: IoU 0.86–0.93, except `visual_only`
 `dev_005675` at 0.38 / 0.55, the weak class on test as well (P11-8).
 
+### PF-32 · Phase 15: what CI can and cannot check, and how the fixtures stay honest
+
+**Decision, recorded 2026-10-18**, from building the Phase 15 suite (553 tests locally, 81% of
+`src/`; 533 + 20 skipped in a clean data-free copy, also 81%).
+
+**CI sees no data, no weights and no GPU.** LAV-DF, the feature caches and `models/*.pt` are
+not in git, so every test that needs them skips itself. That is most of what was *measured*
+in Phases 4–12 — CI cannot re-derive a single reported number. What it can do is protect the
+code those numbers came from: the AP metric, the GT transform, post-processing, the model's
+shape contracts, the losses, the pipeline and the API.
+
+**The e2e and regression tests run a seeded model, not the trained one.** `tests/regression.py`
+fills every tensor from `numpy.random.default_rng(0)` — PCG64 is specified and identical on
+every platform, unlike `torch.manual_seed` initialisation — so `expected_tiny_*.json`, generated
+on Windows, holds on a Linux runner to 1e-4. This pins the pipeline's *numerics*, not detection
+quality (a random model detects nothing). Detection quality has its own regression, local only:
+the shipped model on `dev_004623` must reproduce the response the frontend's tests were recorded
+from.
+
+**The tiny fixtures are `.mkv` with PCM audio, not the plan's `tiny_*.mp4`.** MP4 cannot hold
+PCM in ffmpeg, and AAC decoders may differ in the last bits between ffmpeg builds (local 9.0 vs
+Ubuntu's 6.x). H.264 decoding is bit-exact by specification and PCM is exact, so the only
+cross-platform drift left is the model's. Both clips are synthetic (2 s, test pattern, tones):
+LAV-DF is CC BY-NC and is not redistributed in the repo. `tiny_fake` swaps picture and tone over
+0.8–1.2 s; a test asserts the swap is where it claims (picture difference ~114 inside, 3–6
+outside).
+
+**The two critical tests check against implementations that are not this project's.**
+GT alignment (P15-2): `frame_targets` must equal an exact `fractions.Fraction` reference on
+every millisecond-grid label (exhaustive over 0–12 s for both edges) and on 450 real labels —
+150 chosen because a boundary sits within float error of a frame edge; the manifest has
+**7,061** such entries, the class P10-1 found being shifted. AP (P15-3): frame/clip AP and
+ROC-AUC must equal scikit-learn on tie-heavy inputs; interval AP must equal a pure-Python
+from-the-definition reference.
+
+**A property test re-found a documented behaviour.** Interval AP is *not* invariant to input
+order when two predictions have exactly equal confidence: ties rank by input order, as in the
+published evaluators (module docstring). The invariant is now asserted only for distinct
+confidences, and the tie behaviour is pinned by its own test. Not a bug — but now a visible one.
+
+**Dependencies.** `hypothesis` 6.115.0 added (dev). `requirements.txt` gained only it and
+`sortedcontainers`: a fresh freeze would also have recorded `onnx`/`onnxruntime`, installed for
+Phase 12's ONNX trial and dropped (PF-29). CI installs CPU torch 2.7.1 and holds every other
+package to `requirements.txt`'s pins as constraints; every pinned native wheel was checked to
+exist for manylinux / CPython 3.10 before the first CI run.
+
 ---
 
 ## Appendix B — architectural decisions

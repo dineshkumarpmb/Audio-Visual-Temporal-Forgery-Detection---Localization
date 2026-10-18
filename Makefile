@@ -24,7 +24,7 @@ TORCH_PINS  := torch==2.7.1+cu118 torchvision==0.22.1+cu118 torchaudio==2.7.1+cu
         test-features train-ablations evidence test-once reproduce phase11 \
         features train evaluate ablations export-model benchmark phase12-gate phase12 \
         test-api phase13-gate phase13 api frontend frontend-install frontend-test \
-        frontend-fixtures phase14 demo clean-bench
+        frontend-fixtures phase14 test-fixtures phase15 demo clean-bench
 
 help:  ## Show this help
 	@echo Audio-Visual Temporal Forgery Detection ^& Localization
@@ -54,6 +54,7 @@ help:  ## Show this help
 	@echo     export-model benchmark phase12-gate phase12
 	@echo     test-api phase13-gate phase13
 	@echo     frontend-install frontend-test frontend-fixtures phase14
+	@echo     test-fixtures phase15
 	@echo.
 	@echo   Serving
 	@echo     api           uvicorn on :8000
@@ -105,8 +106,17 @@ typecheck:
 test:
 	$(PY) -m pytest
 
-test-cov:
-	$(PY) -m pytest --cov=src --cov-report=term-missing --cov-report=html
+test-cov:   ## P15-7 - coverage on src/, fails under 70% (pyproject [tool.coverage.report])
+	$(PY) -m pytest --cov=src --cov-report=term-missing:skip-covered --cov-report=html
+
+test-fixtures:  ## re-derive tests/fixtures (tiny clips, expected outputs, label sample)
+	$(PY) scripts/45_make_test_fixtures.py
+
+phase15:    ## ⛔ P15-9 - what CI runs: lint, the full suite with the coverage gate, frontend
+	$(PY) -m ruff check .
+	$(PY) -m ruff format --check .
+	$(PY) -m pytest -q --cov=src --cov-report=term-missing:skip-covered
+	cd frontend && npm test && npm run build
 
 # ── Pipeline (scripts land in their respective phases) ───────────────────────
 

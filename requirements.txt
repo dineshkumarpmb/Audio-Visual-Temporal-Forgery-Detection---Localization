@@ -67,6 +67,7 @@ httpcore==1.0.9
 httptools==0.8.0
 httpx==0.28.1
 huey==3.3.4
+hypothesis==6.115.0
 identify==2.6.19
 idna==3.18
 importlib_metadata==9.0.0
@@ -166,6 +167,7 @@ Send2Trash==2.1.0
 six==1.17.0
 skops==0.14.0
 smmap==5.0.3
+sortedcontainers==2.4.0
 sounddevice==0.5.5
 soundfile==0.14.0
 soupsieve==2.9.2

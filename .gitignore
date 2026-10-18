@@ -85,3 +85,9 @@ desktop.ini
 # reports/*.md and reports/*_facts.json, which ARE tracked.
 /reports/figures/contact_sheets/
 /reports/figures/overlays/
+
+# Phase 15 test fixtures are committed media (tests/regression.py explains why .mkv).
+!/tests/fixtures/*.mkv
+/.hypothesis/
+/htmlcov/
+/coverage.xml

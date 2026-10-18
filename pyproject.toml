@@ -78,6 +78,7 @@ dependencies = [
 dev = [
     "pytest>=7.4",
     "pytest-cov>=4.1",
+    "hypothesis>=6.100",         # property tests (P15-5)
     "httpx>=0.26",               # API integration tests
     "ruff>=0.2",
     "mypy>=1.8",
@@ -120,6 +121,16 @@ warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true      # mediapipe, librosa, av ship no stubs
 exclude = ["notebooks/", ".venv/"]
+
+[tool.coverage.run]
+source = ["src"]
+
+[tool.coverage.report]
+# ⛔ P15-7: the plan's floor. Measured 81% both locally and in a clean, data-free copy (what CI
+# sees); the gap to 70% is headroom, not a target to spend.
+fail_under = 70
+show_missing = true
+skip_covered = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
