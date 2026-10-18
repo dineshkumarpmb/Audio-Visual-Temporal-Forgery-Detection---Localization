@@ -54,7 +54,9 @@ def make_video(
     src = ["-f", "lavfi", "-i", f"testsrc=size=160x120:rate=25:duration={seconds}"]
     if audio:
         src += ["-f", "lavfi", "-i", f"sine=frequency=440:sample_rate=16000:duration={seconds}"]
-    codecs = ["-pix_fmt", "yuv420p", "-c:v", vcodec]
+    # MJPEG is full-range: ffmpeg < 7 (Ubuntu's, in CI) refuses limited-range yuv420p for it.
+    pix_fmt = "yuvj420p" if vcodec == "mjpeg" else "yuv420p"
+    codecs = ["-pix_fmt", pix_fmt, "-c:v", vcodec]
     codecs += ["-c:a", acodec, "-shortest"] if audio else ["-an"]
     _ffmpeg(*src, *codecs, str(path))
     return path
