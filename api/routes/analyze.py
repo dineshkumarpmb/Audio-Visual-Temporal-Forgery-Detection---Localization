@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, Request, Response
 from fastapi.concurrency import run_in_threadpool
 
-from api.dependencies import get_app_settings, get_service, get_store
+from api.dependencies import get_app_settings, get_model_info, get_service, get_store
 from api.errors import ApiError
-from api.schemas import ErrorResponse, JobCreated, JobOut
+from api.schemas import ErrorResponse, JobCreated, JobOut, JobStatus
 from api.services.inference_service import InferenceService
 from api.services.job_store import JobStore
+from api.services.report import build_report
 from api.services.upload import FILE_FIELD, inspect_media, receive_upload
 from api.settings import ApiSettings
 
@@ -89,3 +92,59 @@ async def get_job(
     if job is None:
         raise ApiError(404, "job_not_found", f"no job with id '{job_id[:64]}'")
     return JobOut(**service.job_view(job))
+
+
+def _finished_job(store: JobStore, job_id: str):
+    job = store.get(job_id)
+    if job is None:
+        raise ApiError(404, "job_not_found", f"no job with id '{job_id[:64]}'")
+    if job.status is not JobStatus.succeeded:
+        raise ApiError(
+            409,
+            "job_not_ready",
+            f"the job is {job.status.value}; a report exists only for a finished analysis",
+            {"status": job.status.value},
+        )
+    return job
+
+
+@router.get(
+    "/jobs/{job_id}/keyframes/{index}.jpg",
+    response_class=Response,
+    responses={200: {"content": {"image/jpeg": {}}}, **_errors(404, 409)},
+    summary="One keyframe thumbnail (listed in the result's `keyframes`)",
+)
+async def get_keyframe(job_id: str, index: int, store: JobStore = Depends(get_store)) -> Response:
+    job = _finished_job(store, job_id)
+    if not 0 <= index < len(job.keyframes):
+        raise ApiError(404, "keyframe_not_found", f"no keyframe {index} for this job")
+    return Response(
+        job.keyframes[index],
+        media_type="image/jpeg",
+        headers={"Cache-Control": "private, max-age=3600"},
+    )
+
+
+@router.get(
+    "/jobs/{job_id}/report.pdf",
+    response_class=Response,
+    responses={200: {"content": {"application/pdf": {}}}, **_errors(404, 409)},
+    summary="The analysis as a printable PDF report",
+)
+async def get_report(
+    job_id: str,
+    service: InferenceService = Depends(get_service),
+    store: JobStore = Depends(get_store),
+    model_info: dict = Depends(get_model_info),
+) -> Response:
+    job = _finished_job(store, job_id)
+    if job.report_pdf is None:  # rendered once, kept beside the job until it expires
+        view = service.job_view(job)
+        job.report_pdf = await run_in_threadpool(build_report, view, model_info, job.keyframes)
+    stem = Path(job.filename).stem[:80] or "video"
+    safe = "".join(c if c.isalnum() or c in "-_." else "_" for c in stem)
+    return Response(
+        job.report_pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{safe}-forgery-report.pdf"'},
+    )

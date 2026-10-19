@@ -11,9 +11,15 @@ interface Props {
   threshold?: number | null;
   currentTime?: number;
   onSeek: (time: number) => void;
+  /** Small-multiple use: the voice-only / face-only traces share this component and scale. */
+  title?: string;
+  subtitle?: string;
+  height?: number;
+  lineClass?: string;
+  testId?: string;
 }
 
-const HEIGHT = 160;
+const DEFAULT_HEIGHT = 160;
 const PAD = { top: 10, right: 12, bottom: 22, left: 40 };
 
 /** SVG path for the score line: x = frame centre time, y = P(fake). Exported for tests. */
@@ -31,7 +37,20 @@ export function linePath(scores: number[], width: number, height: number): strin
  * the chart and the timeline above it read as the same story. Hover shows a crosshair and
  * the exact value; click seeks the player.
  */
-export function ScoreChart({ scores, fps, segments, threshold, currentTime = 0, onSeek }: Props) {
+export function ScoreChart({
+  scores,
+  fps,
+  segments,
+  threshold,
+  currentTime = 0,
+  onSeek,
+  title = "Manipulation score, frame by frame",
+  subtitle = "higher = more likely manipulated",
+  height = DEFAULT_HEIGHT,
+  lineClass = "stroke-accent",
+  testId = "chart-line",
+}: Props) {
+  const HEIGHT = height;
   const wrap = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(640);
   const [hover, setHover] = useState<number | null>(null);
@@ -63,10 +82,10 @@ export function ScoreChart({ scores, fps, segments, threshold, currentTime = 0, 
   const hx = hover === null ? 0 : n === 1 ? plotW / 2 : (hover / (n - 1)) * plotW;
 
   return (
-    <figure className="m-0">
+    <figure className="m-0 min-w-0">
       <figcaption className="mb-2">
-        <span className="font-medium text-ink">Manipulation score, frame by frame</span>
-        <span className="ml-2 text-sm text-ink-2">higher = more likely manipulated</span>
+        <span className="font-medium text-ink">{title}</span>
+        {subtitle && <span className="ml-2 text-sm text-ink-2">{subtitle}</span>}
       </figcaption>
       {/* overflow-hidden: width comes from the parent, never from the SVG, or the observer
           would measure its own content and a phone-width page would scroll sideways */}
@@ -75,7 +94,7 @@ export function ScoreChart({ scores, fps, segments, threshold, currentTime = 0, 
           width={width}
           height={HEIGHT}
           role="img"
-          aria-label={`Line chart of the manipulation score for ${n} frames`}
+          aria-label={`${title}: line chart over ${n} frames`}
           className="block overflow-visible"
         >
           <g transform={`translate(${PAD.left},${PAD.top})`}>
@@ -113,11 +132,11 @@ export function ScoreChart({ scores, fps, segments, threshold, currentTime = 0, 
             <path
               d={linePath(scores, plotW, plotH)}
               fill="none"
-              className="stroke-accent"
+              className={lineClass}
               strokeWidth={2}
               strokeLinejoin="round"
               strokeLinecap="round"
-              data-testid="chart-line"
+              data-testid={testId}
             />
             <line x1={xOfTime(currentTime)} x2={xOfTime(currentTime)} y1={-4} y2={plotH}
               className="stroke-ink" strokeWidth={1.5} aria-hidden="true" />
@@ -132,7 +151,7 @@ export function ScoreChart({ scores, fps, segments, threshold, currentTime = 0, 
               <g aria-hidden="true" className="pointer-events-none">
                 <line x1={hx} x2={hx} y1={0} y2={plotH} className="stroke-muted" strokeWidth={1} />
                 <circle cx={hx} cy={yOf(scores[hover])} r={4.5}
-                  className="fill-accent stroke-surface" strokeWidth={2} />
+                  className={`${lineClass.replace("stroke-", "fill-")} stroke-surface`} strokeWidth={2} />
               </g>
             )}
             <rect

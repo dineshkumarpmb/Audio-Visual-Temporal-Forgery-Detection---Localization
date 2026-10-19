@@ -24,6 +24,8 @@
   --hatch: rgba(255, 255, 255, 0.35);
   --real: #0ca30c;
   --warn: #8a5a00; /* warning hue darkened for 4.5:1 text on the light surface */
+  --series-audio: #eb6834; /* categorical slot 2: the voice-only trace */
+  --series-visual: #6250d6; /* categorical slot 7: the face-only trace */
 }
 
 @media (prefers-color-scheme: dark) {
@@ -44,6 +46,8 @@
     --hatch: rgba(0, 0, 0, 0.3);
     --real: #0ca30c;
     --warn: #fab219;
+    --series-audio: #d95926;
+    --series-visual: #9085e9;
   }
 }
 
@@ -64,6 +68,8 @@
   --hatch: rgba(0, 0, 0, 0.3);
   --real: #0ca30c;
   --warn: #fab219;
+  --series-audio: #d95926;
+  --series-visual: #9085e9;
 }
 
 body {

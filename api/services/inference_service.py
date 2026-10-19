@@ -19,10 +19,18 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Protocol
 
+import numpy as np
+
 from api.errors import ApiError
 from api.schemas import ErrorInfo, JobStatus
 from api.services.job_store import Job, JobStore
 from api.settings import ApiSettings
+from src.inference.explain import (
+    key_figures,
+    modality_summary,
+    segment_evidence,
+    summary_sentence,
+)
 
 log = logging.getLogger("avtfd.api")
 
@@ -34,7 +42,14 @@ class Analyzer(Protocol):
 
     threshold: float
 
-    def analyze(self, path: str | Path, *, deadline: float | None = None) -> Any: ...
+    def analyze(
+        self,
+        path: str | Path,
+        *,
+        deadline: float | None = None,
+        details: bool = False,
+        keyframes: bool = False,
+    ) -> Any: ...
 
     def close(self) -> None: ...
 
@@ -128,7 +143,8 @@ class InferenceService:
         self.store.mark_running(job_id)
         deadline = self._clock() + self.settings.job_timeout_s
         try:
-            res = self.analyzer.analyze(path, deadline=deadline)
+            # details + keyframes feed the report; they never change the verdict (pipeline.py).
+            res = self.analyzer.analyze(path, deadline=deadline, details=True, keyframes=True)
         except Exception as exc:  # noqa: BLE001 - every failure becomes a structured error
             error = classify_failure(exc)
             if error.code == "internal_error":
@@ -146,9 +162,10 @@ class InferenceService:
                 ),
             )
             return
-        self.store.finish(job_id, result=self._result(res))
+        thumbs = [k.jpeg for k in getattr(res, "keyframes", [])]
+        self.store.finish(job_id, result=self._result(res, job_id), keyframes=thumbs)
 
-    def _result(self, res: Any) -> dict[str, Any]:
+    def _result(self, res: Any, job_id: str) -> dict[str, Any]:
         out = res.as_dict(include_frames=True)
         warnings = []
         if res.face_found_fraction < LOW_FACE_WARNING:
@@ -162,8 +179,41 @@ class InferenceService:
             verdict="fake" if res.is_fake else "real",
             threshold=self.analyzer.threshold,
             warnings=warnings,
+            evidence=self._evidence(res),
         )
+        out["keyframes"] = [
+            {**k, "url": f"/api/v1/jobs/{job_id}/keyframes/{i}.jpg"}
+            for i, k in enumerate(out.get("keyframes", []))
+        ]
         return out
+
+    def _evidence(self, res: Any) -> dict[str, Any]:
+        """Key figures, per-span evidence and the modality reading -- shared with the PDF."""
+        post = getattr(self.analyzer, "postprocess", None)
+        frame_threshold = float(getattr(post, "threshold", 0.5))
+        scores = np.asarray(res.frame_scores, dtype=np.float64)
+        return {
+            "summary": summary_sentence(res.is_fake, res.segments, res.duration_s),
+            "frame_threshold": frame_threshold,
+            "key_figures": key_figures(
+                res.segments, scores, res.duration_s, res.clip_score, res.face_found_fraction
+            ),
+            "segments": segment_evidence(
+                res.segments,
+                scores,
+                res.fps,
+                frame_threshold,
+                audio_only=getattr(res, "audio_only_scores", None),
+                visual_only=getattr(res, "visual_only_scores", None),
+                boundary=getattr(res, "boundary_scores", None),
+                face_found=getattr(res, "face_found", None),
+            ),
+            "modality": modality_summary(
+                res.clip_score,
+                getattr(res, "audio_only_clip", None),
+                getattr(res, "visual_only_clip", None),
+            ),
+        }
 
     def job_view(self, job: Job) -> dict[str, Any]:
         return {

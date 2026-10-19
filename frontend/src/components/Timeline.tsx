@@ -9,6 +9,23 @@ interface Props {
   currentTime?: number;
   activeIndex?: number | null;
   onSeek: (time: number, segmentIndex: number | null) => void;
+  /** Per-frame 1/0: where a face was tracked. Frames without one were scored from audio. */
+  faceFound?: number[] | null;
+}
+
+/** Runs of tracked-face frames as [startFrac, endFrac] of the strip. Exported for tests. */
+export function faceRuns(found: number[]): [number, number][] {
+  const out: [number, number][] = [];
+  let start: number | null = null;
+  for (let i = 0; i <= found.length; i++) {
+    const on = i < found.length && found[i] === 1;
+    if (on && start === null) start = i;
+    if (!on && start !== null) {
+      out.push([start / found.length, i / found.length]);
+      start = null;
+    }
+  }
+  return out;
 }
 
 /** Where a segment sits on the strip, in percent. Exported so tests check the geometry. */
@@ -36,7 +53,14 @@ function ticks(duration: number): number[] {
  * here", which is weaker than "verified authentic". Each span is a button that seeks the
  * player to its start (P14-5); clicking the bare track seeks to that moment.
  */
-export function Timeline({ duration, segments, currentTime = 0, activeIndex = null, onSeek }: Props) {
+export function Timeline({
+  duration,
+  segments,
+  currentTime = 0,
+  activeIndex = null,
+  onSeek,
+  faceFound,
+}: Props) {
   const seekFromTrack = (e: MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     if (rect.width <= 0) return;
@@ -97,11 +121,26 @@ export function Timeline({ duration, segments, currentTime = 0, activeIndex = nu
         />
       </div>
 
+      {faceFound && faceFound.length > 0 && (
+        <div className="mt-1.5" data-testid="face-band">
+          <div className="relative h-1.5 rounded-full bg-track" aria-hidden="true">
+            {faceRuns(faceFound).map(([a, b]) => (
+              <span
+                key={a}
+                className="absolute inset-y-0 rounded-full bg-ink-2"
+                style={{ left: `${a * 100}%`, width: `${(b - a) * 100}%` }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="relative mt-1 h-5 text-xs text-muted tabular-nums" aria-hidden="true">
-        {ticks(duration).map((t) => (
+        {ticks(duration).map((t, i) => (
           <span
             key={t}
-            className="absolute -translate-x-1/2 first:translate-x-0"
+            // Every other label on phones: eight m:ss.s labels do not fit in 360 px.
+            className={`absolute -translate-x-1/2 first:translate-x-0 ${i % 2 ? "hidden sm:inline" : ""}`}
             style={{ left: `${(t / duration) * 100}%` }}
           >
             {formatTime(t)}
@@ -118,6 +157,12 @@ export function Timeline({ duration, segments, currentTime = 0, activeIndex = nu
           <span aria-hidden="true" className="inline-block h-3 w-5 rounded-sm bg-track" />
           No manipulation detected
         </span>
+        {faceFound && faceFound.length > 0 && (
+          <span className="inline-flex items-center gap-2">
+            <span aria-hidden="true" className="inline-block h-1.5 w-5 rounded-full bg-ink-2" />
+            Face tracked (thin band)
+          </span>
+        )}
       </div>
     </figure>
   );

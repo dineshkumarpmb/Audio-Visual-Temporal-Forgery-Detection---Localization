@@ -80,6 +80,15 @@ class AnalysisResult:
     face_found_fraction: float
     audio_silent: bool
     timings: dict[str, float] = field(default_factory=dict)
+    # -- `analyze(details=True)`: what the model computed beyond the verdict (report) --------
+    boundary_scores: np.ndarray | None = None  # (T, 2) P(span starts / ends here)
+    attention: np.ndarray | None = None  # (T,) pooling weights behind the clip verdict, sum 1
+    face_found: np.ndarray | None = None  # (T,) bool, frames scored with the face present
+    audio_only_scores: np.ndarray | None = None  # (T,) the model with the video removed
+    visual_only_scores: np.ndarray | None = None  # (T,) the model with the audio removed
+    audio_only_clip: float | None = None
+    visual_only_clip: float | None = None
+    keyframes: list = field(default_factory=list)  # src.inference.keyframes.Keyframe
 
     def as_dict(self, *, include_frames: bool = True) -> dict:
         out = {
@@ -98,6 +107,25 @@ class AnalysisResult:
         }
         if include_frames:
             out["frame_scores"] = [round(float(x), 5) for x in self.frame_scores]
+            bnd = self.boundary_scores
+            details = {
+                "boundary_start_scores": None if bnd is None else bnd[:, 0],
+                "boundary_end_scores": None if bnd is None else bnd[:, 1],
+                "attention": self.attention,
+                "audio_only_scores": self.audio_only_scores,
+                "visual_only_scores": self.visual_only_scores,
+            }
+            for key, arr in details.items():
+                if arr is not None:
+                    out[key] = [round(float(x), 5) for x in arr]
+            if self.face_found is not None:
+                out["face_found"] = [int(x) for x in self.face_found]
+        for key in ("audio_only_clip", "visual_only_clip"):
+            value = getattr(self, key)
+            if value is not None:
+                out[key] = round(float(value), 6)
+        if self.keyframes:
+            out["keyframes"] = [k.meta() for k in self.keyframes]
         return out
 
 
@@ -336,10 +364,30 @@ class VideoAnalyzer:
 
     @torch.no_grad()
     def _forward(self, visual: np.ndarray, audio: np.ndarray, face: np.ndarray):
-        """Stage B on one clip. Clips past the positional table are chunked (P10-11)."""
+        """Stage B on one clip -> (frame scores, clip score). See `_forward_full`."""
+        out = self._forward_full(visual, audio, face)
+        return out["frames"], out["clip"]
+
+    @torch.no_grad()
+    def _forward_full(
+        self,
+        visual: np.ndarray,
+        audio: np.ndarray,
+        face: np.ndarray,
+        *,
+        drop_visual: bool = False,
+        drop_audio: bool = False,
+    ) -> dict:
+        """Stage B on one clip. Clips past the positional table are chunked (P10-11).
+
+        Returns `frames` (T,), `clip`, `attention` (T,) and -- when the model has the head --
+        `boundary` (T, 2). `drop_visual` / `drop_audio` are the model's own modality switches
+        (trained by modality dropout); the report uses them to ask what each stream alone
+        would say.
+        """
         t = len(audio)
 
-        def run(a: int, b: int) -> tuple[np.ndarray, float]:
+        def run(a: int, b: int) -> dict:
             v = torch.from_numpy(visual[a:b]).to(self.device).unsqueeze(0)
             au = torch.from_numpy(audio[a:b]).to(self.device).unsqueeze(0)
             mask = torch.ones(1, b - a, dtype=torch.bool, device=self.device)
@@ -350,37 +398,68 @@ class VideoAnalyzer:
                 dtype=torch.float16 if self.device == "cuda" else torch.bfloat16,
                 enabled=self.model_fp16,
             ):
-                out = self.model(v, au, mask, f)
-            frames = torch.sigmoid(out["frame_logits"].float())[0].cpu().numpy()
-            return frames, float(torch.sigmoid(out["logit"].float())[0])
+                out = self.model(v, au, mask, f, drop_visual=drop_visual, drop_audio=drop_audio)
+            res = {
+                "frames": torch.sigmoid(out["frame_logits"].float())[0].cpu().numpy(),
+                "clip": float(torch.sigmoid(out["logit"].float())[0]),
+                "attention": out["attention"].float()[0].cpu().numpy(),
+            }
+            if "boundary_logits" in out:
+                res["boundary"] = torch.sigmoid(out["boundary_logits"].float())[0].cpu().numpy()
+            return res
 
         if t <= MAX_FRAMES:
-            frames, clip = run(0, t)
-            return frames, clip
+            return run(0, t)
 
         # Long upload: average overlapping frame scores (section 6.9); the clip verdict is
         # the most suspicious chunk, since a forgery anywhere makes the video fake. LAV-DF
         # never reaches this branch (longest clip 497 frames).
-        clips: list[float] = []
+        cache: dict[tuple[int, int], dict] = {}
 
-        def predict(a: int, b: int) -> np.ndarray:
-            frames, clip = run(a, b)
-            clips.append(clip)
-            return frames
+        def window(a: int, b: int) -> dict:
+            if (a, b) not in cache:
+                cache[(a, b)] = run(a, b)
+            return cache[(a, b)]
 
-        return stitch_scores(t, predict).astype(np.float32), max(clips)
+        frames = stitch_scores(t, lambda a, b: window(a, b)["frames"]).astype(np.float32)
+        attention = stitch_scores(t, lambda a, b: window(a, b)["attention"])
+        out = {
+            "frames": frames,
+            "clip": max(r["clip"] for r in cache.values()),
+            # Every chunk's weights sum to 1; renormalise the stitched trace so the whole does.
+            "attention": (attention / max(attention.sum(), 1e-12)).astype(np.float32),
+        }
+        if all("boundary" in r for r in cache.values()):
+            boundary = stitch_scores(t, lambda a, b: window(a, b)["boundary"])
+            out["boundary"] = boundary.astype(np.float32)
+        return out
 
     # -- public ------------------------------------------------------------
 
-    def analyze(self, path: str | Path, *, deadline: float | None = None) -> AnalysisResult:
-        """`deadline` is a `time.monotonic()` value; past it, `AnalysisTimeoutError` is raised."""
+    def analyze(
+        self,
+        path: str | Path,
+        *,
+        deadline: float | None = None,
+        details: bool = False,
+        keyframes: bool = False,
+    ) -> AnalysisResult:
+        """`deadline` is a `time.monotonic()` value; past it, `AnalysisTimeoutError` is raised.
+
+        `details` adds what the report shows beyond the verdict -- boundary and attention
+        traces, the per-frame face mask, and the two single-stream reruns (~0.1 s: Stage B
+        is ~1% of the time, PF-29). `keyframes` adds JPEG thumbnails around each flagged span.
+        Neither changes `frame_scores`, `clip_score` or `segments` by a single bit.
+        """
         self._deadline = deadline
         try:
-            return self._analyze(Path(path))
+            return self._analyze(Path(path), details=details, keyframes=keyframes)
         finally:
             self._deadline = None
 
-    def _analyze(self, path: Path) -> AnalysisResult:
+    def _analyze(
+        self, path: Path, *, details: bool = False, keyframes: bool = False
+    ) -> AnalysisResult:
         timings: dict[str, float] = {}
 
         t0 = time.perf_counter()
@@ -389,7 +468,8 @@ class VideoAnalyzer:
 
         t0 = time.perf_counter()
         visual, backbone_s = self._visual(path, track, n_frames, frames)
-        del frames
+        if not keyframes:
+            frames = None  # release pass 1's buffer now; keyframes need it until the end
         pass2 = time.perf_counter() - t0
         timings["align"] = pass2 - backbone_s  # decode + warp
         timings["visual"] = backbone_s
@@ -405,16 +485,39 @@ class VideoAnalyzer:
         audio = audio_res.features[:t]
 
         t0 = time.perf_counter()
-        frame_scores, clip_score = self._forward(visual, audio, found)
+        main = self._forward_full(visual, audio, found)
+        frame_scores, clip_score = main["frames"], main["clip"]
         self._sync()
         timings["model"] = time.perf_counter() - t0
 
         t0 = time.perf_counter()
         segments = scores_to_segments(frame_scores, self.postprocess)
         timings["postprocess"] = time.perf_counter() - t0
-        timings["total"] = sum(timings[s] for s in STAGES)
 
         fps = self.video_cfg.target_fps
+        extra: dict = {}
+        if details:
+            t0 = time.perf_counter()
+            audio_only = self._forward_full(visual, audio, found, drop_visual=True)
+            visual_only = self._forward_full(visual, audio, found, drop_audio=True)
+            self._sync()
+            extra = {
+                "boundary_scores": main.get("boundary"),
+                "attention": main["attention"].astype(np.float32),
+                "face_found": found.astype(bool),
+                "audio_only_scores": audio_only["frames"].astype(np.float32),
+                "visual_only_scores": visual_only["frames"].astype(np.float32),
+                "audio_only_clip": audio_only["clip"],
+                "visual_only_clip": visual_only["clip"],
+            }
+            timings["explain"] = time.perf_counter() - t0
+        if keyframes:
+            t0 = time.perf_counter()
+            extra["keyframes"] = self._keyframes(path, track, t, segments, frames)
+            timings["keyframes"] = time.perf_counter() - t0
+        frames = None
+        timings["total"] = sum(v for k, v in timings.items() if k != "total")
+
         return AnalysisResult(
             n_frames=t,
             duration_s=t / fps,
@@ -426,4 +529,39 @@ class VideoAnalyzer:
             face_found_fraction=float(found.mean()) if t else 0.0,
             audio_silent=audio_res.is_silent,
             timings=timings,
+            **extra,
         )
+
+    def _keyframes(self, path: Path, track, n_frames: int, segments, frames) -> list:
+        """Thumbnails from the frames the model saw: pass 1's buffer when it was kept, else
+        one more streaming decode that stops at the last frame needed."""
+        from src.inference.keyframes import Keyframe, render_thumbnail, select_keyframes
+
+        fps = self.video_cfg.target_fps
+        wanted = select_keyframes(n_frames, segments, fps)
+        if not wanted:
+            return []
+        by_frame = {f: (role, seg) for f, role, seg in wanted}
+        source = frames if frames is not None else iter_frames(path, target_fps=fps)
+        out = []
+        for i, frame in enumerate(source):
+            if i > wanted[-1][0]:
+                break
+            if i not in by_frame:
+                continue
+            role, seg = by_frame[i]
+            found = bool(track.found[i])
+            inside = seg is not None and role in ("start", "middle", "end")
+            out.append(
+                Keyframe(
+                    frame=i,
+                    time_s=i / fps,
+                    role=role,
+                    segment=seg,
+                    face_found=found,
+                    jpeg=render_thumbnail(
+                        frame, track.points[i] if found else None, highlight=inside
+                    ),
+                )
+            )
+        return out

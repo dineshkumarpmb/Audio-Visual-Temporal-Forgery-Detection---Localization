@@ -45,6 +45,52 @@ class Segment(BaseModel):
     confidence: float
 
 
+class KeyframeOut(BaseModel):
+    frame: int
+    time_s: float
+    role: Literal["before", "start", "middle", "end", "after", "sample"]
+    segment: int | None = Field(description="index into `segments`; None for evenly spaced samples")
+    face_found: bool
+    url: str
+
+
+class SegmentEvidence(BaseModel):
+    index: int
+    start_s: float
+    end_s: float
+    duration_s: float
+    frames: list[int]
+    mean_score: float
+    peak_score: float | None
+    audio_only_mean: float | None = Field(description="the span's mean with the video removed")
+    visual_only_mean: float | None = Field(description="the span's mean with the audio removed")
+    face_coverage: float | None
+    driver: Literal["voice", "face", "both", "neither", "unknown"]
+    start_confidence: float | None = None
+    end_confidence: float | None = None
+
+
+class KeyFigures(BaseModel):
+    clip_score: float
+    n_segments: int
+    forged_s: float
+    forged_fraction: float
+    duration_s: float
+    peak_frame_score: float
+    mean_frame_score: float
+    face_coverage: float
+
+
+class Evidence(BaseModel):
+    summary: str
+    frame_threshold: float = Field(description="post-processing threshold segments were cut at")
+    key_figures: KeyFigures
+    segments: list[SegmentEvidence]
+    modality: dict[str, Any] = Field(
+        description="whole-clip scores with each stream removed, and how to read them"
+    )
+
+
 class AnalysisOut(BaseModel):
     verdict: Literal["fake", "real"]
     is_fake: bool
@@ -59,6 +105,17 @@ class AnalysisOut(BaseModel):
     audio_silent: bool
     warnings: list[str]
     timings_s: dict[str, float]
+    # -- report detail (present on every result from the real analyzer) -------------------
+    boundary_start_scores: list[float] | None = None
+    boundary_end_scores: list[float] | None = None
+    attention: list[float] | None = Field(None, description="weight of each frame in the verdict")
+    face_found: list[int] | None = Field(None, description="1 where a face was tracked")
+    audio_only_scores: list[float] | None = Field(None, description="per frame, video removed")
+    visual_only_scores: list[float] | None = Field(None, description="per frame, audio removed")
+    audio_only_clip: float | None = None
+    visual_only_clip: float | None = None
+    keyframes: list[KeyframeOut] = []
+    evidence: Evidence | None = None
 
 
 class JobCreated(BaseModel):

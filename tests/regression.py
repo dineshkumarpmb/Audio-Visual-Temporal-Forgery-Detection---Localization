@@ -146,9 +146,13 @@ def make_tiny_videos(out_dir: Path = FIXTURES) -> tuple[Path, Path]:
     return real, fake
 
 
+# Report detail from `analyze(details=True)` -- pinned too, so the PDF's evidence cannot drift.
+DETAIL_ARRAYS = ("audio_only_scores", "visual_only_scores", "attention")
+
+
 def result_summary(res) -> dict:
     """The parts of an `AnalysisResult` the regression pins, in JSON-ready form."""
-    return {
+    out = {
         "n_frames": res.n_frames,
         "clip_score": float(res.clip_score),
         "frame_scores": [float(x) for x in res.frame_scores],
@@ -156,3 +160,15 @@ def result_summary(res) -> dict:
         "face_found_fraction": float(res.face_found_fraction),
         "audio_silent": bool(res.audio_silent),
     }
+    for key in DETAIL_ARRAYS:
+        arr = getattr(res, key, None)
+        if arr is not None:
+            out[key] = [float(x) for x in arr]
+    if getattr(res, "boundary_scores", None) is not None:
+        out["boundary_scores"] = [[float(a), float(b)] for a, b in res.boundary_scores]
+    for key in ("audio_only_clip", "visual_only_clip"):
+        if getattr(res, key, None) is not None:
+            out[key] = float(getattr(res, key))
+    if getattr(res, "keyframes", None):
+        out["keyframes"] = [[k.frame, k.role, k.segment] for k in res.keyframes]
+    return out

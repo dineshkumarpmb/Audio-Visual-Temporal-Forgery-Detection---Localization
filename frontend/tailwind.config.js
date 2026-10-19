@@ -3,6 +3,8 @@
 // place. Status colours follow the dataviz reference palette and are never reused as series.
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
+  // ScoreChart derives its hover-dot class from the line class at runtime.
+  safelist: ["fill-accent", "fill-series-audio", "fill-series-visual"],
   theme: {
     extend: {
       colors: {
@@ -20,6 +22,8 @@ export default {
         real: "var(--real)",
         warn: "var(--warn)",
         track: "var(--track)",
+        "series-audio": "var(--series-audio)",
+        "series-visual": "var(--series-visual)",
       },
       fontFamily: {
         sans: ["system-ui", "-apple-system", '"Segoe UI"', "sans-serif"],

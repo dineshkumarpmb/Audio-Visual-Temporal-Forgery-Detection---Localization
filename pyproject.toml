@@ -72,6 +72,7 @@ dependencies = [
     "fastapi>=0.109",
     "uvicorn[standard]>=0.27",
     "python-multipart>=0.0.9",   # required for multipart/form-data upload
+    "reportlab>=4.2",            # the PDF report (api/services/report.py)
 ]
 
 [project.optional-dependencies]
@@ -79,6 +80,7 @@ dev = [
     "pytest>=7.4",
     "pytest-cov>=4.1",
     "hypothesis>=6.100",         # property tests (P15-5)
+    "pypdf>=5.0",                # reads the PDF report back in tests
     "httpx>=0.26",               # API integration tests
     "ruff>=0.2",
     "mypy>=1.8",

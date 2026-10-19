@@ -33,6 +33,9 @@ class Job:
     finished_at: datetime | None = None
     result: dict[str, Any] | None = None
     error: ErrorInfo | None = None
+    # In memory only, dropped with the job (job_ttl_s): thumbnails and the rendered report.
+    keyframes: list[bytes] = field(default_factory=list)
+    report_pdf: bytes | None = None
     _finished_mono: float | None = None
 
     @property
@@ -66,12 +69,18 @@ class JobStore:
             job.started_at = _now()
 
     def finish(
-        self, job_id: str, *, result: dict[str, Any] | None = None, error: ErrorInfo | None = None
+        self,
+        job_id: str,
+        *,
+        result: dict[str, Any] | None = None,
+        error: ErrorInfo | None = None,
+        keyframes: list[bytes] | None = None,
     ) -> None:
         with self._lock:
             job = self._jobs[job_id]
             job.status = JobStatus.failed if error is not None else JobStatus.succeeded
             job.result, job.error = result, error
+            job.keyframes = list(keyframes or [])
             job.finished_at = _now()
             job._finished_mono = time.monotonic()
 

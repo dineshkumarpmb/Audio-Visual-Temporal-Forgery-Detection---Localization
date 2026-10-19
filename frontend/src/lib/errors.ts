@@ -75,6 +75,15 @@ const MESSAGES: Record<string, FriendlyError> = {
     advice: "Results are kept for an hour. Upload the video again.",
   },
   aborted: { title: "Upload cancelled", advice: "Choose a video to start again." },
+  report_unavailable: {
+    title: "This server can't make PDF reports yet",
+    advice:
+      "The analysis server was started before the report feature existed. Stop it (Ctrl+C) and run make api again, then analyse the video again.",
+  },
+  job_not_ready: {
+    title: "The analysis hasn't finished",
+    advice: "Wait for the result to appear, then download the report.",
+  },
 };
 
 const FALLBACK: FriendlyError = {

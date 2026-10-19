@@ -1074,6 +1074,42 @@ Phase 12's ONNX trial and dropped (PF-29). CI installs CPU torch 2.7.1 and holds
 package to `requirements.txt`'s pins as constraints; every pinned native wheel was checked to
 exist for manylinux / CPython 3.10 before the first CI run.
 
+### PF-33 · The advanced report: show what the model computes, and say what it cannot mean
+
+**Decision, recorded 2026-10-18**, from extending Phase 14 with a fuller result page and a
+server-rendered PDF (`GET /api/v1/jobs/{id}/report.pdf`), at the user's request.
+
+**Only signals the model already computes.** The pipeline was discarding most of what Stage B
+produces. `VideoAnalyzer.analyze(details=True)` now returns the boundary head's start/end
+traces, the attention-pooling weights behind the clip verdict, the per-frame face mask, and two
+extra Stage-B passes with one stream removed (`drop_visual` / `drop_audio` — the switches
+modality dropout trained). Cost: ~0.07 s on a 4–5 s analysis. `keyframes=True` adds JPEG
+thumbnails around each span (~0.02 s, from pass 1's frame buffer when it was kept). ⛔ Neither
+changes `frame_scores`, `clip_score` or `segments` by a single bit — asserted in
+`test_inference_pipeline.py`, and the Phase 15 regression fixture re-derived with identical
+existing numbers.
+
+**Modality attribution describes the model, not the forgery — and the report says so on screen.**
+A span is "voice" when the audio-only rerun still flags it and the video-only one does not. On
+the face-only LAV-DF fake `dev_005675` both spans read **voice** (voice-only ≈0.7, face-only
+≈0.19): the model catches face-only edits through the soundtrack (PF-19, PF-21). That is the
+correct description of *the model* and a wrong description of *the video*, so the caveat is
+always visible beside the reading (page and PDF), never behind a click, and is pinned by tests.
+
+**PDF on the server, vector, three pages.** reportlab 4.2.5 (pure Python, one runtime dependency)
+draws the timeline and charts with its own primitives — sharp at any zoom, the same colours, and
+forged spans hatched so a greyscale print still shows them. Page 1 verdict + figures + timeline
++ score; page 2 evidence + segments + keyframes; page 3 input, analysis details, how to read it,
+and the measured test figures with limitations. Rendered once per job (0.1–0.6 s) and cached
+beside it.
+
+**Thumbnails are memory-only and expire with the job** (`job_ttl_s`, 1 h). They are never
+written to disk and never committed: the screenshots of the new page contain LAV-DF faces, so
+they stay out of the repo (PF-32's no-redistribution rule).
+
+**Wording is single-sourced.** The headline sentence (`explain.summary_sentence`) matches the
+frontend's `summarise` word for word, with a test on each side.
+
 ---
 
 ## Appendix B — architectural decisions

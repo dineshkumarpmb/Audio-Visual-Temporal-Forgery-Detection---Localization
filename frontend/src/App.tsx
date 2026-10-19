@@ -70,7 +70,9 @@ export default function App() {
   } else if (job?.status === "failed") {
     body = <ErrorPanel code={job.error?.code ?? "internal_error"} onReset={reset} />;
   } else if (job?.status === "succeeded" && job.result) {
-    body = <ResultView job={job} videoUrl={videoUrl} segmentThreshold={threshold} onReset={reset} />;
+    body = (
+      <ResultView job={job} videoUrl={videoUrl} info={info} segmentThreshold={threshold} onReset={reset} />
+    );
   } else {
     body = <JobProgress job={job} reconnecting={reconnecting} />;
   }

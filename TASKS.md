@@ -7,15 +7,15 @@ Legend: ⛔ = blocking gate item · ⭐ = headline capability · 🔬 = experime
 
 ---
 
-## 📍 CURRENT STATUS — 2026-10-18, Phase 15 built (8/9) · CI awaits first push · ✋ Phase 14 gate awaits you
+## 📍 CURRENT STATUS — 2026-10-18, Phase 15 complete (CI green) · advanced report + PDF built · ✋ Phase 14 gate awaits you
 
 | | |
 |---|---|
-| **Done** | Phase −1 · Phase 0 · **P1 (18/20)** · **P2 (13/15)** · **P3 (9/9)** · **P4 (12/12)** · **P5 (8/8)** · **P6 (8/8)** · **P7 (6/6)** · **P8 (10/10)** · **P9 (7/7)** · **P10 (13/14)** · **P11 (11/11)** · **P12 (6/6)** · **P13 (12/12)** · **P14 (10/13, ✋ gate pending)** · **P15 (8/9, CI pending)** · CL-1 ✅ · CL-7 ✅ |
+| **Done** | Phase −1 · Phase 0 · **P1 (18/20)** · **P2 (13/15)** · **P3 (9/9)** · **P4 (12/12)** · **P5 (8/8)** · **P6 (8/8)** · **P7 (6/6)** · **P8 (10/10)** · **P9 (7/7)** · **P10 (13/14)** · **P11 (11/11)** · **P12 (6/6)** · **P13 (12/12)** · **P14 (10/13, ✋ gate pending)** · **P15 (9/9)** · CL-1 ✅ · CL-7 ✅ |
 | **Resolved** | ⛔ **D-1 → MobileNetV2** (0.7189 vs 0.6319). ⛔ **C-1 → log-Mel** (0.9838 vs 0.7677). Both open decisions settled by experiment |
-| **Next** | **Push** so GitHub Actions runs for the first time (P15-8/9 need CI green). ✋ **Close Phase 14**: browser run (P14-10), demo capture (P14-11), non-expert read (P14-12). Then **Phase 16 — Documentation** (needs PRE-1). ⛔ Test split stays spent |
-| **Progress** | ~167 of 203 tasks (≈82%) · **15 of 18 phases complete**; Phase 14 awaits its manual gate, Phase 15 its first CI run |
-| **Tests** | **553 Python passing**, coverage **81%** of `src/` (gate 70%) — 533 + 20 skipped in a data-free copy, also 81% · **39 frontend (Vitest)** · CI: `.github/workflows/ci.yml` |
+| **Next** | ✋ **Close Phase 14** on the new page: browser run (P14-10), demo capture (P14-11), non-expert read (P14-12) — restart `make api` / `make frontend` first, the running servers predate the report endpoints. Then **Phase 16 — Documentation** (needs PRE-1). ⛔ Test split stays spent |
+| **Progress** | ~168 of 203 tasks (≈83%) · **16 of 18 phases complete**; Phase 14 awaits its manual gate, Phase 16 not started |
+| **Tests** | **592 Python passing**, coverage **82%** of `src/` (gate 70%) · **56 frontend (Vitest)** · CI green on GitHub Actions (run 3, `c35da9c`) |
 | **⚠️ Caveat** | ⛔ **PF-17 / PF-19 / PF-20** — the artefacts are inherited by every arm since. Absolute numbers (test included) are **upper bounds**; the trustworthy quantities are the paired deltas in `reports/evidence_table.md`. ⛔ **PF-27**: Phase 4–11 runs reproduce to ~1 seed-sd, not 1e-4 — new training uses `--strict-determinism` |
 | **✋ Awaiting you** | P2-8 (contact sheets) · ⛔ P2-10 (watch 20 overlays) — artefacts in `reports/figures/` · P10-13 (20 timelines, `reports/figures/localization/timelines_dev20.png`) · **P14-10 / ⛔ P14-11 / ⛔ P14-12** (browser run, demo capture, non-expert read) |
 | **Kaggle** | `dinesh1234567` · phone verified · **30 GPU h/week** · P100 16 GB or T4×2 · 12 h/session · 20 GB `/kaggle/working` |
@@ -31,9 +31,24 @@ Phase 13 filled `api/` (`main.py`, `settings.py`, `errors.py`, `schemas.py`, `ro
 `evaluation/localization.py`, `localization/{postprocess,chunking}.py`, `losses/localization.py`,
 `models/heads/boundary.py` and `scripts/32`–`35`.
 
+### 📄 Advanced result page + PDF report (2026-10-18, Phase 14 extension)
+
+**Built at the user's request; decision PF-33.** The result now shows what the model actually
+computes, and downloads as a PDF (`GET /api/v1/jobs/{id}/report.pdf`, also a button).
+
+| | |
+|---|---|
+| page | verdict · **8 key figures** · video + timeline with a **face-tracked band** · score chart · **keyframe filmstrip** per span · segment table with **peak, voice-only, face-only, driver** · **voice or face?** panel with small multiples and an always-visible caveat · input + technical details · PDF / JSON / **CSV** downloads |
+| PDF | 3 pages, vector charts (reportlab), hatched spans survive greyscale; verdict, figures, timeline, score, evidence, segments, keyframes, input, analysis details, limitations with the measured test figures; 0.1–0.6 s, cached per job |
+| pipeline | `analyze(details=True, keyframes=True)`: boundary + attention traces, face mask, two single-stream reruns (+0.07 s), thumbnails (+0.02 s) — **frame scores, verdict and segments bit-identical** |
+| tests | +39 Python (`test_explain`, `test_report`, pipeline parity, regression extended — existing numbers unchanged), +17 frontend on re-recorded real API responses |
+
+⚠️ The face-only LAV-DF fake `dev_005675` is attributed to the **voice** — the model's reliance
+(PF-21), not the edit. The caveat travels with every reading.
+
 ### 🧪 Phase 15 result — testing (2026-10-18)
 
-**Built and green locally; the gate's last box is CI's first run.** Decision **PF-32**.
+**Complete — gate P15-9 passed: suite green, coverage met, CI green** (run 3; runs 1–2 failed on Linux-only issues, below). Decision **PF-32**.
 
 | | |
 |---|---|
@@ -42,7 +57,7 @@ Phase 13 filled `api/` (`main.py`, `settings.py`, `errors.py`, `schemas.py`, `ro
 | ⛔ GT alignment | `frame_targets` = an exact `Fraction` reference on every ms-grid label (exhaustive 0–12 s) and on 450 real labels, 150 of them float-edge cases (the manifest has 7,061) |
 | ⛔ AP metric | frame/clip AP + AUC = scikit-learn on tie-heavy inputs; interval AP = a pure-Python reference |
 | e2e + regression | committed `tiny_real.mkv` / `tiny_fake.mkv` through the real pipeline and the real API; outputs pinned to 1e-4 with a platform-independent seeded model; the shipped model pinned on `dev_004623` (local) |
-| CI | GitHub Actions: Python (CPU torch, ffmpeg, lint, tests + coverage gate) and frontend (tests, build) — not yet run |
+| CI | GitHub Actions: Python (CPU torch, ffmpeg, lint, tests + coverage gate) and frontend (tests, build) — **green**. Run 1: the MAX_PATH guard tripped on the runner's long checkout path (now Windows-only); run 2: Ubuntu's ffmpeg 6 refuses MJPEG in `yuv420p` (fixture now `yuvj420p`); failures surface as public annotations |
 
 ⚠️ **PF-32.** CI cannot see LAV-DF, the weights or a GPU, so it protects the *code* behind the
 numbers, not the numbers. Fixtures are `.mkv` + PCM rather than `.mp4` so no codec drift hides in
@@ -413,7 +428,7 @@ requires re-checking at every scale-up — these scale-ups are what exposed both
 | 12 Optimization | 6 | ✅ **6/6** — gate P12-6 passed; **4.45 s per 10 s clip** (p90 5.26), 31.1 MB, dev accuracy unchanged end to end (Δ ≤ 5.4e-7); no ONNX, no fp16 (PF-29) |
 | 13 API | 12 | ✅ **12/12** — gate P13-12 passed; 44 API tests, error matrix 13/13 over real HTTP, 0 overlapping jobs under a burst, model loaded once (PF-30) |
 | 14 Frontend | 12 | 🟡 **10/13** (incl. P14-0) — built, 39 tests on real API responses; ✋ P14-10 browser run, ⛔ P14-11 demo capture, ⛔ P14-12 non-expert gate await you (PF-31) |
-| 15 Testing | 9 | 🟡 **8/9** — 553 tests, 81% coverage (gate 70%), GT-alignment and AP tests against independent references; CI written, ⛔ P15-9 needs its first green run (PF-32) |
+| 15 Testing | 9 | ✅ **9/9** — gate P15-9 passed: 553 tests (592 with the report work), 81–82% coverage (gate 70%), GT-alignment and AP against independent references, **CI green** (PF-32) |
 | 16 Documentation | 11 | ⬜ Not started (needs PRE-1) |
 | Cloud (Kaggle) | 8 | 🟡 2/8 — CL-1 ✅, CL-7 ✅. No longer on Phase 4's critical path (PF-16) |
 | Cross-cutting | 7 | 🔄 Continuous |
@@ -970,7 +985,7 @@ Otherwise `E − D` would be unattributable — the failure P7-6 exists to preve
 
 ---
 
-## PHASE 15 — Testing — 🟡 **8/9 — ⛔ gate waits on the first CI run (2026-10-18)**
+## PHASE 15 — Testing — ✅ **COMPLETE 9/9, gate passed — CI green (2026-10-18)**
 
 | ID | Task | Status |
 |---|---|---|
@@ -981,8 +996,8 @@ Otherwise `E − D` would be unattributable — the failure P7-6 exists to preve
 | P15-5 | Property tests: segments sorted, non-overlapping, in-bounds | ✅ `test_properties.py` (Hypothesis): the contract for any scores × any legal config incl. boundary refinement, frame-grid edges, min duration, low scores → `[]`, determinism, chunk coverage, exact stitching; derandomized in CI (`tests/conftest.py`) |
 | P15-6 | Regression test on a fixed fixture with committed expected outputs | ✅ `expected_tiny_*.json` (`scripts/45_make_test_fixtures.py`) with a **platform-independent seeded model** — frame scores, clip score and segments pinned to 1e-4; plus the shipped model on `dev_004623` against the recorded API response (local only) |
 | P15-7 | Coverage report — target > 70% on `src/` | ✅ **81%** locally and in a clean data-free copy; `fail_under = 70` in `pyproject.toml`; `make test-cov` writes `htmlcov/`, CI uploads `coverage.xml` |
-| P15-8 | GitHub Actions CI (test-only; **no deployment**, per §0.2) | ✅ `.github/workflows/ci.yml` — Python job (CPU torch 2.7.1, pins from `requirements.txt` as constraints, ffmpeg, hash-pinned MediaPipe fetch, ruff, tests + coverage gate) and frontend job (npm ci, path guard, Vitest, build). Linux wheels for every pinned native package verified to exist. ⏳ Not yet run |
-| P15-9 | ⛔ **Gate:** suite green, coverage met, CI green | 🟡 suite green ✅ (553) · coverage met ✅ (81%) · **CI green ⏳ — needs a push** |
+| P15-8 | GitHub Actions CI (test-only; **no deployment**, per §0.2) | ✅ `.github/workflows/ci.yml` — Python job (CPU torch 2.7.1, pins from `requirements.txt` as constraints, ffmpeg, hash-pinned MediaPipe fetch, ruff, tests + coverage gate) and frontend job (npm ci, path guard, Vitest, build); failing tests re-emitted as public annotations. Two Linux-only fixes on the way to green (path guard, MJPEG pixel format) |
+| P15-9 | ⛔ **Gate:** suite green, coverage met, CI green | ✅ ⛔ **GATE PASSED** — suite green (553) · coverage 81% (80.78% on the runner) · **CI green** on run 3 (`c35da9c`), both jobs |
 
 ---
 
@@ -1066,7 +1081,7 @@ Not a separate phase — these are the tasks the local+Kaggle strategy adds.
 
 *Phase −1 complete except PRE-1 (report retrieval), which does not block Phases 0–15.*
 
-*Completed as of 2026-10-18: ~167 of 203 tasks (≈82%) — see the status table at the top. Snapshot from 2026-09-05 follows: ~100 of 203 tasks (≈49%). Phases −1, 0, 1, 2, 3, 4, 5, 6, 7, 8 done.
+*Completed as of 2026-10-18: ~168 of 203 tasks (≈83%) — see the status table at the top. Snapshot from 2026-09-05 follows: ~100 of 203 tasks (≈49%). Phases −1, 0, 1, 2, 3, 4, 5, 6, 7, 8 done.
 **D-1 → MobileNetV2, C-1 → log-Mel**, Experiment C is a documented negative result (PF-20),
 **Experiment D a decisive positive one** (+0.0844, gate P7-6 passed) whose frame AP survived its own
 confound check (position explains 8.1%), and **Experiment E a mixed one** (+0.0045, gate P8-10

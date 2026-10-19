@@ -164,6 +164,30 @@ class TestAnalyze:
         assert res.audio_silent
         assert np.all(np.isfinite(res.frame_scores))
 
+    def test_details_and_keyframes_change_nothing_they_should_not(self, analyzer, clip):
+        """The report's extras are read-only: scores, verdict and segments bit-identical."""
+        plain = analyzer.analyze(clip)
+        rich = analyzer.analyze(clip, details=True, keyframes=True)
+        np.testing.assert_array_equal(plain.frame_scores, rich.frame_scores)
+        assert plain.clip_score == rich.clip_score and plain.segments == rich.segments
+        assert rich.boundary_scores.shape == (50, 2)
+        assert rich.attention.shape == (50,) and abs(float(rich.attention.sum()) - 1) < 1e-5
+        assert rich.audio_only_scores.shape == rich.visual_only_scores.shape == (50,)
+        assert rich.face_found.dtype == bool and rich.face_found.shape == (50,)
+        assert 0 <= rich.audio_only_clip <= 1 and 0 <= rich.visual_only_clip <= 1
+        assert rich.keyframes and all(k.jpeg[:2] == b"\xff\xd8" for k in rich.keyframes)
+        d = rich.as_dict()
+        assert len(d["audio_only_scores"]) == 50 and len(d["keyframes"]) == len(rich.keyframes)
+        assert "jpeg" not in d["keyframes"][0]  # bytes never go into the JSON
+
+    def test_keyframes_without_the_frame_buffer_match(self, bundle, analyzer, clip):
+        """Over the RAM budget, keyframes come from a second decode -- same pictures."""
+        a = analyzer.analyze(clip, keyframes=True)
+        with VideoAnalyzer(bundle, device="cpu", frame_budget_mb=0.0) as two_pass:
+            b = two_pass.analyze(clip, keyframes=True)
+        assert [k.frame for k in a.keyframes] == [k.frame for k in b.keyframes]
+        assert [k.jpeg for k in a.keyframes] == [k.jpeg for k in b.keyframes]
+
     def test_warmup_runs(self, analyzer):
         assert analyzer.warmup() >= 0.0
 
@@ -187,3 +211,19 @@ def test_long_input_is_chunked_not_truncated(bundle):
         )
     assert frames.shape == (t,)
     assert np.all(np.isfinite(frames)) and 0.0 <= clip <= 1.0
+
+
+@needs_media
+def test_long_input_details_are_stitched(bundle):
+    """Past 750 frames the extra traces stitch too; stitched attention still sums to 1."""
+    with VideoAnalyzer(bundle, device="cpu") as a:
+        t = 900
+        rng = np.random.default_rng(1)
+        out = a._forward_full(
+            rng.standard_normal((t, 1280)).astype(np.float32),
+            rng.standard_normal((t, 80)).astype(np.float32),
+            np.ones(t, dtype=bool),
+            drop_visual=True,
+        )
+    assert out["frames"].shape == (t,) and out["boundary"].shape == (t, 2)
+    assert abs(float(out["attention"].sum()) - 1.0) < 1e-5

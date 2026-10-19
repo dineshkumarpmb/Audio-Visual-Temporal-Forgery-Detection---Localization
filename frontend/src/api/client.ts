@@ -44,6 +44,44 @@ async function getJson<T>(url: string): Promise<T> {
 export const getJob = (jobId: string) => getJson<Job>(`/api/v1/jobs/${encodeURIComponent(jobId)}`);
 export const getModelInfo = () => getJson<ModelInfo>("/api/v1/model-info");
 
+export const reportUrl = (jobId: string) => `/api/v1/jobs/${encodeURIComponent(jobId)}/report.pdf`;
+
+/** `attachment; filename="x.pdf"` -> `x.pdf`; null when absent. */
+export function filenameFrom(disposition: string | null): string | null {
+  const m = disposition?.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+/**
+ * Fetch the PDF report and prove it is one before saving it.
+ *
+ * A bare `<a download>` saves whatever the server answers -- a 66-byte JSON error becomes a
+ * "PDF" that will not open. So: a route-level 404 (`not_found`) means the API process
+ * predates the report endpoint (`report_unavailable`), a job-level 404 means the job expired,
+ * 409 means it has not finished, and a 200 that is not `application/pdf` is refused too.
+ */
+export async function fetchReport(jobId: string): Promise<{ blob: Blob; filename: string | null }> {
+  let resp: Response;
+  try {
+    resp = await fetch(reportUrl(jobId), { headers: { Accept: "application/pdf" } });
+  } catch {
+    throw new ApiError(0, "server_unreachable", "the analysis server is not responding");
+  }
+  if (!resp.ok) {
+    const err = fromBody(resp.status, await resp.text());
+    if (err.status === 404 && err.code === "not_found") {
+      throw new ApiError(404, "report_unavailable", "this server has no report endpoint");
+    }
+    throw err;
+  }
+  const type = resp.headers.get("content-type") ?? "";
+  const blob = await resp.blob();
+  if (!type.includes("application/pdf") || blob.size === 0) {
+    throw new ApiError(resp.status, "unexpected_response", `expected a PDF, got ${type || "nothing"}`);
+  }
+  return { blob, filename: filenameFrom(resp.headers.get("content-disposition")) };
+}
+
 /**
  * Upload with progress. XMLHttpRequest, not fetch: fetch has no upload-progress events, and
  * a 200 MB upload with no progress bar looks frozen.

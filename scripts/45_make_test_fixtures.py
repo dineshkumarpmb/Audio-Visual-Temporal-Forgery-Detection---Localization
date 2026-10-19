@@ -96,7 +96,7 @@ def expected_outputs() -> None:
 
     with VideoAnalyzer(seeded_bundle(), device="cpu") as analyzer:
         for clip, out in EXPECTED.items():
-            res = analyzer.analyze(clip)
+            res = analyzer.analyze(clip, details=True, keyframes=True)
             body = {
                 "clip": clip.name,
                 "generated_with": {

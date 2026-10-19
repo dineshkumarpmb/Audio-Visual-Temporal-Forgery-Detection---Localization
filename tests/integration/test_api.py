@@ -99,10 +99,25 @@ def media(tmp_path_factory) -> dict[str, Path]:
 
 @dataclass
 class FakeResult:
+    """The `AnalysisResult` contract the service reads: verdict, arrays, and (from
+    `details=True`) the single-stream traces the evidence is derived from."""
+
     face_found_fraction: float = 1.0
     audio_silent: bool = False
     is_fake: bool = True
     clip_score: float = 0.9
+    n_frames: int = 25
+    duration_s: float = 1.0
+    fps: float = 25.0
+    segments: list = field(default_factory=lambda: [(0.2, 0.6, 0.8)])
+    frame_scores: np.ndarray = field(default_factory=lambda: np.full(25, 0.1, dtype=np.float32))
+    audio_only_scores: np.ndarray | None = None
+    visual_only_scores: np.ndarray | None = None
+    audio_only_clip: float | None = None
+    visual_only_clip: float | None = None
+    boundary_scores: np.ndarray | None = None
+    face_found: np.ndarray | None = None
+    keyframes: list = field(default_factory=list)
 
     def as_dict(self, *, include_frames: bool = True) -> dict:
         return {
@@ -131,7 +146,7 @@ class FakeAnalyzer:
     closed: bool = False
     seen_deadlines: list = field(default_factory=list)
 
-    def analyze(self, path, *, deadline=None):
+    def analyze(self, path, *, deadline=None, details=False, keyframes=False):
         self.calls += 1
         self.seen_deadlines.append(deadline)
         assert Path(path).is_file(), "the upload must still exist while it is analysed"
@@ -536,7 +551,7 @@ class TestConcurrency:
         lock = threading.Lock()
 
         class Overlap(FakeAnalyzer):
-            def analyze(self, path, *, deadline=None):
+            def analyze(self, path, *, deadline=None, **kwargs):
                 nonlocal active, peak
                 with lock:
                     active += 1

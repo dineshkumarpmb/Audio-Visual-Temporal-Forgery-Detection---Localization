@@ -57,7 +57,10 @@ def analyzer():
 
 @pytest.fixture(scope="module")
 def results(analyzer):
-    return {clip: analyzer.analyze(clip) for clip in (TINY_REAL, TINY_FAKE)}
+    return {
+        clip: analyzer.analyze(clip, details=True, keyframes=True)
+        for clip in (TINY_REAL, TINY_FAKE)
+    }
 
 
 # ---------------------------------------------------------------- fixtures are what they claim
@@ -103,7 +106,7 @@ def test_end_to_end_contract(results, clip):
     assert np.all((res.frame_scores >= 0) & (res.frame_scores <= 1))
     assert 0.0 <= res.clip_score <= 1.0
     assert_segment_contract(res.segments, res.duration_s)
-    assert set(res.timings) == {*STAGES, "total"}
+    assert set(res.timings) == {*STAGES, "explain", "keyframes", "total"}
     assert res.face_found_fraction == 0.0  # a test pattern has no face; visual is masked
     assert not res.audio_silent
 
@@ -169,6 +172,14 @@ def test_regression_against_committed_outputs(results, clip):
         "`python scripts/45_make_test_fixtures.py --expected` and say so in the commit."
     )
     assert abs(got["clip_score"] - expected["clip_score"]) <= SCORE_TOL
+
+    # The report's evidence: single-stream reruns, attention, boundaries, keyframe choice.
+    for key in ("audio_only_scores", "visual_only_scores", "attention", "boundary_scores"):
+        drift = np.abs(np.asarray(got[key]) - np.asarray(expected[key])).max()
+        assert drift <= SCORE_TOL, f"{clip.name}: {key} moved by {drift:.2e}"
+    for key in ("audio_only_clip", "visual_only_clip"):
+        assert abs(got[key] - expected[key]) <= SCORE_TOL, key
+    assert got["keyframes"] == expected["keyframes"]
 
     # Segments: exact edges, unless a score sits within float noise of the threshold, where a
     # different platform could legitimately round the other way.

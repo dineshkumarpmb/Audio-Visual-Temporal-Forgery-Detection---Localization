@@ -64,7 +64,7 @@ describe("App flow", () => {
     ).toBeInTheDocument();
     expect(screen.getAllByTestId("timeline-span")).toHaveLength(2);
     expect(screen.getByTestId("chart-threshold")).toHaveTextContent("20%"); // from model-info
-    expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(screen.getByRole("table", { name: "Manipulated segments" })).toBeInTheDocument();
     expect(screen.getByTestId("video")).toHaveAttribute("src", "blob:test");
     const polls = getJob.mock.calls.length;
     await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS + 200));
@@ -110,7 +110,7 @@ describe("App flow", () => {
     const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
     render(<App />);
     await chooseFile();
-    await userEvent.click(await screen.findByRole("button", { name: /Download full result/ }));
+    await userEvent.click(await screen.findByRole("button", { name: "Full result (JSON)" }));
     expect(click).toHaveBeenCalledTimes(1);
     const json = blobs.find((b) => b.type === "application/json");
     expect(json).toBeDefined();
