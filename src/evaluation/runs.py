@@ -17,6 +17,7 @@ from __future__ import annotations
 import itertools
 from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
@@ -33,7 +34,7 @@ from src.localization.targets import frame_targets, normalise_periods
 FPS = 25.0
 
 # ⛔ P10-10's grid. Shared so any arm tuned later is tuned exactly as Experiment G's were.
-GRID = {
+GRID: dict[str, list] = {
     "threshold": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
     "median_kernel": [1, 3, 5, 9],
     "min_duration_s": [0.0, 0.1, 0.2, 0.3, 0.4, 0.6, 1.0],
@@ -87,6 +88,7 @@ def ground_truth(manifest, lengths: Mapping[str, int]) -> dict[str, list[tuple[f
 
 
 def segments(pred: dict, cfg: PostProcessConfig, smoothed: dict | None = None) -> dict:
+    """Post-process every clip's frame scores into segments with one frozen config."""
     bounds = pred["bounds"] if cfg.refine_radius else None
     return {
         vid: scores_to_segments(
@@ -183,7 +185,7 @@ def classification_metrics(pred: dict, manifest) -> dict:
     ids = list(pred["lengths"])
     scores = np.array([pred["clip_scores"][v] for v in ids])
     labels = np.array([pred["labels"][v] for v in ids])
-    out = summary(scores, labels)
+    out: dict[str, Any] = dict(summary(scores, labels))
     out["per_class"] = per_class_breakdown(
         scores, labels, [str(manifest.loc[v, "class_name"]) for v in ids]
     )
@@ -204,6 +206,7 @@ def classification_metrics(pred: dict, manifest) -> dict:
 
 
 def confusion(scores: np.ndarray, labels: np.ndarray, threshold: float = 0.5) -> dict:
+    """TP / FP / TN / FN at `threshold`, as plain counts."""
     pred = np.asarray(scores) >= threshold
     labels = np.asarray(labels).astype(bool)
     return {

@@ -60,6 +60,7 @@ class FaceTrack:
 
     @property
     def found_fraction(self) -> float:
+        """Fraction of frames with a usable face (detected or interpolated)."""
         return float(self.found.mean()) if self.found.size else 0.0
 
 
@@ -135,6 +136,7 @@ class FaceLandmarkerPool:
         return [five_points(lms, w, h) for lms in result.face_landmarks]
 
     def close(self) -> None:
+        """Release the MediaPipe landmarker."""
         self._landmarker.close()
 
     def __enter__(self) -> FaceLandmarkerPool:

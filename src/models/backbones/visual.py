@@ -43,6 +43,8 @@ NATIVE_DIM = {"resnet18": 512, "mobilenet_v2": 1280}
 
 @dataclass(frozen=True)
 class BackboneInfo:
+    """What a visual backbone outputs, for logging and shape checks."""
+
     name: str
     feature_dim: int
     n_params: int
@@ -71,6 +73,9 @@ class FrozenVisualBackbone(nn.Module):
 
         self.freeze()
 
+    mean: torch.Tensor  # buffers registered in __init__
+    std: torch.Tensor
+
     def freeze(self) -> None:
         """Disable gradients and pin eval mode. Idempotent."""
         for p in self.body.parameters():
@@ -98,6 +103,7 @@ class FrozenVisualBackbone(nn.Module):
         return self.body(x).flatten(1)
 
     def info(self) -> BackboneInfo:
+        """Feature width and parameter count of this backbone."""
         total = sum(p.numel() for p in self.parameters())
         trainable = sum(p.numel() for p in self.parameters() if p.requires_grad)
         return BackboneInfo(self.name, self.feature_dim, total, trainable)
@@ -121,4 +127,5 @@ def _build(name: str, pretrained: bool) -> tuple[nn.Module, int]:
 
 
 def build_backbone(name: str = "resnet18", *, pretrained: bool = True) -> FrozenVisualBackbone:
+    """The frozen ImageNet backbone named by D-1 (`resnet18` | `mobilenet_v2`)."""
     return FrozenVisualBackbone(name, pretrained=pretrained)

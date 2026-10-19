@@ -18,7 +18,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from pathlib import Path, PurePath
-from typing import Any
+from typing import Any, BinaryIO
 
 from fastapi import Request
 from python_multipart import MultipartParser
@@ -66,6 +66,8 @@ ALLOWED_VIDEO_CODECS = {
 
 @dataclass(frozen=True)
 class SavedUpload:
+    """An upload streamed to disk, with the client's name kept for display only."""
+
     path: Path
     filename: str  # the client's name, display only -- never used as a path
     extension: str
@@ -89,7 +91,7 @@ class _Receiver:
         self.settings = settings
         self.saved: SavedUpload | None = None
         self.path: Path | None = None
-        self._fh = None
+        self._fh: BinaryIO | None = None
         self._size = 0
         self._headers: dict[str, str] = {}
         self._field = b""
@@ -129,8 +131,8 @@ class _Receiver:
                 f"'{ext or display}' is not an accepted video format",
                 {"allowed": list(ALLOWED_EXTENSIONS)},
             )
-        mime, _ = parse_options_header(self._headers.get("content-type", ""))
-        mime = mime.decode("latin-1").lower()
+        raw_mime, _ = parse_options_header(self._headers.get("content-type", ""))
+        mime = raw_mime.decode("latin-1").lower()
         if mime not in ALLOWED_MIME:
             raise ApiError(
                 415,
@@ -152,10 +154,12 @@ class _Receiver:
         self._size += end - start
         if self._size > self.settings.max_upload_bytes:
             raise _too_large(self.settings)
+        assert self._fh is not None  # set in on_headers_finished whenever _writing is
         self._fh.write(data[start:end])
 
     def on_part_end(self) -> None:
         if self._writing:
+            assert self._fh is not None and self._meta is not None and self.path is not None
             self._fh.close()
             self._fh = None
             self._writing = False
@@ -171,6 +175,7 @@ class _Receiver:
 
 
 async def receive_upload(request: Request, settings: ApiSettings) -> SavedUpload:
+    """Stream a multipart upload to disk, enforcing type and size while reading (P13-7)."""
     ctype, params = parse_options_header(request.headers.get("content-type", ""))
     if ctype != b"multipart/form-data" or b"boundary" not in params:
         raise ApiError(
@@ -183,7 +188,7 @@ async def receive_upload(request: Request, settings: ApiSettings) -> SavedUpload
         raise _too_large(settings)
 
     rx = _Receiver(settings.upload_dir, settings)
-    callbacks = {
+    callbacks: Any = {  # python_multipart's TypedDict, built by name
         name: getattr(rx, name)
         for name in (
             "on_part_begin",
@@ -256,7 +261,8 @@ def inspect_media(upload: SavedUpload, settings: ApiSettings) -> dict[str, Any]:
 
         if container.duration is not None:
             duration = container.duration / av.time_base
-        elif vs.duration is not None:
+        elif vs.duration is not None and vs.time_base is not None:
+            # Without a time base the duration is unitless -- treat as unreadable below.
             duration = float(vs.duration * vs.time_base)
         else:
             raise corrupt

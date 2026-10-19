@@ -81,6 +81,9 @@ class SequenceGenerator(nn.Module):
         self.register_buffer("feat_mean", torch.zeros(d_model))
         self.register_buffer("feat_std", torch.ones(d_model))
 
+    feat_mean: torch.Tensor  # buffers registered in __init__
+    feat_std: torch.Tensor
+
     def forward(self, noise: torch.Tensor, labels: torch.Tensor, n_frames: int) -> torch.Tensor:
         if noise.shape[-1] != self.noise_dim:
             raise ValueError(f"expected noise of {self.noise_dim} dims, got {noise.shape[-1]}")

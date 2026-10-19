@@ -84,6 +84,7 @@ class Diversity:
 
     @property
     def collapsed(self) -> bool:
+        """True if the generator has collapsed onto too few modes to admit (P9-4)."""
         return (
             self.pairwise_ratio < MIN_PAIRWISE_RATIO
             or self.std_ratio < MIN_STD_RATIO
@@ -91,6 +92,7 @@ class Diversity:
         )
 
     def as_dict(self) -> dict[str, float | bool]:
+        """The diversity diagnostics as plain data, for the run's result.json."""
         return {
             **asdict(self),
             "pairwise_ratio": self.pairwise_ratio,
@@ -275,7 +277,7 @@ def train_gan(
         # log(1 - D(G(z))), which has usable gradients while the discriminator is winning.
         d_fake2 = disc(fake, fake_labels)
         loss_g = bce(d_fake2, torch.ones_like(d_fake2))
-        ms_term = 0.0
+        ms_term: float | torch.Tensor = 0.0
         if ms_weight:
             # Same labels as `fake`, so the penalty measures sensitivity to the *noise* and
             # cannot be paid off by separating the two classes further.

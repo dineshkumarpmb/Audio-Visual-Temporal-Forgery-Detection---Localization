@@ -1,0 +1,74 @@
+{
+  "passed": false,
+  "docs": [
+    {
+      "doc": "README.md",
+      "traced": 18,
+      "minimum": 12,
+      "mismatches": [],
+      "untagged_decimals": [
+        "3.10"
+      ],
+      "missing_make_targets": [],
+      "dead_links": [
+        "docs/figures/architecture.svg (git-ignored)",
+        "docs/figures/result_page.png (git-ignored)"
+      ],
+      "passed": false
+    },
+    {
+      "doc": "reports/results.md",
+      "traced": 95,
+      "minimum": 30,
+      "mismatches": [],
+      "untagged_decimals": [
+        "53.35",
+        "80.00"
+      ],
+      "missing_make_targets": [],
+      "dead_links": [],
+      "passed": true
+    },
+    {
+      "doc": "reports/final_report.md",
+      "traced": 45,
+      "minimum": 25,
+      "mismatches": [],
+      "untagged_decimals": [
+        "0.95",
+        "1.16",
+        "28.999",
+        "3.35",
+        "53.35",
+        "80.00"
+      ],
+      "missing_make_targets": [],
+      "dead_links": [
+        "../docs/figures/architecture.svg (git-ignored)"
+      ],
+      "passed": false
+    },
+    {
+      "doc": "reports/portfolio.md",
+      "traced": 23,
+      "minimum": 10,
+      "mismatches": [],
+      "untagged_decimals": [],
+      "missing_make_targets": [],
+      "dead_links": [],
+      "passed": true
+    },
+    {
+      "doc": "reports/interview_prep.md",
+      "traced": 16,
+      "minimum": 10,
+      "mismatches": [],
+      "untagged_decimals": [
+        "15.16"
+      ],
+      "missing_make_targets": [],
+      "dead_links": [],
+      "passed": true
+    }
+  ]
+}

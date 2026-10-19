@@ -24,6 +24,8 @@ def _now() -> datetime:
 
 @dataclass
 class Job:
+    """One analysis request and, once finished, its result or error."""
+
     id: str
     filename: str
     media: dict[str, Any]
@@ -40,10 +42,13 @@ class Job:
 
     @property
     def done(self) -> bool:
+        """True once the job has succeeded or failed."""
         return self.status in (JobStatus.succeeded, JobStatus.failed)
 
 
 class JobStore:
+    """Thread-safe in-memory jobs; finished ones expire after `ttl_s` (P13-5)."""
+
     def __init__(self, *, ttl_s: float, max_jobs: int) -> None:
         self._jobs: dict[str, Job] = {}
         self._lock = threading.Lock()
@@ -51,6 +56,7 @@ class JobStore:
         self.max_jobs = max_jobs
 
     def create(self, filename: str, media: dict[str, Any]) -> Job:
+        """Register a new queued job for a vetted upload."""
         job = Job(id=uuid.uuid4().hex, filename=filename, media=media)
         with self._lock:
             self._prune()
@@ -58,11 +64,13 @@ class JobStore:
         return job
 
     def get(self, job_id: str) -> Job | None:
+        """The job, or None if unknown or expired."""
         with self._lock:
             self._prune()
             return self._jobs.get(job_id)
 
     def mark_running(self, job_id: str) -> None:
+        """Record that the worker has started this job."""
         with self._lock:
             job = self._jobs[job_id]
             job.status = JobStatus.running
@@ -76,6 +84,7 @@ class JobStore:
         error: ErrorInfo | None = None,
         keyframes: list[bytes] | None = None,
     ) -> None:
+        """Record the result (or error) and keyframes; starts the expiry clock."""
         with self._lock:
             job = self._jobs[job_id]
             job.status = JobStatus.failed if error is not None else JobStatus.succeeded
@@ -98,6 +107,7 @@ class JobStore:
             )
 
     def counts(self) -> dict[JobStatus, int]:
+        """Number of jobs in each status."""
         with self._lock:
             out = dict.fromkeys(JobStatus, 0)
             for j in self._jobs.values():

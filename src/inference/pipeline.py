@@ -91,6 +91,7 @@ class AnalysisResult:
     keyframes: list = field(default_factory=list)  # src.inference.keyframes.Keyframe
 
     def as_dict(self, *, include_frames: bool = True) -> dict:
+        """The result as JSON-ready data; per-frame arrays only when `include_frames`."""
         out = {
             "n_frames": self.n_frames,
             "duration_s": round(self.duration_s, 3),
@@ -167,6 +168,8 @@ def build_bundle(run_dir: str | Path, postprocess: dict, *, source: dict | None 
 
 
 def bundle_parameter_count(bundle: dict) -> dict[str, int]:
+    """Parameter counts of the bundle's Stage-B model and visual backbone."""
+
     def count(sd: dict) -> int:
         return int(sum(v.numel() for v in sd.values() if torch.is_tensor(v)))
 
@@ -195,10 +198,13 @@ class VideoAnalyzer:
         threshold: float = 0.5,
         frame_budget_mb: float = 256.0,
     ) -> None:
-        if not isinstance(bundle, dict):
-            bundle = torch.load(Path(bundle), map_location="cpu", weights_only=False)
-        if bundle.get("format") != BUNDLE_FORMAT:
-            raise ValueError(f"unsupported bundle format {bundle.get('format')!r}")
+        spec: dict = (
+            bundle
+            if isinstance(bundle, dict)
+            else torch.load(Path(bundle), map_location="cpu", weights_only=False)
+        )
+        if spec.get("format") != BUNDLE_FORMAT:
+            raise ValueError(f"unsupported bundle format {spec.get('format')!r}")
 
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.visual_batch = visual_batch
@@ -206,20 +212,20 @@ class VideoAnalyzer:
         self.model_fp16 = model_fp16
         self.threshold = threshold
         self.frame_budget = int(frame_budget_mb * 1024**2)
-        self.source = bundle.get("source", {})
+        self.source = spec.get("source", {})
 
         self.video_cfg = VideoPreprocessConfig()
-        self.audio_cfg = AudioPreprocessConfig(feature=bundle["model_kwargs"]["feature"])
-        self.postprocess = PostProcessConfig(**bundle["postprocess"])
+        self.audio_cfg = AudioPreprocessConfig(feature=spec["model_kwargs"]["feature"])
+        self.postprocess = PostProcessConfig(**spec["postprocess"])
 
-        self.backbone = build_backbone(bundle["backbone_name"], pretrained=False)
-        self.backbone.load_state_dict(bundle["backbone"])
+        self.backbone = build_backbone(spec["backbone_name"], pretrained=False)
+        self.backbone.load_state_dict(spec["backbone"])
         self.backbone = self.backbone.to(self.device)
         if backbone_fp16:
             self.backbone = self.backbone.half()
 
-        self.model = AttentionFusionModel(**bundle["model_kwargs"])
-        self.model.load_state_dict(bundle["model"])  # strict: a mismatch fails loudly
+        self.model = AttentionFusionModel(**spec["model_kwargs"])
+        self.model.load_state_dict(spec["model"])  # strict: a mismatch fails loudly
         self.model = self.model.to(self.device).eval()
 
         self.landmarker = FaceLandmarkerPool(landmarker_path)
@@ -254,6 +260,7 @@ class VideoAnalyzer:
         return time.perf_counter() - t0
 
     def close(self) -> None:
+        """Release the MediaPipe landmarker (the only resource that is not garbage-collected)."""
         self.landmarker.close()
 
     def __enter__(self) -> VideoAnalyzer:

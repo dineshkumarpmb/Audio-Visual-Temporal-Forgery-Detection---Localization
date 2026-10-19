@@ -63,14 +63,15 @@ class LearnedPositionalEncoding(nn.Module):
         super().__init__()
         self.max_len = max_len
         self.enabled = enabled
-        self.embedding = nn.Embedding(max_len, d_model) if enabled else None
+        self.embedding: nn.Embedding | None = None
         if enabled:
+            self.embedding = nn.Embedding(max_len, d_model)
             # Small init: positions should nudge the representation, not dominate the
             # content features they are added to.
             nn.init.normal_(self.embedding.weight, std=0.02)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        if not self.enabled:
+        if not self.enabled or self.embedding is None:
             return x
         t = x.shape[1]
         if t > self.max_len:

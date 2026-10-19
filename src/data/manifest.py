@@ -157,6 +157,7 @@ def write_manifest(df: pd.DataFrame, path: str | Path) -> Path:
 
 
 def read_manifest(path: str | Path) -> pd.DataFrame:
+    """Load a manifest written by `build_manifest` (parquet)."""
     return pd.read_parquet(path)
 
 

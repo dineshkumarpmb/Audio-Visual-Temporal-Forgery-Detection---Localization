@@ -50,7 +50,9 @@ def probe_video(path: str | Path) -> dict:
                 "width": stream.codec_context.width,
                 "height": stream.codec_context.height,
                 "duration_s": (
-                    float(stream.duration * stream.time_base) if stream.duration else None
+                    float(stream.duration * stream.time_base)
+                    if stream.duration and stream.time_base is not None
+                    else None
                 ),
             }
     except DecodeError:

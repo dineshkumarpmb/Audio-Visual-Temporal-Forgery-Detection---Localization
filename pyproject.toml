@@ -122,7 +122,14 @@ python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true      # mediapipe, librosa, av ship no stubs
+plugins = ["pydantic.mypy"]         # Field defaults and settings construction
 exclude = ["notebooks/", ".venv/"]
+
+[[tool.mypy.overrides]]
+# torch's stubs type every nn.Module call as returning Any, so `return self.layer(x)` trips
+# warn_return_any in every forward(). The signatures still type-check every caller.
+module = ["src.models.*", "src.losses.*", "src.training.gan"]
+warn_return_any = false
 
 [tool.coverage.run]
 source = ["src"]

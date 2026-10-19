@@ -70,6 +70,8 @@ def classify_failure(exc: BaseException) -> ErrorInfo:
 
 
 class InferenceService:
+    """Runs analyses on one worker under a semaphore of 1 (P13-9), admitting a bounded queue."""
+
     def __init__(
         self,
         analyzer: Analyzer,
@@ -93,10 +95,12 @@ class InferenceService:
 
     @property
     def busy(self) -> bool:
+        """True while an analysis is running."""
         return self._active > 0
 
     @property
     def queued(self) -> int:
+        """Jobs waiting behind the running one."""
         with self._lock:
             return self._pending - self._active
 
@@ -116,6 +120,7 @@ class InferenceService:
             self._check_capacity_locked()
 
     def submit(self, job: Job, path: Path) -> None:
+        """Admit a vetted upload and run it on the worker; 503 if the queue is full."""
         with self._lock:  # re-check and claim atomically: two uploads may finish together
             self._check_capacity_locked()
             self._pending += 1
@@ -166,7 +171,7 @@ class InferenceService:
         self.store.finish(job_id, result=self._result(res, job_id), keyframes=thumbs)
 
     def _result(self, res: Any, job_id: str) -> dict[str, Any]:
-        out = res.as_dict(include_frames=True)
+        out: dict[str, Any] = res.as_dict(include_frames=True)
         warnings = []
         if res.face_found_fraction < LOW_FACE_WARNING:
             warnings.append(
@@ -216,6 +221,7 @@ class InferenceService:
         }
 
     def job_view(self, job: Job) -> dict[str, Any]:
+        """The `GET /jobs/{id}` body for a job."""
         return {
             "job_id": job.id,
             "status": job.status,
@@ -232,11 +238,13 @@ class InferenceService:
         }
 
     def shutdown(self) -> None:
+        """Stop the worker (cancelling queued jobs) and release the analyzer."""
         self._executor.shutdown(wait=True, cancel_futures=True)
         self.analyzer.close()
 
 
 def file_sha256(path: Path) -> str:
+    """SHA-256 of a file, streamed in 1 MB blocks."""
     h = hashlib.sha256()
     with path.open("rb") as f:
         for block in iter(lambda: f.read(1 << 20), b""):

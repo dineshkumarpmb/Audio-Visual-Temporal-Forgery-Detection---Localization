@@ -95,6 +95,7 @@ def average_precision(scores: np.ndarray, labels: np.ndarray) -> float:
 
 
 def accuracy(scores: np.ndarray, labels: np.ndarray, threshold: float = 0.5) -> float:
+    """Fraction correct at `threshold` -- reported, never selected on (ROC-AUC is primary)."""
     scores, labels = _check(scores, labels)
     return float(((scores >= threshold).astype(np.int64) == labels).mean())
 
@@ -118,6 +119,7 @@ def equal_error_rate(scores: np.ndarray, labels: np.ndarray) -> float:
 
 
 def summary(scores: np.ndarray, labels: np.ndarray, threshold: float = 0.5) -> dict[str, float]:
+    """Table 8.2.1's clip-level numbers for one set of scores: AUC, AP, Acc, P, R, F1, EER."""
     scores, labels = _check(scores, labels)
     pred = (scores >= threshold).astype(np.int64)
     tp = int(((pred == 1) & (labels == 1)).sum())

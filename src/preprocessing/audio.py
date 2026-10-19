@@ -61,6 +61,7 @@ class AudioResult:
 
     @property
     def pad_frames(self) -> float:
+        """Padding (positive) or trim (negative) applied, in video frames."""
         return self.pad_samples / 640.0
 
 
@@ -141,7 +142,8 @@ def cmvn(features: np.ndarray, eps: float = 1e-8) -> np.ndarray:
     """
     mean = features.mean(axis=0, keepdims=True)
     std = features.std(axis=0, keepdims=True)
-    return (features - mean) / (std + eps)
+    out: np.ndarray = (features - mean) / (std + eps)
+    return out
 
 
 def is_silent(y: np.ndarray, threshold: float = 1e-6) -> bool:
@@ -169,7 +171,7 @@ def log_mel(y: np.ndarray, cfg: AudioPreprocessConfig, n_frames: int) -> np.ndar
     mel = mel_fb @ power
     # eps *before* the log: a silent frame is exactly 0 power and log(0) is -inf, which
     # would propagate as NaN through the first batch-norm and be very hard to trace back.
-    out = np.log(mel + cfg.eps).T.astype(np.float32)
+    out: np.ndarray = np.log(mel + cfg.eps).T.astype(np.float32)
     return out[:n_frames]
 
 

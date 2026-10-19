@@ -102,6 +102,7 @@ class AttentionFusionModel(ConcatFusionBaseline):
             if cross_attention
             else None
         )
+        self.temporal: torch.nn.Module | None
         if temporal == "transformer":
             self.temporal = TransformerTemporalEncoder(
                 d_model,
@@ -149,6 +150,7 @@ class AttentionFusionModel(ConcatFusionBaseline):
             fused = self.fuse(torch.cat([v, a], dim=-1))
 
         if self.temporal_kind == "transformer":
+            assert self.temporal is not None
             temporal = self.temporal(
                 fused, mask, return_attention=return_attention, compute_entropy=compute_entropy
             )
@@ -156,6 +158,7 @@ class AttentionFusionModel(ConcatFusionBaseline):
             head_entropy = temporal.get("head_entropy")
             maps = temporal.get("attention_maps")
         elif self.temporal_kind == "lstm":
+            assert self.temporal is not None
             sequence = self.temporal(fused, mask)
             head_entropy, maps = None, None
         else:
@@ -210,8 +213,10 @@ class AttentionFusionModel(ConcatFusionBaseline):
         feature-space augmentation can reach.
         """
         if self.temporal_kind == "transformer":
+            assert self.temporal is not None
             sequence = self.temporal(fused, mask)["sequence"]
         elif self.temporal_kind == "lstm":
+            assert self.temporal is not None
             sequence = self.temporal(fused, mask)
         else:
             sequence = fused

@@ -45,7 +45,8 @@ def template(crop_size: int = 112, margin: float = 0.25) -> np.ndarray:
         raise ValueError(f"margin must be >= 0, got {margin}")
     pts = ARCFACE_112 * (crop_size / 112.0)
     centre = np.array([crop_size / 2.0, crop_size / 2.0])
-    return centre + (pts - centre) / (1.0 + margin)
+    out: np.ndarray = centre + (pts - centre) / (1.0 + margin)
+    return out
 
 
 def umeyama(src: np.ndarray, dst: np.ndarray) -> np.ndarray:

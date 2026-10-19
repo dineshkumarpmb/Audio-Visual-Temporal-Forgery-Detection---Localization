@@ -139,5 +139,6 @@ def write_subset(df: pd.DataFrame, name: str, out_dir: str | Path, seed: int) ->
 
 
 def load_subset(name: str, out_dir: str | Path) -> list[str]:
+    """Read a committed subset id list (`data/manifests/subsets/*.txt`)."""
     path = Path(out_dir) / f"{name}.txt"
     return path.read_text(encoding="utf-8").split()

@@ -24,7 +24,8 @@ TORCH_PINS  := torch==2.7.1+cu118 torchvision==0.22.1+cu118 torchaudio==2.7.1+cu
         test-features train-ablations evidence test-once reproduce phase11 \
         features train evaluate ablations export-model benchmark phase12-gate phase12 \
         test-api phase13-gate phase13 api frontend frontend-install frontend-test \
-        frontend-fixtures phase14 test-fixtures phase15 demo clean-bench
+        frontend-fixtures phase14 test-fixtures phase15 demo demo-check check-docs phase16 \
+        phase8 clean-bench
 
 help:  ## Show this help
 	@echo Audio-Visual Temporal Forgery Detection ^& Localization
@@ -55,6 +56,7 @@ help:  ## Show this help
 	@echo     test-api phase13-gate phase13
 	@echo     frontend-install frontend-test frontend-fixtures phase14
 	@echo     test-fixtures phase15
+	@echo     check-docs demo-check phase16
 	@echo.
 	@echo   Serving
 	@echo     api           uvicorn on :8000
@@ -112,9 +114,10 @@ test-cov:   ## P15-7 - coverage on src/, fails under 70% (pyproject [tool.covera
 test-fixtures:  ## re-derive tests/fixtures (tiny clips, expected outputs, label sample)
 	$(PY) scripts/45_make_test_fixtures.py
 
-phase15:    ## ⛔ P15-9 - what CI runs: lint, the full suite with the coverage gate, frontend
+phase15:    ## ⛔ P15-9 - what CI runs: lint, types, the full suite with the coverage gate, frontend
 	$(PY) -m ruff check .
 	$(PY) -m ruff format --check .
+	$(PY) -m mypy src api
 	$(PY) -m pytest -q --cov=src --cov-report=term-missing:skip-covered
 	cd frontend && npm test && npm run build
 
@@ -292,6 +295,11 @@ train-augmented: ## Phase 9 - train one augmentation arm (ARGS=--arms F1 --seeds
 experiment-f: ## Phase 9 - Experiment F and the P9-7 gate
 	$(PY) scripts/31_experiment_f.py
 
+phase8:     ## Phase 8 - four attention arms x 3 seeds, attention maps, then Experiment E (P8-10)
+	$(PY) scripts/27_train_attention.py --seeds 3
+	$(PY) scripts/29_attention_maps.py
+	$(PY) scripts/28_experiment_e.py
+
 phase9:     ## Phase 9 - the three augmentation arms, then Experiment F
 # The arm order is a dependency, not a preference. F2's generator is trained on the fused
 # embeddings F1's *checkpoint* produces, so the script refuses to run F2 for a seed whose F1
@@ -415,9 +423,16 @@ frontend-fixtures:  ## re-record frontend/src/test/fixtures from the real API (d
 
 phase14: frontend-test
 
-demo:       ## API + frontend together
-	start "avtfd-api" cmd /c "$(PY) -m uvicorn api.main:app --host 127.0.0.1 --port 8000 --workers 1"
-	cd frontend && npm run dev
+demo:       ## P16-10 - API + front end together; Ctrl+C stops both (any shell: cmd, PowerShell, bash)
+	$(PY) scripts/47_demo.py --open
+
+demo-check: ## Is the demo ready to start? (model, front end installed, ports free)
+	$(PY) scripts/47_demo.py --check
+
+check-docs: ## ⛔ P16-11 - every number in the docs traces to a logged run
+	$(PY) scripts/46_check_docs.py
+
+phase16: check-docs demo-check
 
 clean-bench:
 	@if exist "data\interim\_bench" rmdir /s /q "data\interim\_bench"

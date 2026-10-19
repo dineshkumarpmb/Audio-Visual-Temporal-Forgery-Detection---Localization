@@ -26,6 +26,8 @@ SAMPLES_FOR_REAL = 4
 
 @dataclass
 class Keyframe:
+    """One thumbnail: which frame, why it was chosen, and its JPEG bytes (never serialised)."""
+
     frame: int
     time_s: float
     role: str  # before | start | middle | end | after | sample
@@ -34,6 +36,7 @@ class Keyframe:
     jpeg: bytes = b""
 
     def meta(self) -> dict:
+        """The JSON-safe description of this keyframe, without the image bytes."""
         return {
             "frame": self.frame,
             "time_s": round(self.time_s, 3),

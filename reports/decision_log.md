@@ -839,6 +839,34 @@ and it now has a documented baseline to beat.
 
 ---
 
+### PF-21 – PF-26 · Recorded in the TASKS.md tracker, summarised here for completeness
+
+These were logged as they happened in `TASKS.md`'s carried-forward table, not as full entries.
+Each is summarised from that record; the numbers are the ones measured at the time.
+
+- **PF-21 · The collapse onto audio is a dataset finding, not an architecture one (answered
+  2026-09-05, negatively).** Modality dropout, auxiliary heads, recurrence, cross-attention and
+  self-attention were each tried against the §5.6 collapse; zeroing the video stream cost under
+  0.01 AUC in every arm (+0.0010 for the full §5.1 model). On LAV-DF at this scale the audio
+  pathway is so much easier that no architectural encouragement made the visual one worth using.
+  PF-19's fingerprint is the leading explanation. The project's main limitation.
+- **PF-22 · PF-19's fingerprint is stronger after temporal modelling.** Face-only fakes score AUC
+  0.9702 at Experiment D with the visual pathway contributing nothing — their audio is unmodified
+  by definition. Absolute numbers from Phase 7 on are upper bounds; paired deltas are the evidence.
+- **PF-23 · `average_precision` broke ties by row order.** Fixed 2026-09-05 to resolve tie groups,
+  as `roc_auc` always had. Trained-model AP was unaffected (sigmoid outputs are never exactly tied);
+  the constant-scorer floor was corrected from 0.7383 to 0.7200 (the positive rate). Now checked
+  against scikit-learn in CI (`tests/unit/test_ap_metric.py`).
+- **PF-24 · Reliance on video is measured only on LAV-DF dev.** The audio-untouched face splices of
+  Phase 9 are the one training signal that could force video use, but reliance was scored on LAV-DF
+  fakes where audio suffices. A held-out spliced view would show whether any visual skill was
+  learned. Open.
+- **PF-25 · Phase 9 augmentation hurt on dev.** Splice + classical augmentation cost −0.0534 frame AP,
+  negative on all three seeds; Experiment G was therefore trained without it.
+- **PF-26 · Host RAM kills long runs.** Two runs were reaped at ≈1.5 GB free (Phase 10, and
+  Experiment I seed 2 in Phase 11); both resumed exactly from `last.pt`. Close the browser before
+  long runs.
+
 ### PF-27 · Default-mode training is not bit-reproducible; strict mode is (P11-10)
 
 **Finding, recorded 2026-10-03**, from `scripts/39_check_reproducibility.py`.
@@ -1110,6 +1138,36 @@ they stay out of the repo (PF-32's no-redistribution rule).
 **Wording is single-sourced.** The headline sentence (`explain.summary_sentence`) matches the
 frontend's `summarise` word for word, with a test on each side.
 
+### PF-34 · Phase 16: documentation that cannot drift from the measurements
+
+**Decision, recorded 2026-10-19**, from writing the Phase 16 documents.
+
+**Every quoted number is machine-checked.** The README, `results.md`, `final_report.md`,
+`portfolio.md` and `interview_prep.md` carry an invisible source tag after each measured number
+(`<!--n:file#path|format-->`). `scripts/46_check_docs.py` recomputes all 195 from the JSON the
+experiments wrote and fails on any mismatch, dead link or missing `make` target; a unit test runs
+it in CI. It caught two rounding errors in the first draft (0.643 for 0.6425 → 0.642, +0.018 for
+0.0175 → +0.017) — values rounded twice. Untagged decimals are listed for review; the ones left
+are the original report's claims (80.00%, 53.35%), which are quoted, not measured.
+
+**Three resume template lines were rewritten, not filled.** Part 14 asked for "cross-modal fusion
++___ AUC over the best unimodal baseline" (measured −0.080), "self-attention over LSTM +___ AP"
+(+0.015, inside noise) and "modality dropout to prevent collapse" (it did not). `portfolio.md`
+shows each original, the measurement, and the honest replacement.
+
+**`make demo` is a Python launcher, not a shell line.** `make` on Windows runs recipes in cmd.exe
+from PowerShell (`SHELL` reads `sh.exe`, but `%COMSPEC%` expands) and in sh from Git Bash; the old
+`start … cmd /c` recipe only worked in one of them. `scripts/47_demo.py` preflights (model file,
+front end installed, ports free — a stale server from an earlier session is the usual failure),
+starts the API, waits for `/health`, starts Vite, and stops both on Ctrl+C.
+
+**`mypy src api` is clean and in CI.** 97 errors at the start. Most were precision (Optional
+narrowing, reused variables, torch's `nn.Module` calls typed `Any` — handled by a documented
+per-module override for model code). Two were real: a stream with a duration but no time base
+made `duration * time_base` raise `TypeError` — outside any guard in the upload vetting, so it
+would have surfaced as an internal error instead of `corrupt_video`; and `SplicedDataset.plan()`
+was annotated as returning `Splice` objects while returning id pairs.
+
 ---
 
 ## Appendix B — architectural decisions
@@ -1124,7 +1182,7 @@ frontend's `summarise` word for word, with a test on each side.
 | **PF-6** | Raw dataset location | download 25.6 GB to D: / attach on Kaggle / HF streaming / Colab+Drive | User, Phase 1 | 2026-08-27 | ✅ **Attach on Kaggle; only the ~3.3 GB dev-10k feature cache comes local** |
 | **D-1** | Visual backbone | ResNet-18 / MobileNetV2 | Experiment J, Phase 4 | 2026-08-30 | ✅ **MobileNetV2** — dev AUC 0.7189 vs 0.6319, a 0.087 gap far outside seed noise, so §5.2's speed tie-break never applies. Reverses the 2026-08-29 call made at 58 clips |
 | **C-1** | Audio features | MFCC / log-Mel | Experiment K, Phase 5 | 2026-08-30 | ✅ **log-Mel** — dev AUC 0.9838 vs 0.7677, a 0.2161 gap with disjoint seed intervals. ⛔ Read with PF-19: part of the margin is a dataset artefact |
-| **B-1** | Face detector | MediaPipe / MTCNN / RetinaFace | Phase 2 | ⬜ | ⬜ Recommended: MediaPipe (CPU-only, keeps VRAM free, gives landmarks + mouth ROI in one pass) |
+| **B-1** | Face detector | MediaPipe / MTCNN / RetinaFace | Phase 2, PF-8 | 2026-08-29 | ✅ **MediaPipe** FaceLandmarker (Tasks API, pinned `face_landmarker.task`) — CPU-only so VRAM stays free; landmarks every 5th frame, tracked between. Finds no face on 4 of 1,159 cached clips (PF-30). Not ablated against MTCNN/RetinaFace: detection is not the bottleneck the ablation budget was spent on |
 | **F-1** | Sync approach | Learned InfoNCE / pretrained SyncNet | Phase 8, Exp H | 2026-10-03 | ✅ **Learned InfoNCE** built; Exp H shows it does not help AP@0.5 (not significant) and costs 0.096 AP@0.75 (PF-28) |
 | **G-1** | Fusion | Concat / gated / cross-attention | Phase 8 decomposition (concat+Transformer vs cross+Transformer), Phase 11 | 2026-10-03 | ✅ **Cross-attention kept, but a tie**: frame AP +0.0387, spread 0.0561 — not significant |
 | **H-1** | Temporal | BiLSTM / Transformer | Phase 8 decomposition (cross+BiLSTM vs cross+Transformer), Phase 11 | 2026-10-03 | ✅ **Transformer kept, but a tie**: frame AP +0.0153, spread 0.0196 — not significant |

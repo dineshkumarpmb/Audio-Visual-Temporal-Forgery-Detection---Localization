@@ -95,6 +95,7 @@ class SyncHead(nn.Module):
 
             best = sim if best is None else torch.maximum(best, sim)
 
+        assert best is not None  # the window always holds shift 0
         if mask is not None:
             best = best * mask.to(best.dtype)
         return {"sync": best, "visual_embed": v, "audio_embed": a}

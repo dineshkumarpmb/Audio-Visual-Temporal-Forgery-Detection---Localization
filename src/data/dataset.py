@@ -33,6 +33,8 @@ from src.localization.targets import frame_targets
 
 @dataclass(frozen=True)
 class Sample:
+    """One clip's cached features, label and (optionally) per-frame targets."""
+
     video_id: str
     features: np.ndarray  # (T, D) float32
     mask: np.ndarray  # (T,) bool -- True = usable frame
@@ -96,6 +98,7 @@ class VisualFeatureDataset(Dataset):
 
     @property
     def label_balance(self) -> dict[str, float]:
+        """`(n_real, n_fake)` over the dataset -- what `pos_weight` is set from."""
         n = len(self.labels)
         pos = int(self.labels.sum())
         return {
@@ -167,6 +170,7 @@ class AudioFeatureDataset(Dataset):
 
     @property
     def label_balance(self) -> dict[str, float]:
+        """`(n_real, n_fake)` over the dataset -- what `pos_weight` is set from."""
         n = len(self.labels)
         pos = int(self.labels.sum())
         return {
@@ -179,6 +183,8 @@ class AudioFeatureDataset(Dataset):
 
 @dataclass(frozen=True)
 class PairedSample:
+    """One clip's visual and audio features on the common frame grid."""
+
     video_id: str
     visual: np.ndarray  # (T, Dv) float32
     audio: np.ndarray  # (T, Da) float32
@@ -317,6 +323,7 @@ class MultimodalFeatureDataset(Dataset):
 
     @property
     def label_balance(self) -> dict[str, float]:
+        """`(n_real, n_fake)` over the dataset -- what `pos_weight` is set from."""
         n = len(self.labels)
         pos = int(self.labels.sum())
         return {
@@ -344,7 +351,7 @@ def collate_paired(batch: list[PairedSample]) -> dict[str, torch.Tensor | list[s
         mask[i, :t] = torch.from_numpy(s.mask)
         face[i, :t] = torch.from_numpy(s.face)
 
-    out = {
+    out: dict[str, torch.Tensor | list[str]] = {
         "features": visual,  # keeps the Trainer's single-stream contract working
         "audio": audio,
         "mask": mask,
@@ -360,6 +367,7 @@ def collate_paired(batch: list[PairedSample]) -> dict[str, torch.Tensor | list[s
     if batch[0].frames is not None:
         frames = torch.zeros(len(batch), max_t, dtype=torch.float32)
         for i, s in enumerate(batch):
+            assert s.frames is not None  # all or none: the dataset sets with_frames once
             frames[i, : len(s.frames)] = torch.from_numpy(s.frames)
         out["frames"] = frames  # padding stays 0 and is masked out of the loss anyway
     return out

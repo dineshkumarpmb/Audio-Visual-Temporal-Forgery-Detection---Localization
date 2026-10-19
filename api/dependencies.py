@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from fastapi import Request
 
@@ -12,16 +12,16 @@ from api.settings import ApiSettings
 
 
 def get_service(request: Request) -> InferenceService:
-    return request.app.state.service
+    return cast(InferenceService, request.app.state.service)
 
 
 def get_store(request: Request) -> JobStore:
-    return request.app.state.store
+    return cast(JobStore, request.app.state.store)
 
 
 def get_app_settings(request: Request) -> ApiSettings:
-    return request.app.state.settings
+    return cast(ApiSettings, request.app.state.settings)
 
 
 def get_model_info(request: Request) -> dict[str, Any]:
-    return request.app.state.model_info
+    return cast(dict[str, Any], request.app.state.model_info)

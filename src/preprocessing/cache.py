@@ -30,12 +30,13 @@ FACES_ROOT = Path("data/interim/faces")
 AUDIO_ROOT = Path("data/interim/audio")
 
 
-def cache_root(cfg: VideoPreprocessConfig, root: Path | str = FACES_ROOT) -> Path:
+def cache_root(cfg: BaseModel, root: Path | str = FACES_ROOT) -> Path:
     """The directory this config's crops live in."""
     return Path(root) / config_hash(cfg)
 
 
 def cache_path(video_id: str, cfg: VideoPreprocessConfig, root: Path | str = FACES_ROOT) -> Path:
+    """Where one video's cached face crops live for this config."""
     return cache_root(cfg, root) / f"{video_id}.npz"
 
 
@@ -114,10 +115,12 @@ def cache_stats(cfg: VideoPreprocessConfig, root: Path | str = FACES_ROOT) -> di
 
 
 def audio_path(video_id: str, cfg: BaseModel, root: Path | str = AUDIO_ROOT) -> Path:
+    """Where one video's cached audio features live for this config."""
     return cache_root(cfg, root) / f"{video_id}.npy"
 
 
 def is_audio_cached(video_id: str, cfg: BaseModel, root: Path | str = AUDIO_ROOT) -> bool:
+    """True if a complete, loadable audio cache exists for this video."""
     path = audio_path(video_id, cfg, root)
     try:
         return path.is_file() and path.stat().st_size > 0
@@ -150,4 +153,6 @@ def save_audio(
 
 
 def load_audio(video_id: str, cfg: BaseModel, root: Path | str = AUDIO_ROOT) -> np.ndarray:
-    return np.load(audio_path(video_id, cfg, root), mmap_mode="r")
+    """Memory-map one video's cached audio features (`(T, n_mels)`, float32)."""
+    arr: np.ndarray = np.load(audio_path(video_id, cfg, root), mmap_mode="r")
+    return arr

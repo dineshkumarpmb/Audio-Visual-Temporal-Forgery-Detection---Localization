@@ -60,6 +60,7 @@ async def analyze(
     store: JobStore = Depends(get_store),
     settings: ApiSettings = Depends(get_app_settings),
 ) -> JobCreated:
+    """Stream the upload to disk, vet it, queue it; 202 with the job id."""
     service.check_capacity()
     upload = await receive_upload(request, settings)
     try:
@@ -88,6 +89,7 @@ async def get_job(
     service: InferenceService = Depends(get_service),
     store: JobStore = Depends(get_store),
 ) -> JobOut:
+    """The job's status, and its result or structured error once finished."""
     job = store.get(job_id)
     if job is None:
         raise ApiError(404, "job_not_found", f"no job with id '{job_id[:64]}'")
@@ -115,6 +117,7 @@ def _finished_job(store: JobStore, job_id: str):
     summary="One keyframe thumbnail (listed in the result's `keyframes`)",
 )
 async def get_keyframe(job_id: str, index: int, store: JobStore = Depends(get_store)) -> Response:
+    """One keyframe thumbnail of a finished job, as JPEG."""
     job = _finished_job(store, job_id)
     if not 0 <= index < len(job.keyframes):
         raise ApiError(404, "keyframe_not_found", f"no keyframe {index} for this job")
@@ -137,6 +140,7 @@ async def get_report(
     store: JobStore = Depends(get_store),
     model_info: dict = Depends(get_model_info),
 ) -> Response:
+    """The finished job as a PDF report, rendered once and cached with the job."""
     job = _finished_job(store, job_id)
     if job.report_pdf is None:  # rendered once, kept beside the job until it expires
         view = service.job_view(job)

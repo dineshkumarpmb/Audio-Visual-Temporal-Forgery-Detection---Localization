@@ -62,6 +62,7 @@ class MetadataEntry:
 
     @property
     def class_name(self) -> str:
+        """`real` | `visual_only` | `audio_only` | `both` -- the 4-class label."""
         return CLASS_NAMES[(self.modify_video, self.modify_audio)]
 
     @property

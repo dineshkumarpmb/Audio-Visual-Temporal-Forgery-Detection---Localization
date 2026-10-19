@@ -40,6 +40,8 @@ from src.losses.sync import InfoNCESyncLoss
 
 @dataclass
 class TrainConfig:
+    """One Stage-B training run: optimiser, schedule, losses, seed, determinism."""
+
     epochs: int = 30
     lr: float = 1e-3
     weight_decay: float = 1e-4
@@ -81,6 +83,8 @@ class TrainConfig:
 
 @dataclass
 class EpochResult:
+    """One epoch's losses and dev metrics, appended to history.json."""
+
     epoch: int
     train_loss: float
     val_loss: float
@@ -226,6 +230,7 @@ class Trainer:
         return loss, out
 
     def train_epoch(self, loader: DataLoader) -> float:
+        """One pass over the training loader; returns the mean losses."""
         self.model.train()
         total, n = 0.0, 0
         self.optimizer.zero_grad(set_to_none=True)
@@ -250,6 +255,7 @@ class Trainer:
 
     @torch.no_grad()
     def evaluate(self, loader: DataLoader) -> tuple[float, dict, np.ndarray, np.ndarray, list[str]]:
+        """Score the dev loader without gradients; returns metrics and raw predictions."""
         self.model.eval()
         total, n = 0.0, 0
         scores, labels, classes = [], [], []
@@ -352,6 +358,7 @@ class Trainer:
     # ---------------------------------------------------------------- state
 
     def save(self, name: str, epoch: int) -> Path | None:
+        """Write a resumable checkpoint (model, optimiser, epoch, best metric)."""
         if not self.run_dir:
             return None
         path = self.run_dir / name
@@ -381,6 +388,7 @@ class Trainer:
         return self.start_epoch
 
     def write_history(self, path: str | Path) -> None:
+        """Write every epoch so far to history.json -- the run's learning curve."""
         Path(path).write_text(
             json.dumps([asdict(h) for h in self.history], indent=2, default=float) + "\n",
             encoding="utf-8",

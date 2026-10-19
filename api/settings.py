@@ -17,6 +17,8 @@ ALLOWED_EXTENSIONS = (".mp4", ".avi", ".mov", ".mkv")
 
 
 class ApiSettings(BaseSettings):
+    """API limits and paths from `AVTFD_*` environment variables (`.env.example`)."""
+
     model_config = SettingsConfigDict(env_prefix="AVTFD_", env_file=".env", extra="ignore")
 
     model_path: Path = Path("models/avtfd_g_seed0.pt")
@@ -44,9 +46,11 @@ class ApiSettings(BaseSettings):
 
     @property
     def max_upload_bytes(self) -> int:
+        """The upload cap in bytes."""
         return int(self.max_upload_mb * 1024**2)
 
 
 @lru_cache
 def get_settings() -> ApiSettings:
+    """The process's settings, read once."""
     return ApiSettings()

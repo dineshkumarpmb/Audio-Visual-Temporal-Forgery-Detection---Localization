@@ -16,6 +16,7 @@ router = APIRouter(tags=["service"])
 
 @router.get("/health", response_model=HealthOut, summary="Liveness and queue state")
 async def health(request: Request, service: InferenceService = Depends(get_service)) -> HealthOut:
+    """Liveness plus queue state; 200 means the model is loaded."""
     return HealthOut(
         status="ok",
         model_loaded=True,  # the lifespan does not yield until the model is loaded
@@ -30,4 +31,5 @@ async def health(request: Request, service: InferenceService = Depends(get_servi
     "/api/v1/model-info", response_model=ModelInfo, summary="Which model is serving, and limits"
 )
 async def model_info(info: dict[str, Any] = Depends(get_model_info)) -> ModelInfo:
+    """Which model is serving, its post-processing and every limit."""
     return ModelInfo(**info)

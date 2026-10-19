@@ -48,6 +48,8 @@ NATIVE_DIM = {"logmel": 80, "mfcc": 40}
 
 @dataclass(frozen=True)
 class EncoderInfo:
+    """What an audio encoder outputs, for logging and shape checks."""
+
     name: str
     in_dim: int
     feature_dim: int
@@ -140,6 +142,7 @@ class DilatedAudioEncoder(nn.Module):
         return out
 
     def info(self, name: str = "audio") -> EncoderInfo:
+        """Output width, receptive field and parameter count of this encoder."""
         return EncoderInfo(
             name=name,
             in_dim=self.in_dim,

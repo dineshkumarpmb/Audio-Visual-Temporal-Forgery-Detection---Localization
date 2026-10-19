@@ -74,6 +74,7 @@ class PostProcessConfig:
             raise ValueError(f"fps must be > 0, got {self.fps}")
 
     def as_dict(self) -> dict:
+        """The configuration as a plain dict, as frozen to `configs/postprocess_frozen.json`."""
         return asdict(self)
 
 
@@ -82,7 +83,8 @@ def smooth(scores: np.ndarray, kernel: int) -> np.ndarray:
     scores = np.asarray(scores, dtype=np.float64)
     if kernel <= 1 or scores.size == 0:
         return scores.copy()
-    return median_filter(scores, size=kernel, mode="nearest")
+    out: np.ndarray = median_filter(scores, size=kernel, mode="nearest")
+    return out
 
 
 def close_holes(binary: np.ndarray, closing: int) -> np.ndarray:

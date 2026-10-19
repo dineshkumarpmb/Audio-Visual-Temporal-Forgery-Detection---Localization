@@ -65,6 +65,9 @@ jobs:
           ruff check .
           ruff format --check .
 
+      - name: Type check
+        run: mypy src api
+
       # Job logs need admin rights to read through the API; annotations are public. Every
       # FAILED/ERROR line and the coverage verdict are re-emitted as annotations so a failure
       # can be diagnosed from the run page or the checks API without a token.

@@ -90,6 +90,7 @@ class AudioPreprocessConfig(StrictModel):
 
     @property
     def hop_ms(self) -> float:
+        """The STFT hop in milliseconds -- 40 ms, one video frame, by construction."""
         return 1000.0 * self.hop_length / self.sample_rate
 
     @model_validator(mode="after")
@@ -143,6 +144,7 @@ class VisualFeatureConfig(StrictModel):
 
     @property
     def feature_dim(self) -> int:
+        """Width of one frame's embedding for this backbone (512 or 1280)."""
         return {"resnet18": 512, "mobilenet_v2": 1280}[self.backbone]
 
 
@@ -155,6 +157,8 @@ class SubsetConfig(StrictModel):
 
 
 class DataConfig(StrictModel):
+    """Where the data lives and which subset a run uses; validated, frozen."""
+
     data_root: Path = Path("data/raw")
     manifest_path: Path = Path("data/manifests/manifest_v1.parquet")
     min_duration_s: float = Field(default=1.0, gt=0)

@@ -117,7 +117,7 @@ def frame_targets(
     if fps <= 0:
         raise ValueError(f"fps must be > 0, got {fps}")
 
-    target = np.zeros(int(n_frames), dtype=dtype)
+    target: np.ndarray = np.zeros(int(n_frames), dtype=dtype)
     for start, end in normalise_periods(fake_periods):
         lo, hi = frame_range(start, end, fps, n_frames)
         if hi > lo:
@@ -199,8 +199,8 @@ def check_roundtrip(
     worst = 0.0
     shape_ok = len(recovered) == len(merged)
     if shape_ok:
-        for (rs, re_), (i0, i1, s, e) in zip(recovered, merged, strict=True):
-            if abs(rs - i0 / fps) > 1e-9 or abs(re_ - i1 / fps) > 1e-9:
+        for (rs, re_), (m0, m1, s, e) in zip(recovered, merged, strict=True):
+            if abs(rs - m0 / fps) > 1e-9 or abs(re_ - m1 / fps) > 1e-9:
                 shape_ok = False
             # Seconds error against the label, unless the label was clipped at the grid end.
             worst = max(worst, abs(rs - s) * fps)

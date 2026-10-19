@@ -19,6 +19,8 @@ from torch import nn
 
 
 class BoundaryHead(nn.Module):
+    """Per-frame start/end logits `(B, T, 2)` -- trained against Gaussian heatmaps (P10-4)."""
+
     def __init__(self, d_model: int = 256, hidden: int = 64, dropout: float = 0.3) -> None:
         super().__init__()
         self.d_model = d_model

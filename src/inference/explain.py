@@ -54,6 +54,7 @@ def segment_evidence(
     boundary: np.ndarray | None = None,
     face_found: np.ndarray | None = None,
 ) -> list[dict[str, Any]]:
+    """Per flagged span: peak and mean score, each stream alone, face coverage, driver."""
     out = []
     n = len(frame_scores)
     for i, (s, e, conf) in enumerate(segments):
@@ -90,6 +91,7 @@ def key_figures(
     clip_score: float,
     face_found_fraction: float,
 ) -> dict[str, Any]:
+    """The eight headline figures the result page and the PDF lead with."""
     forged = float(sum(e - s for s, e, _ in segments))
     scores = np.asarray(frame_scores, dtype=np.float64)
     return {

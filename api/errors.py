@@ -19,6 +19,8 @@ log = logging.getLogger("avtfd.api")
 
 
 class ApiError(Exception):
+    """An expected failure with a stable machine-readable code (P13-10)."""
+
     def __init__(
         self,
         status: int,
@@ -35,10 +37,12 @@ class ApiError(Exception):
         self.headers = headers
 
     def body(self) -> dict[str, Any]:
+        """This error as the API's JSON error body."""
         return error_body(self.code, self.message, self.detail)
 
 
 def error_body(code: str, message: str, detail: dict[str, Any] | None = None) -> dict[str, Any]:
+    """The one error shape every response uses: `{error: {code, message, detail}}`."""
     return {"error": {"code": code, "message": message, "detail": detail}}
 
 
@@ -46,6 +50,8 @@ _HTTP_CODES = {404: "not_found", 405: "method_not_allowed"}
 
 
 def install_error_handlers(app: FastAPI) -> None:
+    """Route every exception to a structured JSON error -- never a stack trace."""
+
     @app.exception_handler(ApiError)
     async def _api_error(_: Request, exc: ApiError) -> JSONResponse:
         return JSONResponse(exc.body(), status_code=exc.status, headers=exc.headers)

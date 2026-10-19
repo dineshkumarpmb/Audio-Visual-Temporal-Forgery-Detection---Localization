@@ -35,6 +35,7 @@ DEV_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
 
 def limits(settings: ApiSettings) -> dict[str, Any]:
+    """The upload and job limits, as published by `/api/v1/model-info`."""
     return {
         "max_upload_mb": settings.max_upload_mb,
         "allowed_extensions": list(ALLOWED_EXTENSIONS),
@@ -86,10 +87,12 @@ def load_analyzer(settings: ApiSettings) -> tuple[Analyzer, dict[str, Any]]:
 def create_app(
     settings: ApiSettings | None = None, *, analyzer_factory: AnalyzerFactory = load_analyzer
 ) -> FastAPI:
+    """Build the app; the model loads in the lifespan, once (P13-8). Tests pass a factory."""
     settings = settings or get_settings()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        """Load and warm the analyzer before serving; close it on shutdown."""
         settings.upload_dir.mkdir(parents=True, exist_ok=True)
         for stale in settings.upload_dir.iterdir():  # left by a crash or a hard stop
             if stale.is_file():

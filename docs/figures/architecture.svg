@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 640" width="960" height="640" role="img" aria-labelledby="t d">
+  <title id="t">AVTFD two-stage architecture</title>
+  <desc id="d">Stage A extracts face and audio features once per video and caches them. Stage B, the trained model, fuses them with cross-attention and a Transformer and outputs a clip verdict, per-frame scores and boundaries. Post-processing turns frame scores into forged segments served by the API and drawn by the frontend.</desc>
+  <style>
+    :root { --bg:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#898781; --box:#ffffff; --line:#c3c2b7; --band:#f3f2ee; --accent:#2a78d6; --fake:#d03b3b; --train:#8a5a00; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --muted:#898781; --box:#232322; --line:#4a4a46; --band:#202020; --accent:#3987e5; --fake:#e66767; --train:#fab219; }
+    }
+    text { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; fill: var(--ink); }
+    .bg { fill: var(--bg); }
+    .band { fill: var(--band); }
+    .box { fill: var(--box); stroke: var(--line); stroke-width: 1; }
+    .key { fill: var(--box); stroke: var(--accent); stroke-width: 1.5; }
+    .out { fill: var(--box); stroke: var(--fake); stroke-width: 1.5; }
+    .train { fill: none; stroke: var(--train); stroke-width: 1.2; stroke-dasharray: 4 3; }
+    .h { font-size: 13px; font-weight: 650; }
+    .t { font-size: 12px; font-weight: 600; }
+    .s { font-size: 10.5px; fill: var(--ink2); }
+    .lbl { font-size: 11px; font-weight: 700; letter-spacing: .06em; fill: var(--muted); }
+    .tr { font-size: 10.5px; fill: var(--train); }
+    .arrow { stroke: var(--ink2); stroke-width: 1.3; fill: none; marker-end: url(#a); }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#898781"/>
+    </marker>
+  </defs>
+  <rect class="bg" x="0" y="0" width="960" height="640" rx="10"/>
+
+  <!-- STAGE A -->
+  <rect class="band" x="14" y="14" width="932" height="190" rx="8"/>
+  <text class="lbl" x="28" y="36">STAGE A · OFFLINE, ONCE PER VIDEO, CACHED TO DISK</text>
+  <text class="s" x="28" y="52">6 GB of RAM, not 4 GB of VRAM, is the binding limit — so decoding never happens inside the training loop</text>
+
+  <rect class="box" x="28" y="68" width="120" height="52" rx="6"/><text class="t" x="40" y="90">Video track</text><text class="s" x="40" y="106">resampled to 25 fps</text>
+  <rect class="box" x="178" y="68" width="190" height="52" rx="6"/><text class="t" x="190" y="90">Face landmarks (MediaPipe)</text><text class="s" x="190" y="106">CPU · every 5th frame, tracked</text>
+  <rect class="box" x="398" y="68" width="170" height="52" rx="6"/><text class="t" x="410" y="90">Align face crop</text><text class="s" x="410" y="106">5-point similarity · 112×112</text>
+  <rect class="key" x="598" y="68" width="200" height="52" rx="6"/><text class="t" x="610" y="90">MobileNetV2, frozen (D-1)</text><text class="s" x="610" y="106">ImageNet weights · GPU</text>
+  <rect class="box" x="828" y="68" width="104" height="52" rx="6"/><text class="t" x="840" y="90">T × 1280</text><text class="s" x="840" y="106">fp16 cache</text>
+  <path class="arrow" d="M148 94 H176"/><path class="arrow" d="M368 94 H396"/><path class="arrow" d="M568 94 H596"/><path class="arrow" d="M798 94 H826"/>
+
+  <rect class="box" x="28" y="136" width="120" height="52" rx="6"/><text class="t" x="40" y="158">Audio track</text><text class="s" x="40" y="174">any codec</text>
+  <rect class="box" x="178" y="136" width="190" height="52" rx="6"/><text class="t" x="190" y="158">ffmpeg decode</text><text class="s" x="190" y="174">16 kHz mono</text>
+  <rect class="key" x="398" y="136" width="400" height="52" rx="6"/><text class="t" x="410" y="158">log-Mel, 80 bins, hop 640 samples = 40 ms = exactly 1 video frame (C-1)</text><text class="s" x="410" y="174">so audio and video align by array index, never by interpolation</text>
+  <rect class="box" x="828" y="136" width="104" height="52" rx="6"/><text class="t" x="840" y="158">T × 80</text><text class="s" x="840" y="174">CMVN</text>
+  <path class="arrow" d="M148 162 H176"/><path class="arrow" d="M368 162 H396"/><path class="arrow" d="M798 162 H826"/>
+
+  <!-- STAGE B -->
+  <rect class="band" x="14" y="216" width="932" height="250" rx="8"/>
+  <text class="lbl" x="28" y="238">STAGE B · THE TRAINED MODEL (SECTION 5.1) · 5.85 M PARAMETERS · MINUTES PER RUN</text>
+
+  <rect class="box" x="28" y="254" width="170" height="48" rx="6"/><text class="t" x="40" y="274">Visual projection</text><text class="s" x="40" y="290">1280 → 256, face-masked</text>
+  <rect class="box" x="28" y="314" width="170" height="48" rx="6"/><text class="t" x="40" y="334">Audio encoder</text><text class="s" x="40" y="350">dilated 1D-CNN → 256</text>
+  <rect class="key" x="230" y="270" width="190" height="78" rx="6"/><text class="t" x="242" y="292">Cross-attention, ×2</text><text class="s" x="242" y="309">bidirectional: video attends</text><text class="s" x="242" y="323">to audio and audio to video</text><text class="s" x="242" y="337">(G-1)</text>
+  <rect class="key" x="452" y="270" width="200" height="78" rx="6"/><text class="t" x="464" y="292">Transformer encoder, ×4</text><text class="s" x="464" y="309">4 heads · d 256 · pre-norm</text><text class="s" x="464" y="323">learned positions, ≤ 750 frames</text><text class="s" x="464" y="337">longer clips chunked (H-1)</text>
+  <path class="arrow" d="M198 278 L228 296"/><path class="arrow" d="M198 338 L228 322"/><path class="arrow" d="M420 309 H450"/>
+
+  <rect class="out" x="690" y="246" width="242" height="40" rx="6"/><text class="t" x="702" y="264">Clip head → P(fake)</text><text class="s" x="702" y="279">attention pooling over frames</text>
+  <rect class="out" x="690" y="292" width="242" height="40" rx="6"/><text class="t" x="702" y="310">Frame head → P(fake) per 40 ms</text><text class="s" x="702" y="325">focal loss (localization)</text>
+  <rect class="out" x="690" y="338" width="242" height="40" rx="6"/><text class="t" x="702" y="356">Boundary head → start / end</text><text class="s" x="702" y="371">heatmap loss</text>
+  <path class="arrow" d="M652 300 L688 268"/><path class="arrow" d="M652 309 H688"/><path class="arrow" d="M652 318 L688 356"/>
+
+  <rect class="train" x="28" y="392" width="904" height="58" rx="6"/>
+  <text class="tr" x="40" y="412">TRAINING ONLY</text>
+  <text class="s" x="40" y="430">InfoNCE sync loss on the pre-fusion streams · auxiliary audio-only and video-only heads · modality dropout p = 0.2</text>
+  <text class="s" x="40" y="444">all against the collapse onto audio (section 5.6) — which, measured, none of them prevented (PF-21)</text>
+
+  <!-- INFERENCE -->
+  <rect class="band" x="14" y="478" width="932" height="148" rx="8"/>
+  <text class="lbl" x="28" y="500">INFERENCE · src.inference.pipeline.VideoAnalyzer · 4.45 s PER 10 s CLIP ON A GTX 1650</text>
+  <rect class="box" x="28" y="516" width="230" height="58" rx="6"/><text class="t" x="40" y="537">Post-processing (frozen on dev)</text><text class="s" x="40" y="553">median 5 · threshold 0.2 · closing 3</text><text class="s" x="40" y="567">drop spans under 0.2 s</text>
+  <rect class="out" x="290" y="516" width="200" height="58" rx="6"/><text class="t" x="302" y="537">Forged segments</text><text class="s" x="302" y="553">(start s, end s, confidence)</text><text class="s" x="302" y="567">sorted, disjoint, in bounds</text>
+  <rect class="box" x="522" y="516" width="190" height="58" rx="6"/><text class="t" x="534" y="537">FastAPI job queue</text><text class="s" x="534" y="553">one analysis at a time</text><text class="s" x="534" y="567">JSON · CSV · PDF report</text>
+  <rect class="box" x="744" y="516" width="188" height="58" rx="6"/><text class="t" x="756" y="537">React result page</text><text class="s" x="756" y="553">timeline · keyframes</text><text class="s" x="756" y="567">voice-or-face evidence</text>
+  <path class="arrow" d="M258 545 H288"/><path class="arrow" d="M490 545 H520"/><path class="arrow" d="M712 545 H742"/>
+  <text class="s" x="28" y="608">Blue: the two contested choices the original report left open (D-1, C-1) and the two fusion/temporal ablations (G-1, H-1). Red: model outputs. Dashed: present only while training.</text>
+</svg>

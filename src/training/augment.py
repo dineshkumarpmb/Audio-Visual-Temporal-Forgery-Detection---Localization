@@ -359,8 +359,8 @@ class AugmentedPairs:
         """Re-randomise classical augmentation per epoch; splices are unaffected."""
         self.epoch = int(epoch)
 
-    def plan(self) -> list[Splice]:
-        """The provenance of every synthetic example, without loading any features."""
+    def plan(self) -> list[tuple[str, str]]:
+        """`(donor_id, recipient_id)` for every synthetic example, without loading features."""
         out = []
         for k in range(self.n_spliced):
             rng = np.random.default_rng([self.seed, k])
@@ -387,7 +387,8 @@ class AugmentedPairs:
         if self.classical_cfg is not None:
             rng = np.random.default_rng([self.seed, self.epoch, idx, 7919])
             sample = classical(sample, self.classical_cfg, rng)
-        return sample
+        out: PairedSample = sample
+        return out
 
     @property
     def labels(self) -> np.ndarray:

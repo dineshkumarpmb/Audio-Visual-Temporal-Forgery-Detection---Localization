@@ -38,6 +38,8 @@ DEFAULT_MAX_GAP = 15
 
 @dataclass
 class ExtractionResult:
+    """Outcome of extracting one video: frame count, face coverage, timings, error."""
+
     video_id: str
     n_frames: int
     found_fraction: float
@@ -46,6 +48,7 @@ class ExtractionResult:
 
     @property
     def ok(self) -> bool:
+        """True when the video was extracted without error."""
         return self.error is None
 
 

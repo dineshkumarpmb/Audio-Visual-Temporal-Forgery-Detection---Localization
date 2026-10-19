@@ -121,6 +121,7 @@ class VisualBaseline(nn.Module):
 
     @property
     def n_parameters(self) -> int:
+        """Trainable parameter count."""
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
 
@@ -192,6 +193,7 @@ class AudioBaseline(nn.Module):
 
     @property
     def n_parameters(self) -> int:
+        """Trainable parameter count."""
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
 

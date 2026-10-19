@@ -145,7 +145,7 @@ def _hits_lavdf(
     for vid, segs in predictions.items():
         if not len(segs):
             continue
-        arr = np.asarray(segs, dtype=np.float64).reshape(-1, 3)
+        arr: np.ndarray = np.asarray(segs, dtype=np.float64).reshape(-1, 3)
         arr = arr[np.argsort(-arr[:, 2], kind="stable")]
         is_tp = np.zeros(len(arr), dtype=bool)
         g = np.asarray(ground_truth[vid], dtype=np.float64).reshape(-1, 2)
@@ -229,8 +229,8 @@ def average_recall_at_n(
     thresholds = np.asarray(list(iou_thresholds), dtype=np.float64)
     recalled = np.zeros(len(thresholds))
     n_gt = 0
-    for vid, g in ground_truth.items():
-        g = np.asarray(g, dtype=np.float64).reshape(-1, 2)
+    for vid, spans in ground_truth.items():
+        g = np.asarray(spans, dtype=np.float64).reshape(-1, 2)
         if not len(g):
             continue
         n_gt += len(g)
@@ -259,8 +259,8 @@ def boundary_errors(predictions: Predictions, ground_truth: GroundTruth) -> dict
     """
     _validate(predictions, ground_truth)
     start_err, end_err, missed = [], [], 0
-    for vid, g in ground_truth.items():
-        g = np.asarray(g, dtype=np.float64).reshape(-1, 2)
+    for vid, spans in ground_truth.items():
+        g = np.asarray(spans, dtype=np.float64).reshape(-1, 2)
         if not len(g):
             continue
         segs = predictions.get(vid, [])

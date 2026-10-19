@@ -7,15 +7,15 @@ Legend: ⛔ = blocking gate item · ⭐ = headline capability · 🔬 = experime
 
 ---
 
-## 📍 CURRENT STATUS — 2026-10-18, Phase 15 complete (CI green) · advanced report + PDF built · ✋ Phase 14 gate awaits you
+## 📍 CURRENT STATUS — 2026-10-19, Phase 16 written (9/11) · ✋ demo capture, non-expert read and a fresh `make demo` await you
 
 | | |
 |---|---|
-| **Done** | Phase −1 · Phase 0 · **P1 (18/20)** · **P2 (13/15)** · **P3 (9/9)** · **P4 (12/12)** · **P5 (8/8)** · **P6 (8/8)** · **P7 (6/6)** · **P8 (10/10)** · **P9 (7/7)** · **P10 (13/14)** · **P11 (11/11)** · **P12 (6/6)** · **P13 (12/12)** · **P14 (10/13, ✋ gate pending)** · **P15 (9/9)** · CL-1 ✅ · CL-7 ✅ |
+| **Done** | Phase −1 · Phase 0 · **P1 (18/20)** · **P2 (13/15)** · **P3 (9/9)** · **P4 (12/12)** · **P5 (8/8)** · **P6 (8/8)** · **P7 (6/6)** · **P8 (10/10)** · **P9 (7/7)** · **P10 (13/14)** · **P11 (11/11)** · **P12 (6/6)** · **P13 (12/12)** · **P14 (10/13, ✋ gate pending)** · **P15 (9/9)** · **P16 (9/11)** · CL-1 ✅ · CL-7 ✅ |
 | **Resolved** | ⛔ **D-1 → MobileNetV2** (0.7189 vs 0.6319). ⛔ **C-1 → log-Mel** (0.9838 vs 0.7677). Both open decisions settled by experiment |
-| **Next** | ✋ **Close Phase 14** on the new page: browser run (P14-10), demo capture (P14-11), non-expert read (P14-12) — restart `make api` / `make frontend` first, the running servers predate the report endpoints. Then **Phase 16 — Documentation** (needs PRE-1). ⛔ Test split stays spent |
-| **Progress** | ~168 of 203 tasks (≈83%) · **16 of 18 phases complete**; Phase 14 awaits its manual gate, Phase 16 not started |
-| **Tests** | **592 Python passing**, coverage **82%** of `src/` (gate 70%) · **56 frontend (Vitest)** · CI green on GitHub Actions (run 3, `c35da9c`) |
+| **Next** | ✋ Stop the old servers, run **`make demo`** (P16-10), then on that page: browser run (P14-10), **demo capture** (P14-11, also embeds in the README — P16-1), non-expert read (P14-12). ✋ **PRE-1** (original report) unlocks the Part 9 comparison. ⛔ Test split stays spent |
+| **Progress** | ~177 of 203 tasks (≈87%) · **16 of 18 phases complete**; Phases 14 and 16 each wait only on human steps |
+| **Tests** | **605 Python passing**, coverage **82%** of `src/` (gate 70%) · **63 frontend** · `mypy` clean · **195 doc numbers machine-checked** · CI green |
 | **⚠️ Caveat** | ⛔ **PF-17 / PF-19 / PF-20** — the artefacts are inherited by every arm since. Absolute numbers (test included) are **upper bounds**; the trustworthy quantities are the paired deltas in `reports/evidence_table.md`. ⛔ **PF-27**: Phase 4–11 runs reproduce to ~1 seed-sd, not 1e-4 — new training uses `--strict-determinism` |
 | **✋ Awaiting you** | P2-8 (contact sheets) · ⛔ P2-10 (watch 20 overlays) — artefacts in `reports/figures/` · P10-13 (20 timelines, `reports/figures/localization/timelines_dev20.png`) · **P14-10 / ⛔ P14-11 / ⛔ P14-12** (browser run, demo capture, non-expert read) |
 | **Kaggle** | `dinesh1234567` · phone verified · **30 GPU h/week** · P100 16 GB or T4×2 · 12 h/session · 20 GB `/kaggle/working` |
@@ -30,6 +30,18 @@ Legend: ⛔ = blocking gate item · ⭐ = headline capability · 🔬 = experime
 Phase 13 filled `api/` (`main.py`, `settings.py`, `errors.py`, `schemas.py`, `routes/{analyze,health}.py`, `services/{upload,job_store,inference_service}.py`) and added `scripts/43`; Phases 14–16 are untouched. Phase 12 added `inference/pipeline.py` (raw video → segments) and `scripts/40`–`42`. Phase 10 added
 `evaluation/localization.py`, `localization/{postprocess,chunking}.py`, `losses/localization.py`,
 `models/heads/boundary.py` and `scripts/32`–`35`.
+
+### 📚 Phase 16 result — documentation (2026-10-19)
+
+**Written; two items wait on people.** Decision **PF-34**.
+
+| | |
+|---|---|
+| documents | `README.md` (rewritten), `reports/results.md`, `reports/final_report.md` (with §5 limitations), `reports/portfolio.md`, `reports/interview_prep.md`, `docs/figures/architecture.svg`, `docs/figures/result_page.png` |
+| traceability | **195** quoted numbers carry source tags; `make check-docs` recomputes every one from the experiments' JSON (a CI test too). Caught two rounding errors in the first draft |
+| honesty | three resume template lines rewritten because the measurements contradicted them; limitations lead with the audio collapse, the dataset artefact, subset scale and one-dataset scope |
+| code | `mypy src api` clean (97 → 0; two real bugs fixed) and in CI; docstrings on 84 public interfaces; decision log complete (B-1 resolved, PF-21–26 added) |
+| demo | `make demo` → `scripts/47_demo.py`, shell-independent, with preflight; `make phase8` added so the reproduction chain is unbroken |
 
 ### 📄 Advanced result page + PDF report (2026-10-18, Phase 14 extension)
 
@@ -429,7 +441,7 @@ requires re-checking at every scale-up — these scale-ups are what exposed both
 | 13 API | 12 | ✅ **12/12** — gate P13-12 passed; 44 API tests, error matrix 13/13 over real HTTP, 0 overlapping jobs under a burst, model loaded once (PF-30) |
 | 14 Frontend | 12 | 🟡 **10/13** (incl. P14-0) — built, 39 tests on real API responses; ✋ P14-10 browser run, ⛔ P14-11 demo capture, ⛔ P14-12 non-expert gate await you (PF-31) |
 | 15 Testing | 9 | ✅ **9/9** — gate P15-9 passed: 553 tests (592 with the report work), 81–82% coverage (gate 70%), GT-alignment and AP against independent references, **CI green** (PF-32) |
-| 16 Documentation | 11 | ⬜ Not started (needs PRE-1) |
+| 16 Documentation | 11 | 🟡 **9/11** — all documents written, 195 numbers machine-checked, mypy clean; ✋ P16-10 live `make demo` run, ⛔ P16-11 stranger-reproduction (and P16-1's demo embed waits on P14-11) |
 | Cloud (Kaggle) | 8 | 🟡 2/8 — CL-1 ✅, CL-7 ✅. No longer on Phase 4's critical path (PF-16) |
 | Cross-cutting | 7 | 🔄 Continuous |
 
@@ -1001,21 +1013,21 @@ Otherwise `E − D` would be unattributable — the failure P7-6 exists to preve
 
 ---
 
-## PHASE 16 — Documentation
+## PHASE 16 — Documentation — 🟡 **9/11 — written; human steps pending (2026-10-19)**
 
-| ID | Task |
-|---|---|
-| P16-1 | `README.md` — what / why / results / how to run, with the demo capture embedded |
-| P16-2 | `reports/results.md` — all filled tables (8.2.1–8.2.5) |
-| P16-3 | `reports/final_report.md` — methodology, ablations, limitations |
-| P16-4 | Render the §5.1 two-stage architecture ASCII diagram as a proper figure |
-| P16-5 | Complete Appendix B decision log (D-1, C-1, B-1, F-1, G-1, H-1, I-1, L-1) |
-| P16-6 | Docstrings across `src/`; typed interfaces |
-| P16-7 | ⛔ **Honest limitations section** — generalization to unseen generators, subset-scale caveats, any negative results |
-| P16-8 | Fill the Part 14 resume templates and the §14.3 fill-in tracker from real measured numbers |
-| P16-9 | Prepare answers to the 12 interview questions in §15.16 |
-| P16-10 | `make demo` target (uvicorn :8000 + Vite :5173) documented as the local run strategy |
-| P16-11 | ⛔ **Gate:** a stranger can reproduce the headline result from the README alone; every number traces to a logged run; no fabricated numbers anywhere |
+| ID | Task | Status |
+|---|---|---|
+| P16-1 | `README.md` — what / why / results / how to run, with the demo capture embedded | ✅ rewritten: results with caveats, architecture, run, reproduce (`make phase1` … `phase12`), tests, documents; real result-page screenshot. 🟡 the demo capture slot waits on P14-11 |
+| P16-2 | `reports/results.md` — all filled tables (8.2.1–8.2.5) | ✅ headline, per-class, 8.2.1–8.2.3, 8.2.5, the 13-claim §7.3 table, Part 9 against the original — 95 traced numbers |
+| P16-3 | `reports/final_report.md` — methodology, ablations, limitations | ✅ abstract → problem → protocol → architecture → results → limitations → what was built → next steps → references; 45 traced numbers |
+| P16-4 | Render the §5.1 two-stage architecture ASCII diagram as a proper figure | ✅ `docs/figures/architecture.svg` — light/dark aware, every parameter checked against the code |
+| P16-5 | Complete Appendix B decision log (D-1, C-1, B-1, F-1, G-1, H-1, I-1, L-1) | ✅ B-1 resolved (MediaPipe, PF-8); PF-21–26 written up from the TASKS record; PF-34 added; no open rows |
+| P16-6 | Docstrings across `src/`; typed interfaces | ✅ 84 public interfaces documented (the rest are `forward()`s and callbacks their classes document); **`mypy src api` clean** (97 → 0, two real bugs fixed) and in CI |
+| P16-7 | ⛔ **Honest limitations section** — generalization to unseen generators, subset-scale caveats, any negative results | ✅ ⛔ `final_report.md` §5: the face is ignored (0.0016 AUC), the audio artefact, 592-clip scale, one dataset, loose boundaries, no comparison with the original |
+| P16-8 | Fill the Part 14 resume templates and the §14.3 fill-in tracker from real measured numbers | ✅ `reports/portfolio.md` — tracker filled; three template lines rewritten because measurement contradicted them, each explained |
+| P16-9 | Prepare answers to the 12 interview questions in §15.16 | ✅ `reports/interview_prep.md` — each answered from the evidence, with where it lives |
+| P16-10 | `make demo` target (uvicorn :8000 + Vite :5173) documented as the local run strategy | 🟡 `scripts/47_demo.py` (shell-independent launcher, preflight, Ctrl+C stops both), `make demo-check` verified through `make` in PowerShell. ✋ The live run is yours: your old servers hold both ports and the RAM |
+| P16-11 | ⛔ **Gate:** a stranger can reproduce the headline result from the README alone; every number traces to a logged run; no fabricated numbers anywhere | 🟡 **traceability half passed** — `make check-docs`: 195 numbers recomputed from source, no dead links, every named `make` target exists (also a CI test). ✋ The stranger-reproduction half needs a person, and the comparison with the original needs PRE-1 |
 
 ---
 
@@ -1081,7 +1093,7 @@ Not a separate phase — these are the tasks the local+Kaggle strategy adds.
 
 *Phase −1 complete except PRE-1 (report retrieval), which does not block Phases 0–15.*
 
-*Completed as of 2026-10-18: ~168 of 203 tasks (≈83%) — see the status table at the top. Snapshot from 2026-09-05 follows: ~100 of 203 tasks (≈49%). Phases −1, 0, 1, 2, 3, 4, 5, 6, 7, 8 done.
+*Completed as of 2026-10-19: ~177 of 203 tasks (≈87%) — see the status table at the top. Snapshot from 2026-09-05 follows: ~100 of 203 tasks (≈49%). Phases −1, 0, 1, 2, 3, 4, 5, 6, 7, 8 done.
 **D-1 → MobileNetV2, C-1 → log-Mel**, Experiment C is a documented negative result (PF-20),
 **Experiment D a decisive positive one** (+0.0844, gate P7-6 passed) whose frame AP survived its own
 confound check (position explains 8.1%), and **Experiment E a mixed one** (+0.0045, gate P8-10

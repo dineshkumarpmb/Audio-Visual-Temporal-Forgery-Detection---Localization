@@ -66,6 +66,8 @@ frontend/.vite/
 # ── Source material (not ours to redistribute) ──────────────────────────
 docs/*
 !docs/README.md
+# Our own figures (README, final report) -- the source-material rule above must not hide them.
+!docs/figures/
 
 # ── Environment / OS ────────────────────────────────────────────────────
 .env

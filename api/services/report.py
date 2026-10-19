@@ -142,11 +142,13 @@ def _esc(text: str) -> str:
 
 
 def fmt_time(s: float) -> str:
+    """Seconds as `m:ss.s`, the page's time format."""
     m = int(abs(s) // 60)
     return f"{m}:{abs(s) - m * 60:04.1f}"
 
 
 def fmt_pct(p: float, digits: int = 0) -> str:
+    """A probability as a percentage that never rounds to a false certainty."""
     v = p * 100
     if 99.9 < v < 100:
         return ">99.9%"
@@ -409,7 +411,7 @@ def _keyframe_rows(result: dict, thumbs: list[bytes], st: dict) -> list:
     cell_w = CONTENT_W / per_row - 4
     for seg, idxs in groups.items():
         title = "Sampled frames" if seg is None else f"Segment {seg + 1}"
-        cells = []
+        cells: list[Any] = []
         for i in idxs[:per_row]:
             k = metas[i]
             if i >= len(thumbs):
