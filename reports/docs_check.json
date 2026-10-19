@@ -1,20 +1,44 @@
 {
-  "passed": false,
+  "passed": true,
   "docs": [
     {
       "doc": "README.md",
-      "traced": 18,
+      "traced": 37,
       "minimum": 12,
       "mismatches": [],
       "untagged_decimals": [
-        "3.10"
+        "0.0363",
+        "0.043",
+        "0.0482",
+        "0.1893",
+        "0.22",
+        "0.4802",
+        "0.526051",
+        "0.6842",
+        "0.7187",
+        "0.7189",
+        "0.7623",
+        "0.95",
+        "0.9889",
+        "0.999927",
+        "0.999932",
+        "10.08",
+        "10.92",
+        "14.464",
+        "2.36",
+        "3.10",
+        "3.11",
+        "4.45",
+        "5.2745",
+        "522.06",
+        "6.1679",
+        "6.48",
+        "6.96",
+        "8.48"
       ],
       "missing_make_targets": [],
-      "dead_links": [
-        "docs/figures/architecture.svg (git-ignored)",
-        "docs/figures/result_page.png (git-ignored)"
-      ],
-      "passed": false
+      "dead_links": [],
+      "passed": true
     },
     {
       "doc": "reports/results.md",
@@ -43,10 +67,8 @@
         "80.00"
       ],
       "missing_make_targets": [],
-      "dead_links": [
-        "../docs/figures/architecture.svg (git-ignored)"
-      ],
-      "passed": false
+      "dead_links": [],
+      "passed": true
     },
     {
       "doc": "reports/portfolio.md",
